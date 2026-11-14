@@ -3,6 +3,8 @@ on:
   push:
     paths:
       - "workspace.html"
+      - "owner-v1.html"
+      - "owner-ledger-core.mjs"
       - "tests/**"
       - ".github/workflows/workspace-checks.yml"
   pull_request:
@@ -20,4 +22,26 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: node --test tests/workspace.test.mjs
+      - run: node --test tests/workspace.test.mjs tests/owner-ledger.test.mjs
+
+  owner-browser-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install browser for Owner V1 UI
+        run: |
+          npm install --no-save --ignore-scripts playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Run Owner V1 real-browser journey
+        run: node tests/owner.browser.mjs
+      - name: Upload mobile and desktop evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: owner-v1-browser-evidence
+          path: artifacts/owner-v1-browser/
+          if-no-files-found: ignore
