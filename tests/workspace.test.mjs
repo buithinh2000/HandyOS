@@ -29,14 +29,17 @@ test("create job persists a unified record",()=>{
  assert.equal(db.jobs.length,1);assert.equal(db.jobs[0].name,"Sample bathroom");
  assert.deepEqual(db.jobs[0].tasks,[]);
 });
-test("selecting bathroom creates task checklist with correct parent group",()=>{
+test("choosing bathroom adds only ONE main task, with zero automatic subtasks",()=>{
  const {element,stored}=bootstrap();
  element("name").value="Sample bathroom";element("create").onclick();
  element("categories").onclick({target:{closest:()=>({dataset:{category:"Bathroom"}})}});
  const db=JSON.parse(stored.get("handyos-workspace-v07")),j=db.jobs[0];
- assert.ok(j.tasks.some(t=>t.title==="Shower screen"));
- assert.ok(j.tasks.some(t=>t.title==="Vanity"));
- assert.ok(j.tasks.every(t=>t.group==="Bathroom"));
+ assert.equal(j.tasks.length,1);
+ assert.equal(j.tasks[0].title,"Bathroom");
+ assert.equal(j.tasks[0].group,"Bathroom");
+ assert.deepEqual(j.tasks[0].subtasks,[]);
+ assert.match(element("body").innerHTML,/Suggested steps \(optional\)/);
+ assert.match(element("body").innerHTML,/Waterproofing/);
 });
 test("costs and payments are stored under same job",()=>{
  const {element,stored}=bootstrap();
@@ -102,6 +105,7 @@ test("owner can enter and correct job labour hours",()=>{
 test("new owner jobs show full job overview",()=>{
  const {element}=bootstrap();
  element("name").value="Sample flooring";element("create").onclick();
+ element("tabs").onclick({target:{closest:()=>({dataset:{tab:"overview"}})}});
  assert.match(element("body").innerHTML,/Owner job summary/);
  assert.match(element("body").innerHTML,/Provisional margin/);
 });
@@ -315,4 +319,51 @@ test("portfolio open action switches job without modifying saved records",()=>{
  element("body").onclick({target:{closest:()=>({dataset:{action:"open-job",id:first}})}});
  assert.match(element("body").innerHTML,/Owner job summary/);
  assert.equal(JSON.parse(stored.get("handyos-workspace-v07")).jobs.length,2);
+});
+
+test("new job lands in main task flow and does not auto-fill 111 tasks",()=>{
+ const {element,stored}=bootstrap();
+ element("name").value="Kitchen quick flow";element("create").onclick();
+ assert.match(element("body").innerHTML,/Main tasks/);
+ assert.equal(JSON.parse(stored.get("handyos-workspace-v07")).jobs[0].tasks.length,0);
+ element("mainTaskName").value="";
+ element("mainTaskPreset").value="Kitchen";
+ element("body").onclick({target:{closest:()=>({id:"addTask",dataset:{}})}});
+ const j=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0];
+ assert.equal(j.tasks.length,1);
+ assert.equal(j.tasks[0].title,"Kitchen");
+ assert.equal(j.tasks[0].subtasks.length,0);
+});
+test("adding an optional subtask only adds the selected item; toggle and remove work",()=>{
+ const {element,stored}=bootstrap();
+ element("name").value="Bathroom";element("create").onclick();
+ element("categories").onclick({target:{closest:()=>({dataset:{category:"Bathroom"}})}});
+ const first=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0].tasks[0].id;
+ element("suggest-"+first).value="Waterproofing";
+ element("body").onclick({target:{closest:()=>({dataset:{action:"add-suggestion",id:first}})}});
+ let j=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0];
+ assert.equal(j.tasks.length,1);
+ assert.equal(j.tasks[0].subtasks.length,1);
+ assert.equal(j.tasks[0].subtasks[0].title,"Waterproofing");
+ const sub=j.tasks[0].subtasks[0].id;
+ element("body").onclick({target:{closest:()=>({dataset:{action:"toggle-subtask",id:first,subId:sub}})}});
+ j=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0];
+ assert.equal(j.tasks[0].subtasks[0].done,true);
+ element("body").onclick({target:{closest:()=>({dataset:{action:"remove-subtask",id:first,subId:sub}})}});
+ j=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0];
+ assert.equal(j.tasks[0].subtasks.length,0);
+});
+test("the optional free-text subtask and its main task remain on the same job",()=>{
+ const {element,stored}=bootstrap();
+ element("name").value="New job";element("create").onclick();
+ element("mainTaskName").value="Bathroom renovation";
+ element("mainTaskPreset").value="Bathroom";
+ element("body").onclick({target:{closest:()=>({id:"addTask",dataset:{}})}});
+ const task=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0].tasks[0].id;
+ element("subtask-"+task).value="Custom access inspection";
+ element("body").onclick({target:{closest:()=>({dataset:{action:"add-subtask",id:task}})}});
+ const j=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0];
+ assert.equal(j.tasks[0].subtasks[0].title,"Custom access inspection");
+ assert.equal(j.tasks[0].title,"Bathroom renovation");
+ assert.equal(j.tasks[0].group,"Bathroom");
 });
