@@ -79,8 +79,8 @@ async function dispatch(req){
    if(req.method==="GET"){
     await canAccessJob(client,ctx,sub,jobId);
     // Homeowners must NOT see internal labour rates, unit costs, private notes, or assignments.
-    const fields=ctx.role==="homeowner"?"id,title,status,due_on":"id,title,notes,status,qty,unit,unit_cost_ex_gst,assigned_to,due_on";
-    const q=await client.query("select "+fields+" from tasks where tenant_id=$1 and job_id=$2 order by position,created_at limit 500",[ctx.tenant_id,jobId]);
+    const fields=["owner","manager"].includes(ctx.role)?"id,title,notes,status,qty,unit,unit_cost_ex_gst,assigned_to,due_on":"id,title,status,due_on";
+    const q=await client.query("select "+fields+" from tasks where tenant_id=$1 and job_id=$2"+(ctx.role==="homeowner"?" and client_visible=true":"")+" order by position,created_at limit 500",[ctx.tenant_id,jobId]);
     return{tasks:q.rows}
    }
    if(req.method==="POST"){
