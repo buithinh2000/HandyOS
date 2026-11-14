@@ -455,8 +455,8 @@ test("legacy auto-created task steps are collapsed per trade without deleting or
  const titles=["Inspection & measure","Site protection","Demolition & waste"];
  for(let i=0;i<3;i++){
   const id=job.tasks[i].id;
-  element("body").onchange({target:{closest:()=>({dataset:{task:id,key:"title"}}),value:titles[i]}});
-  element("body").onchange({target:{closest:()=>({dataset:{task:id,key:"cost"}}),value:String(100*(i+1))}});
+  element("body").onchange({target:{closest:()=>({dataset:{task:id,key:"title"},value:titles[i]})}});
+  element("body").onchange({target:{closest:()=>({dataset:{task:id,key:"cost"},value:String(100*(i+1))})}});
  }
  const after=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0];
  assert.equal(after.tasks.length,3);
