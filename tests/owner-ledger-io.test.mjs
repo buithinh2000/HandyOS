@@ -56,3 +56,13 @@ test("customer progress payment CSV preserves entered tax basis, actual cash and
  assert.match(out,/"Actual cash AUD"/);
  assert.match(out,/"200"/);
 });
+
+test("job CSV explicitly includes only one reserve, other expenses inside total, and final profit",()=>{
+ const data=fixture(),j=data.jobs[0];j.taxReservePct=15;
+ j.expenses.push({id:"other",date:"2026-11-13",kind:"other",title:"Site parking",amount:50,gstBasis:"no_gst",paidStatus:"paid"});
+ const out=ownerExports(data).jobs;
+ assert.match(out,/Tax & Reserve Fund %/);
+ assert.match(out,/Other expenses \(within total\) ex GST/);
+ assert.match(out,/Final estimated profit after reserve/);
+ assert.match(out,/"15"/);
+});
