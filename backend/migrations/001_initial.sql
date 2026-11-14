@@ -56,6 +56,7 @@ create table if not exists tasks (
  title text not null check(length(title) between 1 and 200),
  notes text not null default '',
  status text not null default 'todo' check(status in ('todo','in_progress','blocked','done')),
+ client_visible boolean not null default false,
  qty numeric(12,3) not null default 1 check(qty>=0),
  unit text not null default 'item',
  unit_cost_ex_gst numeric(14,2) not null default 0 check(unit_cost_ex_gst>=0),
