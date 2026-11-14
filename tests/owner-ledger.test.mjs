@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {normalize,expenseEx,weeklyStart,workerTotals,workerByPeriod,employeesSummary,expenseSummary,companySummary,summary,canClose,snapshot,wageYearSummary,periodSettlement,isSettlementCurrent} from "../owner-ledger-core.mjs";
+import {normalize,expenseEx,weeklyStart,workerTotals,workerByPeriod,employeesSummary,expenseSummary,companySummary,summary,canClose,snapshot,wageYearSummary,periodSettlement,isSettlementCurrent,workerNames,customerPayment,paymentBreakdown} from "../owner-ledger-core.mjs";
 
 const j=(id,name)=>({id,name,stage:"active",contract:11000,tasks:[],categories:[],materials:[],expenses:[],timesheets:[],payments:[],workerPayments:[]});
 const worker=(name,date,hours,rate)=>({id:name+date,worker:name,date,hours,rate});
@@ -136,4 +136,43 @@ test("owner V1 exposes month, category, job and annual worker filters",()=>{
  for(const id of ["wageYearFilter","yearFilter","monthFilter","kindFilter","jobFilter","data-settle"]){assert.ok(html.includes(id),id)}
  assert.match(html,/Saved payroll settlements/);
  assert.match(html,/Closing a period records a snapshot only/);
+});
+
+test("explicit staff roster appears before any timesheets and persists through normalization",()=>{
+ const db=normalize({jobs:[],staff:[{id:"worker-1",name:"Taylor",role:"Carpenter",rate:42,active:true}]});
+ assert.deepEqual(workerNames(db.jobs,db.staff),["Taylor"]);
+ const workers=employeesSummary(db.jobs,db.staff);
+ assert.equal(workers.length,1);
+ assert.equal(workers[0].name,"Taylor");
+ assert.equal(workers[0].due,0);
+ assert.equal(wageYearSummary(db.jobs,"2026",db.staff).rows[0].earned,0);
+});
+test("customer payment GST options preserve actual received cash and classify GST",()=>{
+ const inc=customerPayment(110,"inc"),ex=customerPayment(100,"ex"),free=customerPayment(100,"no_gst");
+ assert.deepEqual([inc.amount,inc.gstAmount,inc.netAmount],[110,10,100]);
+ assert.deepEqual([ex.amount,ex.gstAmount,ex.netAmount],[110,10,100]);
+ assert.deepEqual([free.amount,free.gstAmount,free.netAmount],[100,0,100]);
+ const x=j("new","Bathroom");x.payments.push(
+  {status:"received",...inc},{status:"received",...ex},
+  {status:"received",...free},{status:"requested",...customerPayment(55,"inc")});
+ const report=paymentBreakdown(x);
+ assert.equal(report.cash,320);
+ assert.equal(report.receivedNet,300);
+ assert.equal(report.receivedGst,20);
+ assert.equal(report.requested,55);
+ assert.equal(summary(x).received,320);
+ assert.equal(summary(x).profit,10000); // agreed contract, unaffected by cash payments
+ assert.throws(()=>customerPayment(-20,"inc"));
+ assert.throws(()=>customerPayment(100,"invalid"));
+});
+test("historical payments without tax basis continue as inclusive cash without conversion",()=>{
+ const x=j("old","Legacy");
+ x.payments=[{status:"received",amount:275},{status:"requested",amount:100}];
+ assert.equal(summary(x).received,275);
+ assert.equal(paymentBreakdown(x).receivedGst,25);
+ assert.equal(paymentBreakdown(x).requested,100);
+});
+test("owner screen has staff form and GST payment basis options",()=>{
+ const html=readFileSync(new URL("../owner-v1.html",import.meta.url),"utf8");
+ for(const term of ["staffName","staffRole","staffRate","addStaff","workerName","payBasis","no_gst","customerPayment"]){assert.ok(html.includes(term),term)}
 });
