@@ -54,7 +54,9 @@ async function dispatch(req){
  const url=new URL(req.url||"/", "http://localhost");
  const sub=await authenticate(req);
  return transaction(async client=>{
+  await client.query("select set_config('app.actor_sub',$1,true)",[sub]);
   const memberships=await context(client,sub);const ctx=chooseTenant(req,memberships);
+  await client.query("select set_config('app.tenant_id',$1,true)",[ctx.tenant_id]);
   if(req.method==="GET"&&url.pathname==="/v1/me")return{tenant_id:ctx.tenant_id,role:ctx.role,actor_id:sub};
   if(req.method==="GET"&&url.pathname==="/v1/jobs"){
    if(["owner","manager"].includes(ctx.role)){
