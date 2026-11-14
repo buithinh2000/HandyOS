@@ -1,10 +1,13 @@
 import http from "node:http";
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import pg from "pg";
 import { CognitoJwtVerifier } from "aws-jwt-verify";
 import { HttpError,sanitizeText,ensureUuid,parseJSON,taskColumns } from "./domain.mjs";
 
 const { Pool } = pg;
+const renovationCatalog = JSON.parse(readFileSync(new URL("../../shared/renovation-catalog.json",import.meta.url),"utf8"));
+const templateByCode = new Map(renovationCatalog.categories.map(x=>[x.code,x]));
 const required = ["DATABASE_URL","COGNITO_USER_POOL_ID","COGNITO_APP_CLIENT_ID","AWS_REGION"];
 for (const key of required) if (!process.env[key]) throw new Error("Missing configuration: " + key);
 if (!/^postgres(ql)?:\/\//.test(process.env.DATABASE_URL)) throw Error("DATABASE_URL must be PostgreSQL");
@@ -54,6 +57,7 @@ async function dispatch(req){
   const memberships=await context(client,sub);const ctx=chooseTenant(req,memberships);
   await client.query("select set_config('app.tenant_id',$1,true)",[ctx.tenant_id]);
   if(req.method==="GET"&&url.pathname==="/v1/me")return{tenant_id:ctx.tenant_id,role:ctx.role,actor_id:sub};
+  if(req.method==="GET"&&url.pathname==="/v1/renovation-catalog")return renovationCatalog;
   if(req.method==="GET"&&url.pathname==="/v1/jobs"){
    if(["owner","manager"].includes(ctx.role)){
     const q=await client.query("select id,name,code,stage,notes,created_at from jobs where tenant_id=$1 order by created_at desc limit 100",[ctx.tenant_id]);return{jobs:q.rows}
@@ -63,11 +67,24 @@ async function dispatch(req){
   }
   if(req.method==="POST"&&url.pathname==="/v1/jobs"){
    if(!["owner","manager"].includes(ctx.role))throw new HttpError(403,"Not permitted");
-   const data=await body(req);const name=sanitizeText(data.name),code=typeof data.code==="string"?data.code.slice(0,60):"";
+   const data=await body(req);
+   const name=sanitizeText(data.name),code=typeof data.code==="string"?data.code.slice(0,60):"";
+   const categories=Array.isArray(data.category_codes)?data.category_codes:[];
+   if(categories.length>21||categories.some(c=>typeof c!=="string"||!templateByCode.has(c)))throw new HttpError(400,"Invalid renovation categories");
+   const chosen=[...new Set(categories)];
    const id=randomUUID();
    await client.query("insert into jobs(id,tenant_id,name,code) values($1,$2,$3,$4)",[id,ctx.tenant_id,name,code]);
+   let taskCount=0;
+   for(const [position,templateCode] of chosen.entries()){
+    const template=templateByCode.get(templateCode),categoryId=randomUUID();
+    await client.query("insert into work_categories(id,tenant_id,job_id,name,position) values($1,$2,$3,$4,$5)",[categoryId,ctx.tenant_id,id,template.name,position]);
+    for(const [index,title] of template.tasks.entries()){
+     await client.query("insert into tasks(id,tenant_id,job_id,category_id,title,position) values($1,$2,$3,$4,$5,$6)",[randomUUID(),ctx.tenant_id,id,categoryId,title,index]);
+     taskCount++;
+    }
+   }
    await client.query("insert into audit_events(tenant_id,actor_sub,action,entity_type,entity_id) values($1,$2,'created','job',$3)",[ctx.tenant_id,sub,id]);
-   return {job:{id,name,code,stage:"survey"}}
+   return {job:{id,name,code,stage:"survey"},categories:chosen.length,tasks_created:taskCount}
   }
   const match=/^\/v1\/jobs\/([^/]+)\/tasks$/.exec(url.pathname);
   if(match){
