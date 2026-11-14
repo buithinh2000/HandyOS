@@ -83,3 +83,24 @@ test("payment entry can be removed from the same job",()=>{
  j=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0];
  assert.equal(j.payments.length,0);
 });
+
+test("owner can enter and correct job labour hours",()=>{
+ const {element,stored}=bootstrap();
+ element("name").value="Example job";element("create").onclick();
+ element("tabs").onclick({target:{closest:()=>({dataset:{tab:"labour"}})}});
+ element("workerName").value="Worker Example";element("workDate").value="2026-11-15";
+ element("workHours").value="7.5";element("workRate").value="45";element("workNote").value="Painting";
+ element("body").onclick({target:{closest:()=>({id:"addHours",dataset:{}})}});
+ let j=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0];
+ assert.equal(j.timesheets.length,1);
+ assert.equal(j.timesheets[0].hours*j.timesheets[0].rate,337.5);
+ element("body").onclick({target:{closest:()=>({dataset:{action:"remove-hours",id:j.timesheets[0].id}})}});
+ j=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0];
+ assert.equal(j.timesheets.length,0);
+});
+test("new owner jobs show full job overview",()=>{
+ const {element}=bootstrap();
+ element("name").value="Sample flooring";element("create").onclick();
+ assert.match(element("body").innerHTML,/Owner job summary/);
+ assert.match(element("body").innerHTML,/Illustrative gross margin/);
+});
