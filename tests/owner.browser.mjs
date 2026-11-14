@@ -44,6 +44,14 @@ await page.locator("#payBasis").selectOption("inc");
 await page.locator("#payStatus").selectOption("received");
 await page.locator("#addPayment").click();
 assert.match(await page.locator("#screen").innerText(),/\$9,500\.00/);
+await page.locator("#taxReservePct").fill("15");
+await page.locator("#saveJob").click();
+assert.match(await page.locator("#screen").innerText(),/Tax & Reserve Fund/);
+assert.match(await page.locator("#screen").innerText(),/\$1,650\.00/);
+assert.match(await page.locator("#screen").innerText(),/\$7,850\.00/);
+const profitRecord=await page.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0]);
+assert.equal(profitRecord.taxReservePct,15);
+
 await page.locator("#payRef").fill("No GST receipt");
 await page.locator("#payAmount").fill("200");
 await page.locator("#payBasis").selectOption("no_gst");
