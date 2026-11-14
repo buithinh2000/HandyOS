@@ -66,3 +66,13 @@ test("job CSV explicitly includes only one reserve, other expenses inside total,
  assert.match(out,/Final estimated profit after reserve/);
  assert.match(out,/"15"/);
 });
+
+test("Job CSV exports adjusted contract and overhead separately from incurred expenses",()=>{
+ const data=fixture(),j=data.jobs[0];j.approvedVariationInc=220;j.overheadAllocationEx=40;j.taxReservePct=10;
+ const out=ownerExports(data).jobs;
+ assert.match(out,/Approved variations incl GST/);
+ assert.match(out,/Adjusted contract incl GST/);
+ assert.match(out,/Unbooked overhead allocation ex GST/);
+ assert.match(out,/"220"/);
+ assert.match(out,/"40"/);
+});
