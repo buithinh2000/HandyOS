@@ -5,6 +5,7 @@ on:
       - "workspace.html"
       - "owner-v1.html"
       - "owner-ledger-core.mjs"
+      - "owner-ledger-io.mjs"
       - "tests/**"
       - ".github/workflows/workspace-checks.yml"
   pull_request:
@@ -22,7 +23,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: node --test tests/workspace.test.mjs tests/owner-ledger.test.mjs
+      - run: node --test tests/workspace.test.mjs tests/owner-ledger.test.mjs tests/owner-ledger-io.test.mjs
 
   owner-browser-qa:
     runs-on: ubuntu-24.04
