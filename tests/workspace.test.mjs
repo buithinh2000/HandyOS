@@ -145,3 +145,18 @@ test("unclassified historic expenses block profit display",()=>{
  assert.match(js,/unclassified\?null/);
  assert.match(js,/GST basis needed/);
 });
+
+test("Bunnings product reference fields and search link appear in scope",()=>{
+ const {element}=bootstrap();
+ element("name").value="Bathroom sample";element("create").onclick();
+ element("categories").onclick({target:{closest:()=>({dataset:{category:"Bathroom"}})}});
+ element("tabs").onclick({target:{closest:()=>({dataset:{tab:"scope"}})}});
+ assert.match(element("body").innerHTML,/Bunnings product URL/);
+ assert.match(element("body").innerHTML,/Search Bunnings/);
+ assert.match(element("body").innerHTML,/Price checked on/);
+});
+test("quote prices remain manually entered, never represented as live Bunnings prices",()=>{
+ assert.match(script,/Price entered manually/);
+ assert.match(script,/bunningsLink/);
+ assert.match(script,/Only HTTPS Bunnings Warehouse product URLs/);
+});
