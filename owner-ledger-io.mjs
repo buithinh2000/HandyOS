@@ -1,4 +1,4 @@
-import {normalize,summary,workerNames,workerTotals,expenseEx} from "./owner-ledger-core.mjs";
+import {normalize,summary,expenseEx} from "./owner-ledger-core.mjs";
 
 function record(x){return !!x&&typeof x==="object"&&!Array.isArray(x)}
 function arr(x){return Array.isArray(x)&&x.every(record)}
@@ -40,7 +40,7 @@ export function ownerExports(state){
  const jobRows=jobs.map(j=>{const s=summary(j);return[j.name,j.code||"",j.stage||"",s.agreedInc??"",s.received,s.expensesEx,s.labour,s.profit??"",s.wagesPaid,s.wagesOutstanding]});
  const hours=jobs.flatMap(j=>(j.timesheets||[]).map(x=>[j.name,x.worker||"",x.date||"",x.hours??"",x.rate??"",(Number(x.hours)||0)*(Number(x.rate)||0)]));
  const wagePayments=jobs.flatMap(j=>(j.workerPayments||[]).map(x=>[j.name,x.worker||"",x.paidOn||"",x.amount??""]));
- const expenses=jobs.flatMap(j=>(j.expenses||[]).map(x=>[j.name,x.date||"",x.kind||"",x.title||"",x.amount??"",x.gstBasis||"",expenseEx(x),x.paidStatus||""]));
+ const expenses=jobs.flatMap(j=>(j.expenses||[]).map(x=>[j.name,x.date||"",x.kind||"",x.title||"",x.amount??"",x.gstBasis||"",Number.isFinite(expenseEx(x))?expenseEx(x):"Unknown",x.paidStatus||""]));
  const clientPayments=jobs.flatMap(j=>(j.payments||[]).map(x=>[j.name,x.date||"",x.reference||"",x.status||"",x.amount??""]));
  return{
   "jobs":csv(["Job","Code","Stage","Contract incl GST","Cash received","Expenses ex GST","Labour earned","Estimated profit ex GST","Wages paid","Wages outstanding"],jobRows),
