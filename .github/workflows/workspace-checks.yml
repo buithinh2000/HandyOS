@@ -21,3 +21,24 @@ jobs:
         with:
           node-version: "22"
       - run: node --test tests/workspace.test.mjs
+  browser-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install pinned Playwright and Chromium
+        run: |
+          npm install --no-save --ignore-scripts playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Run real browser responsive journey
+        run: node tests/workspace.browser.mjs
+      - name: Upload responsive screenshot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: handyos-browser-qa
+          path: artifacts/browser/
+          if-no-files-found: ignore
