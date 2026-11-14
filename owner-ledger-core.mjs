@@ -143,7 +143,14 @@ export function paymentBreakdown(job){
 }
 export function summary(job) {
  const agreedInc=money(job.contract),hasContract=Number.isFinite(agreedInc)&&agreedInc>0;
- const agreedEx=hasContract?round2(agreedInc/1.1):null; // draft assumes contract is standard GST taxable
+ // Approved variations are net increases/decreases in signed, GST-inclusive contract value.
+ const variationRaw=job.approvedVariationInc===undefined||job.approvedVariationInc===""?0:Number(job.approvedVariationInc);
+ const variationValid=Number.isFinite(variationRaw);
+ const approvedVariationInc=variationValid?round2(variationRaw):null;
+ const totalContractInc=hasContract&&variationValid?round2(agreedInc+approvedVariationInc):null;
+ const adjustedContractValid=totalContractInc!==null&&totalContractInc>0;
+ const totalContractEx=adjustedContractValid?round2(totalContractInc/1.1):null;
+ const agreedEx=hasContract?round2(agreedInc/1.1):null; // standard 10% GST assumption
  let expensesEx=0,expensesEntered=0,unclassified=0;
  for(const e of job.expenses||[]) {
   const raw=money(e.amount),net=expenseEx(e);
@@ -162,19 +169,26 @@ export function summary(job) {
  const rawRate=job.taxReservePct===undefined||job.taxReservePct===""?0:Number(job.taxReservePct);
  const taxReserveValid=Number.isFinite(rawRate)&&rawRate>=0&&rawRate<=100;
  const taxReservePct=taxReserveValid?rawRate:null;
- const taxReserveAmount=hasContract&&taxReserveValid?round2(agreedInc*taxReservePct/100):null;
+ const taxReserveAmount=adjustedContractValid&&taxReserveValid?round2(totalContractInc*taxReservePct/100):null;
  // Owner-entered future costs are estimates only: not paid expenses or accrued wages.
  // Do not add these to expense ledger; Owner must reduce them when posting actuals.
  const remainingCostRaw=job.remainingCostEx===undefined||job.remainingCostEx===""?0:money(job.remainingCostEx);
  const remainingCostValid=Number.isFinite(remainingCostRaw);
  const remainingCostEx=remainingCostValid?remainingCostRaw:null;
- const profitBeforeReserve=hasContract&&unclassified===0&&remainingCostValid?round2(agreedEx-costEx-remainingCostEx):null;
+ const overheadRaw=job.overheadAllocationEx===undefined||job.overheadAllocationEx===""?0:money(job.overheadAllocationEx);
+ const overheadValid=Number.isFinite(overheadRaw);
+ const overheadAllocationEx=overheadValid?overheadRaw:null;
+ // Overhead is an unbooked owner allocation, separate from actual Expenses.
+ const profitBeforeReserve=adjustedContractValid&&unclassified===0&&remainingCostValid&&overheadValid?round2(totalContractEx-costEx-remainingCostEx-overheadAllocationEx):null;
  const profit=profitBeforeReserve!==null&&taxReserveAmount!==null?round2(profitBeforeReserve-taxReserveAmount):null;
  const otherExpensesEx=round2((job.expenses||[]).filter(e=>e.kind==="other").reduce((sum,e)=>{const v=expenseEx(e);return sum+(Number.isFinite(v)?v:0)},0));
 
- const remaining=hasContract?round2(agreedInc-received):null;
+ const remaining=adjustedContractValid?round2(totalContractInc-received):null;
  const risks=[];
  if(!hasContract)risks.push("Enter the agreed contract amount incl GST before estimating profit.");
+ if(!variationValid||hasContract&&!adjustedContractValid)risks.push("Approved variation must leave the adjusted contract above zero.");
+ if(!overheadValid)risks.push("Overhead allocation must be a non-negative ex-GST amount.");
+ if(overheadValid&&overheadAllocationEx>0)risks.push("Allocated overhead must not duplicate any expense already included in this job.");
  if(unclassified)risks.push(unclassified+" expense line(s) have unknown GST basis.");
  if(!taxReserveValid)risks.push("Tax & Reserve Fund percentage must be between 0 and 100.");
  if(!remainingCostValid)risks.push("Remaining Costs must be a valid non-negative amount ex GST.");
@@ -182,11 +196,13 @@ export function summary(job) {
  if(job.stage==="closed"&&remainingCostEx>0)risks.push("Closed job still has estimated remaining costs: reconcile to actual costs.");
  if((job.expenses||[]).some(e=>e.kind==="labour")&&(job.timesheets||[]).length)risks.push("Labour expense lines and timesheets both exist: verify no duplicated wages.");
  if(hasContract&&received>agreedInc)risks.push("Recorded cash received exceeds the agreed contract amount.");
- return {remainingCostEx,otherExpensesEx,taxReservePct,taxReserveAmount,profitBeforeReserve,paymentReceivedNet:payment.receivedNet,paymentReceivedGst:payment.receivedGst,wagesPaid,wagesOutstanding:round2(labour-wagesPaid),hasContract,agreedInc:hasContract?agreedInc:null,agreedEx,expensesEx,expensesEntered,unclassified,labour,costEx,received,requested,remaining,profit,risks};
+ return {approvedVariationInc,totalContractInc,totalContractEx,overheadAllocationEx,remainingCostEx,otherExpensesEx,taxReservePct,taxReserveAmount,profitBeforeReserve,paymentReceivedNet:payment.receivedNet,paymentReceivedGst:payment.receivedGst,wagesPaid,wagesOutstanding:round2(labour-wagesPaid),hasContract,agreedInc:hasContract?agreedInc:null,agreedEx,expensesEx,expensesEntered,unclassified,labour,costEx,received,requested,remaining,profit,risks};
 }
 export function canClose(job) {
  const s=summary(job);
  if(!s.hasContract)return {ok:false,reason:"Agreed contract amount is required to close a job."};
+ if(s.totalContractInc===null)return {ok:false,reason:"Approved variations must result in a positive adjusted contract."};
+ if(s.overheadAllocationEx===null)return {ok:false,reason:"Enter valid overhead allocation ex GST."};
  if(s.unclassified)return {ok:false,reason:"Classify GST basis of every expense before closing."};
  if(s.taxReservePct===null)return {ok:false,reason:"Enter a valid Tax & Reserve Fund percentage."};
  if(s.remainingCostEx===null)return {ok:false,reason:"Enter a valid Remaining Costs amount."};
@@ -197,5 +213,5 @@ export function snapshot(job,closedAt) {
  const permission=canClose(job);
  if(!permission.ok)throw new Error(permission.reason);
  const s=summary(job);
- return {closedAt,contractInc:s.agreedInc,contractEx:s.agreedEx,expensesEx:s.expensesEx,otherExpensesEx:s.otherExpensesEx,remainingCostEx:s.remainingCostEx,labour:s.labour,taxReservePct:s.taxReservePct,taxReserveAmount:s.taxReserveAmount,profitBeforeReserve:s.profitBeforeReserve,profitEstimate:s.profit,receivedInc:s.received,remainingContractInc:s.remaining,expenseCount:job.expenses.length,paymentCount:job.payments.length,timesheetCount:job.timesheets.length,wagesPaid:s.wagesPaid,wagesOutstanding:s.wagesOutstanding};
+ return {closedAt,contractInc:s.agreedInc,contractEx:s.agreedEx,approvedVariationInc:s.approvedVariationInc,totalContractInc:s.totalContractInc,totalContractEx:s.totalContractEx,overheadAllocationEx:s.overheadAllocationEx,expensesEx:s.expensesEx,otherExpensesEx:s.otherExpensesEx,remainingCostEx:s.remainingCostEx,labour:s.labour,taxReservePct:s.taxReservePct,taxReserveAmount:s.taxReserveAmount,profitBeforeReserve:s.profitBeforeReserve,profitEstimate:s.profit,receivedInc:s.received,remainingContractInc:s.remaining,expenseCount:job.expenses.length,paymentCount:job.payments.length,timesheetCount:job.timesheets.length,wagesPaid:s.wagesPaid,wagesOutstanding:s.wagesOutstanding};
 }
