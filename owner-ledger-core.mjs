@@ -147,8 +147,9 @@ export function summary(job) {
  const variationRaw=job.approvedVariationInc===undefined||job.approvedVariationInc===""?0:Number(job.approvedVariationInc);
  const variationValid=Number.isFinite(variationRaw);
  const approvedVariationInc=variationValid?round2(variationRaw):null;
- const totalContractInc=hasContract&&variationValid?round2(agreedInc+approvedVariationInc):null;
- const adjustedContractValid=totalContractInc!==null&&totalContractInc>0;
+ const adjustedTotal=hasContract&&variationValid?round2(agreedInc+approvedVariationInc):null;
+ const adjustedContractValid=adjustedTotal!==null&&adjustedTotal>0;
+ const totalContractInc=adjustedContractValid?adjustedTotal:null;
  const totalContractEx=adjustedContractValid?round2(totalContractInc/1.1):null;
  const agreedEx=hasContract?round2(agreedInc/1.1):null; // standard 10% GST assumption
  let expensesEx=0,expensesEntered=0,unclassified=0;
