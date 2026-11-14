@@ -3,8 +3,7 @@ const $=id=>document.getElementById(id);
 const html=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let accessToken=null,activeTenant=null;
 const configured=()=>{
- const keys=["cognitoDomain","cognitoClientId","apiOrigin","redirectUri"];
- return keys.every(x=>typeof config[x]==="string"&&config[x].startsWith("https://"));
+ return ["cognitoDomain","apiOrigin","redirectUri"].every(x=>typeof config[x]==="string"&&config[x].startsWith("https://")) && typeof config.cognitoClientId==="string" && config.cognitoClientId.length>8;
 };
 function status(message,error=false){$("status").textContent=message;$("status").style.color=error?"#ac2525":"#405a72"}
 function base64url(bytes){return btoa(String.fromCharCode(...bytes)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")}
