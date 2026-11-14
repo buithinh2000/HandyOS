@@ -16,6 +16,7 @@ export function expenseEx(entry) {
 export function normalize(db) {
  const state=db&&typeof db==="object"?db:{};
  if(!Array.isArray(state.jobs))state.jobs=[];
+ if(!Array.isArray(state.payrollSettlements))state.payrollSettlements=[];
  for(const job of state.jobs) {
   for(const field of ["tasks","categories","materials","timesheets","expenses","payments"])if(!Array.isArray(job[field]))job[field]=[];
   if(!Array.isArray(job.workerPayments))job.workerPayments=[];
@@ -68,6 +69,25 @@ export function workerByPeriod(jobs,name,period="week",jobId=""){
  for(const t of data.earned){const k=keyFor(t.date);if(!k)continue;const row=rows.get(k)||{period:k,hours:0,earned:0,paid:0};row.hours=round2(row.hours+t.hours);row.earned=round2(row.earned+t.total);rows.set(k,row)}
  for(const p of data.payments){const k=keyFor(p.periodStart||p.paidOn);if(!k)continue;const row=rows.get(k)||{period:k,hours:0,earned:0,paid:0};row.paid=round2(row.paid+p.amount);rows.set(k,row)}
  return [...rows.values()].sort((a,b)=>b.period.localeCompare(a.period)).map(x=>({...x,outstanding:round2(x.earned-x.paid)}));
+}
+export function wageYearSummary(jobs,year=""){
+ const results=employeesSummary(jobs).map(worker=>{
+  const wages=worker.earned.filter(x=>!year||String(x.date||"").startsWith(year));
+  const payments=worker.payments.filter(x=>!year||String(x.paidOn||"").startsWith(year));
+  const earned=round2(wages.reduce((s,x)=>s+x.total,0)),paid=round2(payments.reduce((s,x)=>s+x.amount,0));
+  return{name:worker.name,hours:round2(wages.reduce((s,x)=>s+x.hours,0)),earned,paid,difference:round2(earned-paid)};
+ });
+ return{rows:results,earned:round2(results.reduce((s,x)=>s+x.earned,0)),paid:round2(results.reduce((s,x)=>s+x.paid,0))};
+}
+export function periodSettlement(jobs,worker,period,key,jobId=""){
+ if(!["week","month"].includes(period))throw new Error("Only weekly or monthly settlements are supported.");
+ if(!/^\d{4}-\d{2}(-\d{2})?$/.test(key))throw new Error("Invalid settlement period.");
+ const row=workerByPeriod(jobs,worker,period,jobId).find(x=>x.period===key);
+ if(!row)throw new Error("No recorded work or payments in this period.");
+ return{worker,period,key,jobId,hours:row.hours,earned:row.earned,paid:row.paid,balance:row.outstanding};
+}
+export function isSettlementCurrent(jobs,s){
+ try{const actual=periodSettlement(jobs,s.worker,s.period,s.key,s.jobId||"");return actual.hours===s.hours&&actual.earned===s.earned&&actual.paid===s.paid}catch{return false}
 }
 export function employeesSummary(jobs){
  return workerNames(jobs).map(name=>({name,...workerTotals(jobs,name)}));

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {normalize,expenseEx,weeklyStart,workerTotals,workerByPeriod,employeesSummary,expenseSummary,companySummary,summary,canClose,snapshot} from "../owner-ledger-core.mjs";
+import {normalize,expenseEx,weeklyStart,workerTotals,workerByPeriod,employeesSummary,expenseSummary,companySummary,summary,canClose,snapshot,wageYearSummary,periodSettlement,isSettlementCurrent} from "../owner-ledger-core.mjs";
 
 const j=(id,name)=>({id,name,stage:"active",contract:11000,tasks:[],categories:[],materials:[],expenses:[],timesheets:[],payments:[],workerPayments:[]});
 const worker=(name,date,hours,rate)=>({id:name+date,worker:name,date,hours,rate});
@@ -94,4 +94,46 @@ test("owner view follows list then employee detail, no public employee share lin
  assert.match(html,/Employee name/);
  assert.match(html,/No secure login/);
  assert.doesNotMatch(html,/data-share-employee/);
+});
+
+test("employee yearly earned and paid aggregates across jobs without double-counting",()=>{
+ const a=j("one","Bathroom"),b=j("two","Kitchen");
+ a.timesheets.push(worker("Alex","2025-11-04",8,40));
+ b.timesheets.push(worker("Alex","2026-02-02",5,60));
+ a.workerPayments.push({worker:"Alex",amount:250,paidOn:"2025-12-01"});
+ b.workerPayments.push({worker:"Alex",amount:200,paidOn:"2026-03-01"});
+ const older=wageYearSummary([a,b],"2025");
+ assert.equal(older.earned,320);assert.equal(older.paid,250);
+ const current=wageYearSummary([a,b],"2026");
+ assert.equal(current.earned,300);assert.equal(current.paid,200);
+ assert.equal(wageYearSummary([a,b],"").earned,620);
+ assert.equal(wageYearSummary([a,b],"").paid,450);
+});
+test("weekly/monthly payroll close receipts are snapshots, and late edits invalidate them",()=>{
+ const a=j("bath","Bathroom");a.timesheets.push(worker("Alex","2026-11-09",8,50));
+ a.workerPayments.push({worker:"Alex",amount:200,paidOn:"2026-11-10"});
+ const week=periodSettlement([a],"Alex","week","2026-11-09");
+ assert.equal(week.hours,8);assert.equal(week.earned,400);assert.equal(week.paid,200);
+ assert.equal(week.balance,200);assert.equal(isSettlementCurrent([a],week),true);
+ const month=periodSettlement([a],"Alex","month","2026-11");
+ assert.equal(month.earned,400);assert.equal(isSettlementCurrent([a],month),true);
+ a.workerPayments.push({worker:"Alex",amount:100,paidOn:"2026-11-11"});
+ assert.equal(isSettlementCurrent([a],week),false);
+ assert.equal(isSettlementCurrent([a],month),false);
+ assert.equal(summary(a).labour,400);assert.equal(summary(a).wagesPaid,300);
+ assert.throws(()=>periodSettlement([a],"Alex","year","2026"),/Only weekly/);
+});
+test("legacy data gains settlement collection without overwriting saved job records",()=>{
+ const original={jobs:[{id:"x",name:"Old",timesheets:[],payments:[],expenses:[],tasks:[]}]};
+ const normalized=normalize(original);
+ assert.deepEqual(normalized.payrollSettlements,[]);
+ assert.equal(normalized.jobs[0].id,"x");
+ const receipt={worker:"Alex",period:"week",key:"2026-11-09",earned:100,paid:0};
+ normalized.payrollSettlements.push(receipt);assert.deepEqual(normalize(normalized).payrollSettlements,[receipt]);
+});
+test("owner V1 exposes month, category, job and annual worker filters",()=>{
+ const html=readFileSync(new URL("../owner-v1.html",import.meta.url),"utf8");
+ for(const id of ["wageYearFilter","yearFilter","monthFilter","kindFilter","jobFilter","data-settle"]){assert.ok(html.includes(id),id)}
+ assert.match(html,/Saved payroll settlements/);
+ assert.match(html,/Closing a period records a snapshot only/);
 });
