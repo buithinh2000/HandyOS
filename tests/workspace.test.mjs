@@ -446,3 +446,38 @@ test("existing subtasks remain visible while the add form is collapsed",()=>{
  assert.match(view,/class="subtasks has-items"/);
  assert.equal(JSON.parse(stored.get("handyos-workspace-v07")).jobs[0].tasks[0].subtasks.length,1);
 });
+
+test("legacy auto-created task steps are collapsed per trade without deleting or repricing them",()=>{
+ const {element,stored}=bootstrap();
+ element("name").value="Legacy renovation";element("create").onclick();
+ for(let i=0;i<3;i++)element("categories").onclick({target:{closest:()=>({dataset:{category:"Site preparation"}})}});
+ let job=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0];
+ const titles=["Inspection & measure","Site protection","Demolition & waste"];
+ for(let i=0;i<3;i++){
+  const id=job.tasks[i].id;
+  element("body").onchange({target:{closest:()=>({dataset:{task:id,key:"title"},value:titles[i]})}});
+  element("body").onchange({target:{closest:()=>({dataset:{task:id,key:"cost"},value:String(100*(i+1))})}});
+ }
+ const after=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0];
+ assert.equal(after.tasks.length,3);
+ assert.equal(after.tasks.reduce((n,t)=>n+Number(t.cost),0),600);
+ const view=element("body").innerHTML;
+ assert.match(view,/Legacy checklist detected/);
+ assert.match(view,/class="legacy-group"/);
+ assert.match(view,/Site preparation/);
+ assert.match(view,/3 existing steps/);
+ assert.match(view,/Inspection &amp; measure/);
+ element("journey").onclick({target:{closest:()=>({dataset:{step:"quote"}})}});
+ assert.match(element("body").innerHTML,/\$600\.00/);
+ const final=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0];
+ assert.equal(final.tasks.length,3);
+ assert.equal(final.tasks.reduce((n,t)=>n+Number(t.cost),0),600);
+});
+test("modern single main task stays directly visible, never collapsed as legacy",()=>{
+ const {element}=bootstrap();
+ element("name").value="Modern";element("create").onclick();
+ element("categories").onclick({target:{closest:()=>({dataset:{category:"Bathroom"}})}});
+ assert.match(element("body").innerHTML,/class="task"/);
+ assert.doesNotMatch(element("body").innerHTML,/Legacy checklist detected/);
+ assert.doesNotMatch(element("body").innerHTML,/class="legacy-group"/);
+});
