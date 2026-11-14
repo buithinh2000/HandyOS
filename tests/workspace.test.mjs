@@ -202,3 +202,36 @@ test("printed quote explicitly shows estimated material line and supplier proven
  assert.match(element("report").innerHTML,/Owner-selected store/);
  assert.match(element("report").innerHTML,/Owner-entered estimate/);
 });
+
+test("quote review flags missing supplier code and prevents pretending unknown shelf price is verified",()=>{
+ const {element}=bootstrap();
+ element("name").value="Sample quote";element("create").onclick();
+ element("tabs").onclick({target:{closest:()=>({dataset:{tab:"materials"}})}});
+ element("matName").value="Tile adhesive";element("matSupplier").value="Bunnings";
+ element("matSku").value="";element("matUnit").value="each";element("matQty").value="4";
+ element("matWaste").value="0";element("matPack").value="1";
+ element("matPrice").value="0";element("matUrl").value="";element("matStore").value="";
+ element("body").onclick({target:{closest:()=>({id:"addMaterial",dataset:{}})}});
+ element("tabs").onclick({target:{closest:()=>({dataset:{tab:"review"}})}});
+ assert.match(element("body").innerHTML,/PRICE_UNKNOWN/);
+ assert.match(element("body").innerHTML,/SKU_MISSING/);
+ assert.match(element("body").innerHTML,/STORE_MISSING/);
+ assert.match(element("body").innerHTML,/Rules-based assistant/);
+});
+test("quote review checks wet-area waterproofing and never auto-mutates scope",()=>{
+ const {element,stored}=bootstrap();
+ element("name").value="Bathroom sample";element("create").onclick();
+ element("categories").onclick({target:{closest:()=>({dataset:{category:"Bathroom"}})}});
+ const before=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0].tasks.length;
+ element("tabs").onclick({target:{closest:()=>({dataset:{tab:"review"}})}});
+ const after=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0].tasks.length;
+ assert.equal(after,before);
+ assert.match(element("body").innerHTML,/Quote Review/);
+});
+test("printed quote discloses quote review finding count",()=>{
+ const {element}=bootstrap();
+ element("name").value="Draft";element("create").onclick();
+ element("tabs").onclick({target:{closest:()=>({dataset:{tab:"quote"}})}});
+ element("body").onclick({target:{closest:()=>({id:"printQuote",dataset:{}})}});
+ assert.match(element("report").innerHTML,/Quote Review identified/);
+});
