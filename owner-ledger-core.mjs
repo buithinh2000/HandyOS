@@ -16,6 +16,7 @@ export function expenseEx(entry) {
 export function normalize(db) {
  const state=db&&typeof db==="object"?db:{};
  if(!Array.isArray(state.jobs))state.jobs=[];
+ if(!Array.isArray(state.staff))state.staff=[];
  if(!Array.isArray(state.payrollSettlements))state.payrollSettlements=[];
  for(const job of state.jobs) {
   for(const field of ["tasks","categories","materials","timesheets","expenses","payments"])if(!Array.isArray(job[field]))job[field]=[];
@@ -46,8 +47,9 @@ export function labourByPeriod(job,period) {
 }
 
 export const workerKey = name=>String(name||"").trim().toLowerCase();
-export function workerNames(jobs){
+export function workerNames(jobs,staff=[]){
  const names=new Map();
+ for(const member of staff){const n=String(member.name||"").trim();if(n&&!names.has(workerKey(n)))names.set(workerKey(n),n)}
  for(const job of jobs)for(const t of [...(job.timesheets||[]),...(job.workerPayments||[])]){
    const n=String(t.worker||"").trim();if(n&&!names.has(workerKey(n)))names.set(workerKey(n),n);
  }
@@ -70,8 +72,8 @@ export function workerByPeriod(jobs,name,period="week",jobId=""){
  for(const p of data.payments){const k=keyFor(p.periodStart||p.paidOn);if(!k)continue;const row=rows.get(k)||{period:k,hours:0,earned:0,paid:0};row.paid=round2(row.paid+p.amount);rows.set(k,row)}
  return [...rows.values()].sort((a,b)=>b.period.localeCompare(a.period)).map(x=>({...x,outstanding:round2(x.earned-x.paid)}));
 }
-export function wageYearSummary(jobs,year=""){
- const results=employeesSummary(jobs).map(worker=>{
+export function wageYearSummary(jobs,year="",staff=[]){
+ const results=employeesSummary(jobs,staff).map(worker=>{
   const wages=worker.earned.filter(x=>!year||String(x.date||"").startsWith(year));
   const payments=worker.payments.filter(x=>!year||String(x.paidOn||"").startsWith(year));
   const earned=round2(wages.reduce((s,x)=>s+x.total,0)),paid=round2(payments.reduce((s,x)=>s+x.amount,0));
@@ -89,8 +91,8 @@ export function periodSettlement(jobs,worker,period,key,jobId=""){
 export function isSettlementCurrent(jobs,s){
  try{const actual=periodSettlement(jobs,s.worker,s.period,s.key,s.jobId||"");return actual.hours===s.hours&&actual.earned===s.earned&&actual.paid===s.paid}catch{return false}
 }
-export function employeesSummary(jobs){
- return workerNames(jobs).map(name=>({name,...workerTotals(jobs,name)}));
+export function employeesSummary(jobs,staff=[]){
+ return workerNames(jobs,staff).map(name=>({name,...workerTotals(jobs,name)}));
 }
 export function expenseSummary(jobs,{jobId="",kind="",year="",month=""}={}){
  const entries=[];
@@ -112,6 +114,33 @@ export function companySummary(jobs){
  const expense=expenseSummary(jobs);const employees=employeesSummary(jobs);
  return{jobs:jobs.length,open:jobs.filter(j=>j.stage!=="closed").length,received:round2(jobs.reduce((a,j)=>a+summary(j).received,0)),labourDue:round2(employees.reduce((a,e)=>a+e.due,0)),wagesPaid:round2(employees.reduce((a,e)=>a+e.paid,0)),wagesOutstanding:round2(employees.reduce((a,e)=>a+e.outstanding,0)),expensesEx:expense.net,expensesPaid:expense.paid,expenseUnclassified:expense.unclassified};
 }
+// Payment input is the amount keyed by Owner. amount remains actual customer cash
+// for compatibility with older entries that stored inclusive cash in amount.
+export function customerPayment(input,basis="inc"){
+ const entered=money(input);
+ if(!Number.isFinite(entered)||entered<=0)throw new Error("Payment amount must be positive.");
+ if(!["inc","ex","no_gst"].includes(basis))throw new Error("Invalid GST basis.");
+ const amount=basis==="ex"?round2(entered*1.1):entered;
+ const gstAmount=basis==="inc"?round2(entered-entered/1.1):basis==="ex"?round2(amount-entered):0;
+ const netAmount=round2(amount-gstAmount);
+ return {enteredAmount:entered,amount,gstBasis:basis,gstAmount,netAmount};
+}
+export function paymentBreakdown(job){
+ const entries=(job.payments||[]).map(p=>{
+  const gross=money(p.amount),basis=p.gstBasis||"inc";
+  // Old entries had no tax marker and were entered as cash incl GST.
+  const net=Number.isFinite(gross)?basis==="no_gst"?gross:basis==="ex"?
+    // New entries always store amount as actual cash. No further multiplication.
+    round2(gross/1.1):round2(gross/1.1):NaN;
+  return {...p,gross,net,gst:Number.isFinite(net)?round2(gross-net):NaN,basis};
+ });
+ const received=entries.filter(p=>p.status==="received");
+ const requested=entries.filter(p=>p.status==="requested");
+ return {entries,cash:round2(received.reduce((a,p)=>a+(Number.isFinite(p.gross)?p.gross:0),0)),
+ requested:round2(requested.reduce((a,p)=>a+(Number.isFinite(p.gross)?p.gross:0),0)),
+ receivedNet:round2(received.reduce((a,p)=>a+(Number.isFinite(p.net)?p.net:0),0)),
+ receivedGst:round2(received.reduce((a,p)=>a+(Number.isFinite(p.gst)?p.gst:0),0))};
+}
 export function summary(job) {
  const agreedInc=money(job.contract),hasContract=Number.isFinite(agreedInc)&&agreedInc>0;
  const agreedEx=hasContract?round2(agreedInc/1.1):null; // draft assumes contract is standard GST taxable
@@ -123,8 +152,9 @@ export function summary(job) {
  }
  const labour=round2(labourRows(job).reduce((s,x)=>s+x.total,0));
  const wagesPaid=round2((job.workerPayments||[]).reduce((a,p)=>a+(money(p.amount)||0),0));
- const received=round2((job.payments||[]).filter(p=>p.status==="received").reduce((s,p)=>s+(money(p.amount)||0),0));
- const requested=round2((job.payments||[]).filter(p=>p.status==="requested").reduce((s,p)=>s+(money(p.amount)||0),0));
+ const payment=paymentBreakdown(job);
+ const received=payment.cash;
+ const requested=payment.requested;
  const costEx=round2(expensesEx+labour);
  const profit=hasContract&&unclassified===0?round2(agreedEx-costEx):null;
  const remaining=hasContract?round2(agreedInc-received):null;
@@ -133,7 +163,7 @@ export function summary(job) {
  if(unclassified)risks.push(unclassified+" expense line(s) have unknown GST basis.");
  if((job.expenses||[]).some(e=>e.kind==="labour")&&(job.timesheets||[]).length)risks.push("Labour expense lines and timesheets both exist: verify no duplicated wages.");
  if(hasContract&&received>agreedInc)risks.push("Recorded cash received exceeds the agreed contract amount.");
- return {wagesPaid,wagesOutstanding:round2(labour-wagesPaid),hasContract,agreedInc:hasContract?agreedInc:null,agreedEx,expensesEx,expensesEntered,unclassified,labour,costEx,received,requested,remaining,profit,risks};
+ return {paymentReceivedNet:payment.receivedNet,paymentReceivedGst:payment.receivedGst,wagesPaid,wagesOutstanding:round2(labour-wagesPaid),hasContract,agreedInc:hasContract?agreedInc:null,agreedEx,expensesEx,expensesEntered,unclassified,labour,costEx,received,requested,remaining,profit,risks};
 }
 export function canClose(job) {
  const s=summary(job);
