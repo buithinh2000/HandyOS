@@ -17,7 +17,8 @@ function bootstrap(){
   if(!elements.has(id))elements.set(id,{id,value:"",innerHTML:"",textContent:"",onclick:null,onchange:null,addEventListener(){}});
   return elements.get(id);
  };
- const context={document:{getElementById:element,addEventListener(){},createElement(){return {click(){}}}},localStorage:{getItem:k=>stored.get(k)||null,setItem:(k,v)=>stored.set(k,v)},Intl,Math,Date,JSON,Number,String,Array,Set,Map,Error,Blob:class{},URL:{createObjectURL:()=>"",revokeObjectURL(){}},setTimeout(){},confirm:()=>true,alert:()=>{},prompt:()=>null,window:{print(){}},console};
+ const listeners={};
+ const context={document:{getElementById:element,addEventListener(type,fn){listeners[type]=fn},dispatchChange(target){listeners.change?.({target})},createElement(){return {click(){}}}},localStorage:{getItem:k=>stored.get(k)||null,setItem:(k,v)=>stored.set(k,v)},Intl,Math,Date,JSON,Number,String,Array,Set,Map,Error,Blob:class{},URL:{createObjectURL:()=>"",revokeObjectURL(){}},setTimeout(){},confirm:()=>true,alert:()=>{},prompt:()=>null,window:{print(){}},console};
  vm.runInNewContext(script,context);
  return {context,element,stored};
 }
@@ -234,4 +235,45 @@ test("printed quote discloses quote review finding count",()=>{
  element("tabs").onclick({target:{closest:()=>({dataset:{tab:"quote"}})}});
  element("body").onclick({target:{closest:()=>({id:"printQuote",dataset:{}})}});
  assert.match(element("report").innerHTML,/Quote Review identified/);
+});
+
+test("quote budget separates task/material/labour/other/contingency and prints all components",()=>{
+ const {element,context,stored}=bootstrap();
+ element("name").value="Quote budget";element("create").onclick();
+ element("tabs").onclick({target:{closest:()=>({dataset:{tab:"materials"}})}});
+ element("matName").value="Plasterboard";element("matSupplier").value="Bunnings";
+ element("matSku").value="123";element("matUnit").value="m²";
+ element("matQty").value="20";element("matWaste").value="10";
+ element("matPack").value="2.88";element("matPrice").value="27.5";
+ element("matUrl").value="";element("matStore").value="Local";
+ element("body").onclick({target:{closest:()=>({id:"addMaterial",dataset:{}})}});
+ element("tabs").onclick({target:{closest:()=>({dataset:{tab:"quote"}})}});
+ for(const [id,value] of [["labourAllowance","300"],["otherAllowance","70"],["contingencyPct","10"],["markup","20"]]){
+  context.document.dispatchChange({id,value});
+ }
+ const output=element("body").innerHTML;
+ assert.match(output,/Labour allowance/);
+ assert.match(output,/Other allowance/);
+ assert.match(output,/Contingency/);
+ const record=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0];
+ assert.equal(record.labourAllowance,300);
+ assert.equal(record.otherAllowance,70);
+ assert.equal(record.contingencyPct,10);
+ assert.equal(record.markup,20);
+ // Material ex GST 8*25=200; base=570; contingency=57; sale=752.4 ex GST.
+ assert.match(output,/\$752\.40/);
+ element("body").onclick({target:{closest:()=>({id:"printQuote",dataset:{}})}});
+ assert.match(element("report").innerHTML,/Material: Plasterboard/);
+ assert.match(element("report").innerHTML,/Labour allowance/);
+ assert.match(element("report").innerHTML,/Other allowance/);
+ assert.match(element("report").innerHTML,/Contingency/);
+});
+test("owner cannot set negative quote allowances",()=>{
+ const {element,context,stored}=bootstrap();
+ element("name").value="Invalid quote budget";element("create").onclick();
+ context.document.dispatchChange({id:"labourAllowance",value:"-500"});
+ context.document.dispatchChange({id:"contingencyPct",value:"110"});
+ const record=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0];
+ assert.equal(record.labourAllowance,0);
+ assert.equal(record.contingencyPct,0);
 });
