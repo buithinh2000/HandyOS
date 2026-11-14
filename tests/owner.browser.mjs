@@ -1,0 +1,53 @@
+import {chromium} from "playwright";
+import {createServer} from "node:http";
+import {readFileSync,mkdirSync} from "node:fs";
+import {resolve} from "node:path";
+import assert from "node:assert/strict";
+const pages={"/owner-v1.html":{body:readFileSync(resolve("owner-v1.html")),type:"text/html"},"/owner-ledger-core.mjs":{body:readFileSync(resolve("owner-ledger-core.mjs")),type:"text/javascript"}};
+const server=createServer((req,res)=>{const p=pages[(req.url||"").split("?")[0]];if(!p){res.writeHead(404);res.end();return}res.writeHead(200,{"content-type":p.type+"; charset=utf-8"});res.end(p.body)});
+await new Promise(ok=>server.listen(0,"127.0.0.1",ok));
+const address="http://127.0.0.1:"+server.address().port+"/owner-v1.html";
+mkdirSync("artifacts/owner-v1-browser",{recursive:true});
+let browser;
+try{
+browser=await chromium.launch({headless:true});
+for(const width of [390,1280]){
+const page=await browser.newPage({viewport:{width,height:850},deviceScaleFactor:1});
+const errors=[];
+page.on("pageerror",e=>errors.push(e.message));
+page.on("dialog",d=>d.accept("Sample renovation"));
+await page.goto(address);
+await page.locator("#newJob").click();
+await page.locator("#contract").fill("11000");
+await page.locator("#saveJob").click();
+await page.locator("#expenseTitle").fill("Sample material");
+await page.locator("#expenseAmount").fill("110");
+await page.locator("#addExpense").click();
+await page.locator("#workerName").fill("Alex");
+await page.locator("#workHours").fill("8");
+await page.locator("#workRate").fill("50");
+await page.locator("#addHours").click();
+await page.locator("#payRef").fill("Deposit 1");
+await page.locator("#payAmount").fill("2200");
+await page.locator("#payStatus").selectOption("received");
+await page.locator("#addPayment").click();
+assert.match(await page.locator("#screen").innerText(),/\$9,500\.00/);
+await page.locator('[data-page="employees"]').click();
+assert.match(await page.locator("#screen").innerText(),/Alex/);
+await page.locator('[data-open="worker"]').first().click();
+await page.locator("#wageAmount").fill("250");
+await page.locator("#addWage").click();
+assert.match(await page.locator("#screen").innerText(),/\$150\.00/);
+await page.locator('[data-period="month"]').click();
+await page.locator('[data-period="year"]').click();
+await page.locator('[data-page="company"]').click();
+assert.match(await page.locator("#screen").innerText(),/\$400\.00/);
+assert.match(await page.locator("#screen").innerText(),/\$250\.00/);
+const bounds=await page.evaluate(()=>({width:innerWidth,content:document.documentElement.scrollWidth}));
+assert.ok(bounds.content<=bounds.width+2,JSON.stringify(bounds));
+assert.deepEqual(errors,[]);
+await page.screenshot({path:"artifacts/owner-v1-browser/dashboard-"+width+".png",fullPage:true});
+await page.close();
+}
+console.log("OWNER_BROWSER_QA_PASS");
+}finally{if(browser)await browser.close();await new Promise(ok=>server.close(ok))}
