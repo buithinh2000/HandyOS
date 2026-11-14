@@ -7,7 +7,7 @@ Parameters:
     AllowedPattern: '^[a-z0-9-]{1,63}$'
   CallbackUrl:
     Type: String
-    Default: 'https://handyos.buitai.com/auth/callback'
+    Default: 'https://handyos.buitai.com/portal.html'
   LogoutUrl:
     Type: String
     Default: 'https://handyos.buitai.com/'
