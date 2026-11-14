@@ -53,7 +53,7 @@ const findings=reviewQuote(j);
 return '<h2>Quote Review · V1</h2><p class="muted small">Rules-based assistant, not a generative AI model. Suggestions only; it never changes quantities, prices or product codes. Check the final quote yourself.</p><div class="stat"><b>'+findings.filter(f=>f.severity==="high").length+' high · '+findings.filter(f=>f.severity==="medium").length+' review · '+findings.filter(f=>f.severity==="info").length+' suggestions</b></div>'+(findings.length?findings.map(f=>'<div class="task"><b>'+safe(f.severity.toUpperCase())+' · '+safe(f.code)+'</b><p>'+safe(f.message)+'</p><p class="small muted">'+safe(f.action)+'</p></div>').join(""):'<p>No configured flags were found; this is not a quote completeness certification.</p>');
 }
 function portfolioTotals(jobs){
-const rows=jobs.map(j=>{const t=totals(j),done=j.tasks.filter(x=>x.status==="done").length,taskCount=j.tasks.length,active=j.stage!=="closed",due=String(j.dueDate||""),overdue=active&&/^\\d{4}-\\d{2}-\\d{2}$/.test(due)&&due<date();
+const rows=jobs.map(j=>{const t=totals(j),done=j.tasks.filter(x=>x.status==="done").length,taskCount=j.tasks.length,active=j.stage!=="closed",due=String(j.dueDate||""),overdue=active&&/^\d{4}-\d{2}-\d{2}$/.test(due)&&due<date();
 return{j,t,done,taskCount,overdue}});
 return{rows,count:jobs.length,active:rows.filter(x=>x.j.stage!=="closed").length,overdue:rows.filter(x=>x.overdue).length,
 draftQuote:rows.reduce((sum,x)=>sum+x.t.total,0),cashReceived:rows.reduce((sum,x)=>sum+x.t.paid,0),
