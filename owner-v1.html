@@ -4,7 +4,7 @@
 <nav id="nav" class="nav"><button data-page="jobs">Jobs</button><button data-page="employees">Employees</button><button data-page="expenses">Expenses</button><button data-page="company">Overview</button></nav><section id="screen"></section></main>
 <script type="module">
 import {STORE_KEY,normalize,money,dollars,summary,canClose,snapshot,workerNames,workerTotals,workerByPeriod,employeesSummary,companySummary,expenseSummary} from "./owner-ledger-core.mjs";
-const $=id=>document.getElementById(id),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])),today=()=>new Date().toLocaleDateString("en-CA"),uid=()=>crypto.randomUUID();
+const $=id=>document.getElementById(id),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])),today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-")},uid=()=>crypto.randomUUID();
 let state;try{state=normalize(JSON.parse(localStorage.getItem(STORE_KEY)||"{}"))}catch{state=normalize({})}
 let page="jobs",jobId="",person="",period="week",year="";
 const jNow=()=>state.jobs.find(j=>j.id===jobId),cash=dollars;
