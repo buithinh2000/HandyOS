@@ -160,3 +160,27 @@ test("quote prices remain manually entered, never represented as live Bunnings p
  assert.match(script,/bunningsLink/);
  assert.match(script,/Only HTTPS Bunnings Warehouse product URLs/);
 });
+
+test("material takeoff rounds packages up and saves supplier estimates",()=>{
+ const {element,stored}=bootstrap();
+ element("name").value="Plaster test";element("create").onclick();
+ element("tabs").onclick({target:{closest:()=>({dataset:{tab:"materials"}})}});
+ element("matName").value="Plasterboard";element("matSupplier").value="Bunnings";
+ element("matSku").value="TEST123";element("matUnit").value="m²";
+ element("matQty").value="20";element("matWaste").value="10";element("matPack").value="2.88";element("matPrice").value="30";element("matUrl").value="";
+ element("body").onclick({target:{closest:()=>({id:"addMaterial",dataset:{}})}});
+ const j=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0];
+ assert.equal(j.materials.length,1);assert.equal(j.materials[0].supplier,"Bunnings");
+ element("tabs").onclick({target:{closest:()=>({dataset:{tab:"materials"}})}});
+ assert.match(element("body").innerHTML,/\$240\.00/); // ceil(22/2.88)=8 packs
+});
+test("material takeoff rejects zero pack size",()=>{
+ const {element,stored}=bootstrap();
+ element("name").value="Invalid materials";element("create").onclick();
+ element("tabs").onclick({target:{closest:()=>({dataset:{tab:"materials"}})}});
+ element("matName").value="Tiles";element("matSupplier").value="Mitre 10";
+ element("matSku").value="";element("matUnit").value="m²";
+ element("matQty").value="8";element("matWaste").value="10";element("matPack").value="0";element("matPrice").value="12";element("matUrl").value="";
+ element("body").onclick({target:{closest:()=>({id:"addMaterial",dataset:{}})}});
+ assert.equal(JSON.parse(stored.get("handyos-workspace-v07")).jobs[0].materials.length,0);
+});
