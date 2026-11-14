@@ -367,3 +367,29 @@ test("the optional free-text subtask and its main task remain on the same job",(
  assert.equal(j.tasks[0].title,"Bathroom renovation");
  assert.equal(j.tasks[0].group,"Bathroom");
 });
+
+test("job-first journey moves from main tasks to materials, quote and review",()=>{
+ const {element,stored}=bootstrap();
+ element("name").value="Bathroom journey";element("create").onclick();
+ assert.match(element("body").innerHTML,/Main tasks/);
+ assert.match(element("journey").innerHTML,/1 · Tasks/);
+ element("mainTaskName").value="Bathroom";
+ element("mainTaskPreset").value="Bathroom";
+ element("body").onclick({target:{closest:()=>({id:"addTask",dataset:{}})}});
+ element("body").onclick({target:{closest:()=>({dataset:{step:"materials"}})}});
+ assert.match(element("body").innerHTML,/Materials takeoff/);
+ element("body").onclick({target:{closest:()=>({dataset:{step:"quote"}})}});
+ assert.match(element("body").innerHTML,/Estimate \/ quote/);
+ element("body").onclick({target:{closest:()=>({dataset:{step:"review"}})}});
+ assert.match(element("body").innerHTML,/Quote Review/);
+ const jobs=JSON.parse(stored.get("handyos-workspace-v07")).jobs;
+ assert.equal(jobs.length,1);
+ assert.equal(jobs[0].tasks.length,1);
+});
+test("job reference is optional and does not obstruct simple job creation",()=>{
+ const {element,stored}=bootstrap();
+ element("name").value="Simple Job";
+ element("create").onclick();
+ assert.equal(JSON.parse(stored.get("handyos-workspace-v07")).jobs[0].name,"Simple Job");
+ assert.match(html,/Job reference \(optional\)/);
+});
