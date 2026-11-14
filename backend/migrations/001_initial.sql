@@ -46,7 +46,8 @@ create table if not exists work_categories (
  name text not null check(length(name) between 1 and 160),
  position integer not null default 0,
  foreign key(tenant_id,job_id) references jobs(tenant_id,id) on delete cascade,
- unique(tenant_id,id)
+ unique(tenant_id,id),
+ unique(tenant_id,job_id,id)
 );
 create table if not exists tasks (
  id uuid primary key default gen_random_uuid(),
@@ -65,7 +66,7 @@ create table if not exists tasks (
  due_on date,
  created_at timestamptz not null default now(),
  foreign key(tenant_id,job_id) references jobs(tenant_id,id) on delete cascade,
- foreign key(tenant_id,category_id) references work_categories(tenant_id,id),
+ foreign key(tenant_id,job_id,category_id) references work_categories(tenant_id,job_id,id),
  unique(tenant_id,id)
 );
 create index if not exists tasks_by_job on tasks(tenant_id,job_id,position);
