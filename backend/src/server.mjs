@@ -2,6 +2,7 @@ import http from "node:http";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { CognitoJwtVerifier } from "aws-jwt-verify";
+import { HttpError,sanitizeText,ensureUuid,parseJSON,taskColumns } from "./domain.mjs";
 
 const { Pool } = pg;
 const required = ["DATABASE_URL","COGNITO_USER_POOL_ID","COGNITO_APP_CLIENT_ID","AWS_REGION"];
@@ -11,11 +12,6 @@ const pool = new Pool({ connectionString:process.env.DATABASE_URL, ssl: process.
 const verifier = CognitoJwtVerifier.create({userPoolId:process.env.COGNITO_USER_POOL_ID,clientId:process.env.COGNITO_APP_CLIENT_ID,tokenUse:"access"});
 const allowedOrigin = process.env.FRONTEND_ORIGIN || "https://handyos.buitai.com";
 
-export class HttpError extends Error { constructor(status,message){super(message);this.status=status} }
-export function sanitizeText(value,max=200){if(typeof value!=="string")throw new HttpError(400,"Expected text");let t=value.trim();if(!t||t.length>max)throw new HttpError(400,"Invalid text length");return t}
-export function allowedRole(role,action){return ["owner","manager"].includes(role) || (action==="read" && ["worker","homeowner"].includes(role))}
-export function ensureUuid(id){if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id||""))throw new HttpError(400,"Invalid ID");return id}
-export function parseJSON(data){try {const o=JSON.parse(data);if(!o || Array.isArray(o) || typeof o!=="object")throw Error();return o}catch{throw new HttpError(400,"Invalid JSON body")}}
 function reply(res,status,value,origin){res.writeHead(status,{"content-type":"application/json; charset=utf-8","cache-control":"no-store","access-control-allow-origin":origin,"vary":"Origin","x-content-type-options":"nosniff"});res.end(JSON.stringify(value))}
 async function body(req){let chunks=[],size=0;for await(const chunk of req){size+=chunk.length;if(size>100_000)throw new HttpError(413,"Request too large");chunks.push(chunk)}return parseJSON(Buffer.concat(chunks).toString("utf8"))}
 async function authenticate(req){
@@ -79,7 +75,7 @@ async function dispatch(req){
    if(req.method==="GET"){
     await canAccessJob(client,ctx,sub,jobId);
     // Homeowners must NOT see internal labour rates, unit costs, private notes, or assignments.
-    const fields=["owner","manager"].includes(ctx.role)?"id,title,notes,status,qty,unit,unit_cost_ex_gst,assigned_to,due_on":"id,title,status,due_on";
+    const fields=taskColumns(ctx.role);
     const q=await client.query("select "+fields+" from tasks where tenant_id=$1 and job_id=$2"+(ctx.role==="homeowner"?" and client_visible=true":"")+" order by position,created_at limit 500",[ctx.tenant_id,jobId]);
     return{tasks:q.rows}
    }
