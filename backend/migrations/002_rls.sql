@@ -51,6 +51,7 @@ create policy audit_events_insert on audit_events for insert with check (tenant_
 grant usage on schema public to handyos_runtime;
 grant select on tenants,memberships,job_members to handyos_runtime;
 grant select,insert on jobs,tasks,audit_events to handyos_runtime;
-grant select on work_categories,cost_entries,quotes,quote_lines,progress_claims,payments to handyos_runtime;
+grant select,insert on work_categories to handyos_runtime;
+grant select on cost_entries,quotes,quote_lines,progress_claims,payments to handyos_runtime;
 -- No anonymous DB access and no direct browser-to-Postgres network route.
 commit;
