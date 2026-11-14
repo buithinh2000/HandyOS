@@ -1,0 +1,44 @@
+name: HandyOS PostgreSQL Integration
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/postgres-integration.yml"
+  push:
+    paths:
+      - "backend/**"
+      - ".github/workflows/postgres-integration.yml"
+permissions:
+  contents: read
+jobs:
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: test-only
+          POSTGRES_DB: handyos_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: test-only
+      PGDATABASE: handyos_ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create isolated application role
+        run: psql -X -v ON_ERROR_STOP=1 -c "create role handyos_runtime nologin nosuperuser nocreatedb nocreaterole nobypassrls;"
+      - name: Apply versioned SQL migrations
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -f backend/migrations/001_initial.sql
+          psql -X -v ON_ERROR_STOP=1 -f backend/migrations/002_rls.sql
+      - name: Verify tenant isolation and job/task insert
+        run: psql -X -v ON_ERROR_STOP=1 -f backend/test/postgres-smoke.sql
