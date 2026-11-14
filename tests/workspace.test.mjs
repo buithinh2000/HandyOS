@@ -377,7 +377,7 @@ test("job-first journey moves from main tasks to materials, quote and review",()
  element("mainTaskPreset").value="Bathroom";
  element("body").onclick({target:{closest:()=>({id:"addTask",dataset:{}})}});
  element("body").onclick({target:{closest:()=>({dataset:{step:"materials"}})}});
- assert.match(element("body").innerHTML,/Materials takeoff/);
+ assert.match(element("body").innerHTML,/Material estimate/);
  element("body").onclick({target:{closest:()=>({dataset:{step:"quote"}})}});
  assert.match(element("body").innerHTML,/Estimate \/ quote/);
  element("body").onclick({target:{closest:()=>({dataset:{step:"review"}})}});
@@ -392,4 +392,30 @@ test("job reference is optional and does not obstruct simple job creation",()=>{
  element("create").onclick();
  assert.equal(JSON.parse(stored.get("handyos-workspace-v07")).jobs[0].name,"Simple Job");
  assert.match(html,/Job reference \(optional\)/);
+});
+
+test("primary navigation keeps quote journey separate from business controls",()=>{
+ const {element}=bootstrap();
+ element("name").value="Sample project";element("create").onclick();
+ assert.match(html,/class="workspace-pane"/);
+ assert.match(html,/class="workspace-main"/);
+ assert.match(html,/Business tools & job overview/);
+ assert.match(element("journey").innerHTML,/Tasks/);
+ assert.match(element("journey").innerHTML,/Materials/);
+ assert.match(element("journey").innerHTML,/Quote/);
+ assert.match(element("journey").innerHTML,/Review/);
+ assert.doesNotMatch(element("journey").innerHTML,/Actual costs/);
+ assert.match(element("tabs").innerHTML,/Actual costs/);
+});
+test("material form puts core price fields first and supplier provenance in optional details",()=>{
+ const {element}=bootstrap();
+ element("name").value="Plasterboard project";element("create").onclick();
+ element("journey").onclick({target:{closest:()=>({dataset:{step:"materials"}})}});
+ const view=element("body").innerHTML;
+ assert.match(view,/Quantity & provisional price/);
+ assert.match(view,/Optional: wastage, units & supplier source/);
+ assert.match(view,/Price per pack/);
+ assert.match(view,/id="matSku"/);
+ assert.match(view,/id="matStore"/);
+ assert.ok(view.indexOf("id=\"matPrice\"")<view.indexOf("id=\"matStore\""));
 });
