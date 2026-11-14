@@ -176,3 +176,60 @@ test("owner screen has staff form and GST payment basis options",()=>{
  const html=readFileSync(new URL("../owner-v1.html",import.meta.url),"utf8");
  for(const term of ["staffName","staffRole","staffRate","addStaff","workerName","payBasis","no_gst","customerPayment"]){assert.ok(html.includes(term),term)}
 });
+
+test("single Tax & Reserve Fund is Owner-chosen percent of TOTAL contract incl GST, deducted exactly once",()=>{
+ const a=j("reserve","Bathroom");
+ a.contract=11000;
+ a.taxReservePct=15;
+ a.expenses.push({id:"other",amount:220,gstBasis:"inc",kind:"other",date:"2026-11-15",paidStatus:"paid"});
+ a.expenses.push({id:"material",amount:1100,gstBasis:"inc",kind:"material",date:"2026-11-15",paidStatus:"paid"});
+ a.timesheets.push(worker("Alex","2026-11-15",10,40));
+ const x=summary(a);
+ assert.equal(x.agreedEx,10000);
+ assert.equal(x.otherExpensesEx,200);
+ assert.equal(x.expensesEx,1200);
+ assert.equal(x.labour,400);
+ assert.equal(x.profitBeforeReserve,8400);
+ assert.equal(x.taxReservePct,15);
+ assert.equal(x.taxReserveAmount,1650);
+ assert.equal(x.profit,6750);
+ assert.equal(canClose(a).ok,true);
+ const close=snapshot(a,"2026-11-15");
+ assert.equal(close.profitEstimate,6750);
+ assert.equal(close.taxReserveAmount,1650);
+ assert.equal(close.taxReservePct,15);
+ assert.equal(close.otherExpensesEx,200);
+ // Wage payments are not an additional expense.
+ a.workerPayments.push({id:"paid",worker:"Alex",paidOn:"2026-11-15",amount:300});
+ assert.equal(summary(a).profit,6750);
+});
+test("reserve percentage is optional on old jobs, zero by default, never auto 15%",()=>{
+ const a=j("legacy","Legacy");
+ assert.equal(summary(a).taxReservePct,0);
+ assert.equal(summary(a).taxReserveAmount,0);
+ assert.equal(summary(a).profit,10000);
+ a.taxReservePct=0;
+ assert.equal(summary(a).profit,10000);
+});
+test("invalid reserve percentages block final profit and close instead of misleading numbers",()=>{
+ const a=j("bad","Bath");
+ for(const value of [-1,101,"bad"]){
+  a.taxReservePct=value;
+  assert.equal(summary(a).profit,null);
+  assert.equal(canClose(a).ok,false);
+ }
+});
+test("unclassified expenses block final estimated profit even with reserve",()=>{
+ const a=j("unknown","Kitchen");
+ a.taxReservePct=15;
+ a.expenses.push({id:"x",amount:100,kind:"other"});
+ assert.equal(summary(a).profit,null);
+ assert.equal(canClose(a).ok,false);
+});
+test("job and company views include one combined owner percentage, other expenses, and final profit",()=>{
+ const html=readFileSync(new URL("../owner-v1.html",import.meta.url),"utf8");
+ assert.ok(html.includes("Tax & Reserve Fund (%)"));
+ assert.ok(html.includes("Other expenses (ex GST, already included below)"));
+ assert.ok(html.includes("Final estimated profit after reserve"));
+ assert.ok(html.includes("taxReservePct"));
+});
