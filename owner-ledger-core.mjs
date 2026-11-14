@@ -150,30 +150,41 @@ export function summary(job) {
   if(Number.isFinite(raw))expensesEntered=round2(expensesEntered+raw);
   if(Number.isFinite(net))expensesEx=round2(expensesEx+net);else unclassified++;
  }
+ const otherExpensesEx=round2((job.expenses||[]).filter(e=>e.kind==="other").reduce((total,e)=>{const amount=expenseEx(e);return total+(Number.isFinite(amount)?amount:0)},0));
+ const regularExpensesEx=round2(expensesEx-otherExpensesEx);
  const labour=round2(labourRows(job).reduce((s,x)=>s+x.total,0));
  const wagesPaid=round2((job.workerPayments||[]).reduce((a,p)=>a+(money(p.amount)||0),0));
  const payment=paymentBreakdown(job);
  const received=payment.cash;
  const requested=payment.requested;
  const costEx=round2(expensesEx+labour);
- const profit=hasContract&&unclassified===0?round2(agreedEx-costEx):null;
+ const taxReservePct=job.taxReservePct===undefined?0:Number(job.taxReservePct);
+ const reserveValid=Number.isFinite(taxReservePct)&&taxReservePct>=0&&taxReservePct<=100;
+ // Owner instruction: contingency is 15% of the agreed TOTAL contract incl GST.
+ // Tax provision is a user-entered planning percentage of revenue EX GST.
+ const contingencyReserve=hasContract?round2(agreedInc*0.15):null;
+ const taxReserve=hasContract&&reserveValid?round2(agreedEx*taxReservePct/100):null;
+ const grossProfit=hasContract&&unclassified===0?round2(agreedEx-costEx):null;
+ const profit=grossProfit!==null&&reserveValid?round2(grossProfit-contingencyReserve-taxReserve):null;
  const remaining=hasContract?round2(agreedInc-received):null;
  const risks=[];
  if(!hasContract)risks.push("Enter the agreed contract amount incl GST before estimating profit.");
  if(unclassified)risks.push(unclassified+" expense line(s) have unknown GST basis.");
+ if(!reserveValid)risks.push("Tax reserve percentage is invalid (must be 0–100%).");
  if((job.expenses||[]).some(e=>e.kind==="labour")&&(job.timesheets||[]).length)risks.push("Labour expense lines and timesheets both exist: verify no duplicated wages.");
  if(hasContract&&received>agreedInc)risks.push("Recorded cash received exceeds the agreed contract amount.");
- return {paymentReceivedNet:payment.receivedNet,paymentReceivedGst:payment.receivedGst,wagesPaid,wagesOutstanding:round2(labour-wagesPaid),hasContract,agreedInc:hasContract?agreedInc:null,agreedEx,expensesEx,expensesEntered,unclassified,labour,costEx,received,requested,remaining,profit,risks};
+ return {otherExpensesEx,regularExpensesEx,grossProfit,taxReservePct,taxReserve,contingencyReserve,paymentReceivedNet:payment.receivedNet,paymentReceivedGst:payment.receivedGst,wagesPaid,wagesOutstanding:round2(labour-wagesPaid),hasContract,agreedInc:hasContract?agreedInc:null,agreedEx,expensesEx,expensesEntered,unclassified,labour,costEx,received,requested,remaining,profit,risks};
 }
 export function canClose(job) {
  const s=summary(job);
  if(!s.hasContract)return {ok:false,reason:"Agreed contract amount is required to close a job."};
  if(s.unclassified)return {ok:false,reason:"Classify GST basis of every expense before closing."};
+ if(!Number.isFinite(s.taxReserve))return {ok:false,reason:"Tax reserve percentage must be 0–100% before closing."};
  return {ok:true,reason:""};
 }
 export function snapshot(job,closedAt) {
  const permission=canClose(job);
  if(!permission.ok)throw new Error(permission.reason);
  const s=summary(job);
- return {closedAt,contractInc:s.agreedInc,contractEx:s.agreedEx,expensesEx:s.expensesEx,labour:s.labour,profitEstimate:s.profit,receivedInc:s.received,remainingContractInc:s.remaining,expenseCount:job.expenses.length,paymentCount:job.payments.length,timesheetCount:job.timesheets.length,wagesPaid:s.wagesPaid,wagesOutstanding:s.wagesOutstanding};
+ return {closedAt,contractInc:s.agreedInc,contractEx:s.agreedEx,expensesEx:s.expensesEx,labour:s.labour,profitEstimate:s.profit,grossProfitEstimate:s.grossProfit,taxReservePct:s.taxReservePct,taxReserve:s.taxReserve,contingencyReserve:s.contingencyReserve,otherExpensesEx:s.otherExpensesEx,receivedInc:s.received,remainingContractInc:s.remaining,expenseCount:job.expenses.length,paymentCount:job.payments.length,timesheetCount:job.timesheets.length,wagesPaid:s.wagesPaid,wagesOutstanding:s.wagesOutstanding};
 }
