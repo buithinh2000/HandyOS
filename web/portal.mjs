@@ -59,6 +59,8 @@ async function load(){
  const info=await api("/v1/me");
  activeTenant=info.tenant_id;
  $("identity").textContent="Vai trò: "+info.role;
+ const {categories}=await api("/v1/renovation-catalog");
+ $("categoryChoices").innerHTML=categories.map(c=>'<label style="display:flex;align-items:center;gap:7px"><input style="width:auto" type="checkbox" name="category_code" value="'+html(c.code)+'">'+html(c.name)+'</label>').join("");
  const {jobs}=await api("/v1/jobs");
  $("jobs").innerHTML=jobs.length?jobs.map(j=>'<button class="job" data-id="'+html(j.id)+'">'+html(j.name)+' <small>'+html(j.stage)+'</small></button>').join(""):'<p>Chưa có công trình được phân quyền.</p>';
  $("newJobSection").hidden=!["owner","manager"].includes(info.role);
@@ -76,7 +78,8 @@ $("newJob").addEventListener("submit",async e=>{
  e.preventDefault();
  const name=$("jobName").value.trim();
  if(!name)return;
- try{await api("/v1/jobs",{method:"POST",body:JSON.stringify({name})});$("jobName").value="";await load();}catch(err){status(err.message,true)}
+ try{const category_codes=[...document.querySelectorAll('input[name="category_code"]:checked')].map(x=>x.value);
+ await api("/v1/jobs",{method:"POST",body:JSON.stringify({name,category_codes})});$("jobName").value="";await load();}catch(err){status(err.message,true)}
 });
 if(!configured()){status("Chưa có hạ tầng AWS staging. Không cho phép đăng nhập giả.",true);$("login").disabled=true;}
 else completeLogin().then(ok=>{if(ok)return load();status("Đăng nhập bằng AWS Cognito để mở HandyOS.")}).catch(e=>status(e.message,true));
