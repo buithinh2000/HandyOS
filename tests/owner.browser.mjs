@@ -51,6 +51,12 @@ assert.match(await page.locator("#screen").innerText(),/\$1,650\.00/);
 assert.match(await page.locator("#screen").innerText(),/\$7,850\.00/);
 const profitRecord=await page.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0]);
 assert.equal(profitRecord.taxReservePct,15);
+await page.locator("#remainingCostEx").fill("500");
+await page.locator("#saveJob").click();
+assert.match(await page.locator("#screen").innerText(),/\$7,350\.00/);
+assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0].remainingCostEx),500);
+await page.locator("#remainingCostEx").fill("0");
+await page.locator("#saveJob").click();
 
 await page.locator("#payRef").fill("No GST receipt");
 await page.locator("#payAmount").fill("200");

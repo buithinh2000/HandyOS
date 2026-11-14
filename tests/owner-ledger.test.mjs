@@ -233,3 +233,37 @@ test("job and company views include one combined owner percentage, other expense
  assert.ok(html.includes("Final estimated profit after reserve"));
  assert.ok(html.includes("taxReservePct"));
 });
+
+test("remaining forecast costs are deducted once and excluded from incurred cost and cash",()=>{
+ const a=j("forecast","Bathroom");a.contract=11000;a.taxReservePct=15;a.remainingCostEx=1800;
+ a.expenses.push({id:"material",amount:1100,gstBasis:"inc",kind:"material"});
+ a.timesheets.push(worker("Alex","2026-11-15",8,50));
+ const x=summary(a);
+ assert.equal(x.costEx,1400);
+ assert.equal(x.remainingCostEx,1800);
+ assert.equal(x.profitBeforeReserve,6800);
+ assert.equal(x.taxReserveAmount,1650);
+ assert.equal(x.profit,5150);
+ assert.equal(x.received,0);
+ assert.equal(canClose(a).ok,false);
+ assert.match(canClose(a).reason,/Remaining Costs/);
+ // Owner reconciles $500 of planned spend into real expenses, reducing forecast $500.
+ a.expenses.push({id:"extra",amount:500,gstBasis:"ex",kind:"other"});
+ a.remainingCostEx=1300;
+ assert.equal(summary(a).profit,5150);
+ a.remainingCostEx=0;
+ assert.equal(summary(a).profit,6450);
+ assert.equal(canClose(a).ok,true);
+ assert.equal(snapshot(a,"2026-11-15").remainingCostEx,0);
+});
+test("legacy jobs with no remaining forecast remain unchanged, invalid amounts block close",()=>{
+ const a=j("legacy","Legacy");assert.equal(summary(a).remainingCostEx,0);
+ assert.equal(summary(a).profit,10000);
+ for(const value of [-1,"wrong"]){a.remainingCostEx=value;assert.equal(summary(a).profit,null);assert.equal(canClose(a).ok,false)}
+});
+test("owner screens expose remaining forecast cost and clear double-counting guidance",()=>{
+ const html=readFileSync(new URL("../owner-v1.html",import.meta.url),"utf8");
+ assert.match(html,/Remaining Costs ex GST/);
+ assert.match(html,/Reduce Remaining Costs as you enter actual/);
+ assert.match(html,/Final estimated profit/);
+});
