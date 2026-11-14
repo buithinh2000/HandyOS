@@ -481,3 +481,56 @@ test("modern single main task stays directly visible, never collapsed as legacy"
  assert.doesNotMatch(element("body").innerHTML,/Legacy checklist detected/);
  assert.doesNotMatch(element("body").innerHTML,/class="legacy-group"/);
 });
+
+test("task and separate materials explicitly trigger a high overlap warning without changing the quote",()=>{
+ const {element,stored}=bootstrap();
+ element("name").value="Mixed quote";element("create").onclick();
+ element("categories").onclick({target:{closest:()=>({dataset:{category:"Bathroom"}})}});
+ const before=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0];
+ const task=before.tasks[0];
+ element("body").onchange({target:{closest:()=>({dataset:{task:task.id,key:"cost"}}),value:"100"}});
+ element("body").onchange({target:{closest:()=>({dataset:{task:task.id,key:"costBasis"}}),value:"inclusive"}});
+ element("journey").onclick({target:{closest:()=>({dataset:{step:"materials"}})}});
+ element("matName").value="Exact plasterboard";
+ element("matSupplier").value="Bunnings";element("matSku").value="SKU1";
+ element("matUnit").value="each";element("matQty").value="1";
+ element("matWaste").value="0";element("matPack").value="1";
+ element("matPrice").value="22";element("matUrl").value="";
+ element("matStore").value="Sample";
+ element("body").onclick({target:{closest:()=>({id:"addMaterial",dataset:{}})}});
+ element("journey").onclick({target:{closest:()=>({dataset:{step:"quote"}})}});
+ const quoteBefore=element("body").innerHTML;
+ assert.match(quoteBefore,/\$144\.00/); // (100 + 22/1.1) * 1.20
+ element("journey").onclick({target:{closest:()=>({dataset:{step:"review"}})}});
+ assert.match(element("body").innerHTML,/TASK_MATERIAL_OVERLAP/);
+ const after=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0];
+ assert.equal(after.tasks[0].cost,100);
+ assert.equal(after.tasks[0].costBasis,"inclusive");
+ assert.equal(after.materials.length,1);
+});
+test("subtask-only checklist never becomes a separately priced quote line",()=>{
+ const {element,stored}=bootstrap();
+ element("name").value="Scope checklist";element("create").onclick();
+ element("categories").onclick({target:{closest:()=>({dataset:{category:"Bathroom"}})}});
+ const task=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0].tasks[0];
+ element("subtask-"+task.id).value="Tiling";
+ element("body").onclick({target:{closest:()=>({dataset:{action:"add-subtask",id:task.id}})}});
+ element("journey").onclick({target:{closest:()=>({dataset:{step:"review"}})}});
+ assert.match(element("body").innerHTML,/SUBTASKS_NOT_PRICED/);
+ element("journey").onclick({target:{closest:()=>({dataset:{step:"quote"}})}});
+ assert.match(element("body").innerHTML,/\$0\.00/);
+ const storedTask=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0].tasks[0];
+ assert.equal(storedTask.subtasks.length,1);
+ assert.equal(storedTask.cost,0);
+});
+test("new main task cost basis initially unspecified and remains user-editable",()=>{
+ const {element,stored}=bootstrap();
+ element("name").value="Task types";element("create").onclick();
+ element("categories").onclick({target:{closest:()=>({dataset:{category:"Kitchen"}})}});
+ const task=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0].tasks[0];
+ assert.equal(task.costBasis,"unspecified");
+ assert.match(element("body").innerHTML,/Task cost includes/);
+ element("body").onchange({target:{closest:()=>({dataset:{task:task.id,key:"costBasis"}}),value:"labour_only"}});
+ const saved=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0].tasks[0];
+ assert.equal(saved.costBasis,"labour_only");
+});
