@@ -113,7 +113,8 @@ create table if not exists progress_claims (
  gst_amount numeric(14,2) not null check(gst_amount>=0),
  due_on date,
  status text not null default 'draft' check(status in ('draft','issued','part_paid','paid','void')),
- foreign key(tenant_id,job_id) references jobs(tenant_id,id) on delete cascade
+ foreign key(tenant_id,job_id) references jobs(tenant_id,id) on delete cascade,
+ unique(tenant_id,id)
 );
 create table if not exists payments (
  id uuid primary key default gen_random_uuid(),
