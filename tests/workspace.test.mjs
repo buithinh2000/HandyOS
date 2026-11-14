@@ -102,7 +102,7 @@ test("new owner jobs show full job overview",()=>{
  const {element}=bootstrap();
  element("name").value="Sample flooring";element("create").onclick();
  assert.match(element("body").innerHTML,/Owner job summary/);
- assert.match(element("body").innerHTML,/Illustrative gross margin/);
+ assert.match(element("body").innerHTML,/Provisional margin/);
 });
 
 test("expense entries carry explicit tax basis and quote overview does not classify gross as net",()=>{
