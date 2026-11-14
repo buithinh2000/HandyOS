@@ -277,3 +277,42 @@ test("owner cannot set negative quote allowances",()=>{
  assert.equal(record.labourAllowance,0);
  assert.equal(record.contingencyPct,0);
 });
+
+test("owner portfolio aggregates multiple jobs but labels draft quote separately from received cash",()=>{
+ const {element,stored}=bootstrap();
+ element("name").value="Bathroom job";element("code").value="B-1";element("create").onclick();
+ element("tabs").onclick({target:{closest:()=>({dataset:{tab:"payment"}})}});
+ element("paymentRef").value="Deposit";element("paymentAmount").value="250";element("paymentStatus").value="received";
+ element("body").onclick({target:{closest:()=>({id:"addPayment",dataset:{}})}});
+ element("name").value="Kitchen job";element("code").value="K-1";element("create").onclick();
+ element("tabs").onclick({target:{closest:()=>({dataset:{tab:"portfolio"}})}});
+ assert.match(element("body").innerHTML,/Owner portfolio/);
+ assert.match(element("body").innerHTML,/Bathroom job/);
+ assert.match(element("body").innerHTML,/Kitchen job/);
+ assert.match(element("body").innerHTML,/Draft quote total inc GST/);
+ assert.match(element("body").innerHTML,/Cash received from recorded payments/);
+ assert.match(element("body").innerHTML,/\$250\.00/);
+ assert.match(element("body").innerHTML,/NOT contracted revenue/);
+ assert.equal(JSON.parse(stored.get("handyos-workspace-v07")).jobs.length,2);
+});
+test("owner can record due date and portfolio marks open overdue job",()=>{
+ const {element,stored}=bootstrap();
+ element("name").value="Late example";element("create").onclick();
+ element("tabs").onclick({target:{closest:()=>({dataset:{tab:"details"}})}});
+ element("stage").value="active";element("dueDate").value="2020-02-01";element("notes").value="Sample only";
+ element("body").onclick({target:{closest:()=>({id:"saveDetails",dataset:{}})}});
+ element("tabs").onclick({target:{closest:()=>({dataset:{tab:"portfolio"}})}});
+ assert.match(element("body").innerHTML,/OVERDUE/);
+ assert.match(element("body").innerHTML,/2020-02-01/);
+ assert.equal(JSON.parse(stored.get("handyos-workspace-v07")).jobs[0].dueDate,"2020-02-01");
+});
+test("portfolio open action switches job without modifying saved records",()=>{
+ const {element,stored}=bootstrap();
+ element("name").value="First job";element("create").onclick();
+ const first=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0].id;
+ element("name").value="Second job";element("create").onclick();
+ element("tabs").onclick({target:{closest:()=>({dataset:{tab:"portfolio"}})}});
+ element("body").onclick({target:{closest:()=>({dataset:{action:"open-job",id:first}})}});
+ assert.match(element("body").innerHTML,/Owner job summary/);
+ assert.equal(JSON.parse(stored.get("handyos-workspace-v07")).jobs.length,2);
+});
