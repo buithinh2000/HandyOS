@@ -38,7 +38,7 @@ test("choosing bathroom adds only ONE main task, with zero automatic subtasks",(
  assert.equal(j.tasks[0].title,"Bathroom");
  assert.equal(j.tasks[0].group,"Bathroom");
  assert.deepEqual(j.tasks[0].subtasks,[]);
- assert.match(element("body").innerHTML,/Suggested steps \(optional\)/);
+ assert.match(element("body").innerHTML,/Add subtask \(optional\)/);
  assert.match(element("body").innerHTML,/Waterproofing/);
 });
 test("costs and payments are stored under same job",()=>{
@@ -418,4 +418,31 @@ test("material form puts core price fields first and supplier provenance in opti
  assert.match(view,/id="matSku"/);
  assert.match(view,/id="matStore"/);
  assert.ok(view.indexOf("id=\"matPrice\"")<view.indexOf("id=\"matStore\""));
+});
+
+test("empty main tasks stay compact and reveal only optional subtask editor",()=>{
+ const {element,stored}=bootstrap();
+ element("name").value="Compact card";element("create").onclick();
+ element("categories").onclick({target:{closest:()=>({dataset:{category:"Bathroom"}})}});
+ const view=element("body").innerHTML;
+ assert.match(view,/Add subtask \(optional\)/);
+ assert.match(view,/class="subtask-editor"/);
+ assert.match(view,/Use a suggested step/);
+ assert.doesNotMatch(view,/No subtasks yet/);
+ const j=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0];
+ assert.equal(j.tasks.length,1);
+ assert.equal(j.tasks[0].subtasks.length,0);
+});
+test("existing subtasks remain visible while the add form is collapsed",()=>{
+ const {element,stored}=bootstrap();
+ element("name").value="Compact steps";element("create").onclick();
+ element("categories").onclick({target:{closest:()=>({dataset:{category:"Bathroom"}})}});
+ const id=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0].tasks[0].id;
+ element("subtask-"+id).value="Waterproof wall";
+ element("body").onclick({target:{closest:()=>({dataset:{action:"add-subtask",id}})}});
+ const view=element("body").innerHTML;
+ assert.match(view,/Waterproof wall/);
+ assert.match(view,/Add another subtask/);
+ assert.match(view,/class="subtasks has-items"/);
+ assert.equal(JSON.parse(stored.get("handyos-workspace-v07")).jobs[0].tasks[0].subtasks.length,1);
 });
