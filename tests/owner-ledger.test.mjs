@@ -267,3 +267,51 @@ test("owner screens expose remaining forecast cost and clear double-counting gui
  assert.match(html,/Reduce Remaining Costs as you enter actual/);
  assert.match(html,/Final estimated profit/);
 });
+
+test("approved contract variations adjust revenue and reserve exactly once; overhead is unbooked",()=>{
+ const a=j("var","Bathroom");
+ a.contract=11000; a.approvedVariationInc=2200; a.overheadAllocationEx=300; a.taxReservePct=15; a.remainingCostEx=500;
+ a.expenses.push({id:"material",amount:1100,gstBasis:"inc",kind:"material"});
+ a.timesheets.push(worker("Alex","2026-11-15",10,40));
+ const v=summary(a);
+ assert.equal(v.agreedInc,11000);assert.equal(v.approvedVariationInc,2200);
+ assert.equal(v.totalContractInc,13200);assert.equal(v.totalContractEx,12000);
+ assert.equal(v.expensesEx,1000);assert.equal(v.labour,400);assert.equal(v.costEx,1400);
+ assert.equal(v.overheadAllocationEx,300);assert.equal(v.remainingCostEx,500);
+ assert.equal(v.profitBeforeReserve,9800);assert.equal(v.taxReserveAmount,1980);
+ assert.equal(v.profit,7820);assert.equal(v.remaining,13200);
+ // Moving an overhead allocation into recorded actual costs must not affect total forecast
+ a.expenses.push({id:"recorded",amount:100,gstBasis:"ex",kind:"other"});a.overheadAllocationEx=200;
+ assert.equal(summary(a).profit,7820);
+ a.remainingCostEx=0;assert.equal(canClose(a).ok,true);
+ const receipt=snapshot(a,"2026-11-15");
+ assert.equal(receipt.approvedVariationInc,2200);assert.equal(receipt.overheadAllocationEx,200);
+ assert.equal(receipt.totalContractInc,13200);
+});
+test("negative approved variation lowers revenue and reserve, invalid or zero contract blocks close",()=>{
+ const a=j("deduct","Kitchen");a.contract=11000;a.taxReservePct=10;a.approvedVariationInc=-1100;
+ assert.equal(summary(a).totalContractInc,9900);
+ assert.equal(summary(a).totalContractEx,9000);
+ assert.equal(summary(a).taxReserveAmount,990);
+ assert.equal(summary(a).profit,8010);
+ a.approvedVariationInc=-11000;
+ assert.equal(summary(a).profit,null);assert.equal(canClose(a).ok,false);
+ a.approvedVariationInc="oops";
+ assert.equal(summary(a).profit,null);assert.equal(canClose(a).ok,false);
+ a.approvedVariationInc=0;a.overheadAllocationEx=-10;
+ assert.equal(summary(a).profit,null);assert.equal(canClose(a).ok,false);
+});
+test("legacy jobs with no variations or overhead keep their previous profit",()=>{
+ const a=j("legacy","Legacy");a.taxReservePct=15;
+ assert.equal(summary(a).approvedVariationInc,0);
+ assert.equal(summary(a).overheadAllocationEx,0);
+ assert.equal(summary(a).totalContractInc,11000);
+ assert.equal(summary(a).profit,8350);
+});
+test("Job V1 keeps variation and overhead optional while exposing profit breakdown",()=>{
+ const html=readFileSync(new URL("../owner-v1.html",import.meta.url),"utf8");
+ assert.match(html,/Optional: approved contract variations & overhead/);
+ assert.match(html,/approvedVariationInc/);
+ assert.match(html,/overheadAllocationEx/);
+ assert.match(html,/Adjusted contract value ex GST/);
+});

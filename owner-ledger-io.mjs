@@ -38,14 +38,14 @@ export function csv(headers,rows){
 }
 export function ownerExports(state){
  const jobs=state.jobs||[];
- const jobRows=jobs.map(j=>{const s=summary(j);return[j.name,j.code||"",j.stage||"",s.agreedInc??"",s.received,s.expensesEx,s.otherExpensesEx,s.labour,s.remainingCostEx??"",s.profitBeforeReserve??"",s.taxReservePct??"",s.taxReserveAmount??"",s.profit??"",s.wagesPaid,s.wagesOutstanding]});
+ const jobRows=jobs.map(j=>{const s=summary(j);return[j.name,j.code||"",j.stage||"",s.agreedInc??"",s.approvedVariationInc??"",s.totalContractInc??"",s.totalContractEx??"",s.received,s.expensesEx,s.otherExpensesEx,s.labour,s.remainingCostEx??"",s.overheadAllocationEx??"",s.profitBeforeReserve??"",s.taxReservePct??"",s.taxReserveAmount??"",s.profit??"",s.wagesPaid,s.wagesOutstanding]});
  const hours=jobs.flatMap(j=>(j.timesheets||[]).map(x=>[j.name,x.worker||"",x.date||"",x.hours??"",x.rate??"",(Number(x.hours)||0)*(Number(x.rate)||0)]));
  const wagePayments=jobs.flatMap(j=>(j.workerPayments||[]).map(x=>[j.name,x.worker||"",x.paidOn||"",x.amount??""]));
  const expenses=jobs.flatMap(j=>(j.expenses||[]).map(x=>[j.name,x.date||"",x.kind||"",x.title||"",x.amount??"",x.gstBasis||"",Number.isFinite(expenseEx(x))?expenseEx(x):"Unknown",x.paidStatus||""]));
  const clientPayments=jobs.flatMap(j=>(j.payments||[]).map(x=>[j.name,x.date||"",x.reference||"",x.status||"",x.gstBasis||"inc (legacy)",x.enteredAmount??x.amount??"",x.gstAmount??(x.amount!=null?Math.round(Number(x.amount)/11*100)/100:""),x.netAmount??(x.amount!=null?Math.round(Number(x.amount)/1.1*100)/100:""),x.amount??""]));
  const staff=(state.staff||[]).map(x=>[x.name,x.role||"",x.rate??"",x.active===false?"inactive":"active"]);
  return{
-  "jobs":csv(["Job","Code","Stage","Contract incl GST","Cash received","Expenses ex GST","Other expenses (within total) ex GST","Labour earned","Remaining Costs ex GST (estimated)","Profit before reserve ex GST","Tax & Reserve Fund %","Tax & Reserve Fund AUD","Final estimated profit after reserve","Wages paid","Wages outstanding"],jobRows),
+  "jobs":csv(["Job","Code","Stage","Base contract incl GST","Approved variations incl GST","Adjusted contract incl GST","Adjusted contract ex GST","Cash received","Expenses ex GST","Other expenses (within total) ex GST","Labour earned","Remaining Costs ex GST (estimated)","Unbooked overhead allocation ex GST","Profit before reserve ex GST","Tax & Reserve Fund %","Tax & Reserve Fund AUD","Final estimated profit after reserve","Wages paid","Wages outstanding"],jobRows),
   "labour-hours":csv(["Job","Employee","Work date","Hours","Hourly cost AUD","Wages earned AUD"],hours),
   "wage-payments":csv(["Job","Employee","Paid date","Amount AUD"],wagePayments),
   "expenses":csv(["Job","Date","Category","Description","Entered amount AUD","GST basis","Cost ex GST AUD","Paid status"],expenses),
