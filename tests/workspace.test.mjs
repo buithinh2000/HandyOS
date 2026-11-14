@@ -488,8 +488,8 @@ test("task and separate materials explicitly trigger a high overlap warning with
  element("categories").onclick({target:{closest:()=>({dataset:{category:"Bathroom"}})}});
  const before=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0];
  const task=before.tasks[0];
- element("body").onchange({target:{closest:()=>({dataset:{task:task.id,key:"cost"}}),value:"100"}});
- element("body").onchange({target:{closest:()=>({dataset:{task:task.id,key:"costBasis"}}),value:"inclusive"}});
+ element("body").onchange({target:{closest:()=>({dataset:{task:task.id,key:"cost"},value:"100"})}});
+ element("body").onchange({target:{closest:()=>({dataset:{task:task.id,key:"costBasis"},value:"inclusive"})}});
  element("journey").onclick({target:{closest:()=>({dataset:{step:"materials"}})}});
  element("matName").value="Exact plasterboard";
  element("matSupplier").value="Bunnings";element("matSku").value="SKU1";
@@ -530,7 +530,7 @@ test("new main task cost basis initially unspecified and remains user-editable",
  const task=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0].tasks[0];
  assert.equal(task.costBasis,"unspecified");
  assert.match(element("body").innerHTML,/Task cost includes/);
- element("body").onchange({target:{closest:()=>({dataset:{task:task.id,key:"costBasis"}}),value:"labour_only"}});
+ element("body").onchange({target:{closest:()=>({dataset:{task:task.id,key:"costBasis"},value:"labour_only"})}});
  const saved=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0].tasks[0];
  assert.equal(saved.costBasis,"labour_only");
 });
