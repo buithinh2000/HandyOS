@@ -167,7 +167,7 @@ test("material takeoff rounds packages up and saves supplier estimates",()=>{
  element("tabs").onclick({target:{closest:()=>({dataset:{tab:"materials"}})}});
  element("matName").value="Plasterboard";element("matSupplier").value="Bunnings";
  element("matSku").value="TEST123";element("matUnit").value="m²";
- element("matQty").value="20";element("matWaste").value="10";element("matPack").value="2.88";element("matPrice").value="30";element("matUrl").value="";
+ element("matQty").value="20";element("matWaste").value="10";element("matPack").value="2.88";element("matPrice").value="33";element("matUrl").value="";element("matStore").value="Hawthorn";
  element("body").onclick({target:{closest:()=>({id:"addMaterial",dataset:{}})}});
  const j=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0];
  assert.equal(j.materials.length,1);assert.equal(j.materials[0].supplier,"Bunnings");
@@ -180,7 +180,7 @@ test("material takeoff rejects zero pack size",()=>{
  element("tabs").onclick({target:{closest:()=>({dataset:{tab:"materials"}})}});
  element("matName").value="Tiles";element("matSupplier").value="Mitre 10";
  element("matSku").value="";element("matUnit").value="m²";
- element("matQty").value="8";element("matWaste").value="10";element("matPack").value="0";element("matPrice").value="12";element("matUrl").value="";
+ element("matQty").value="8";element("matWaste").value="10";element("matPack").value="0";element("matPrice").value="12";element("matUrl").value="";element("matStore").value="Online";
  element("body").onclick({target:{closest:()=>({id:"addMaterial",dataset:{}})}});
  assert.equal(JSON.parse(stored.get("handyos-workspace-v07")).jobs[0].materials.length,0);
 });
