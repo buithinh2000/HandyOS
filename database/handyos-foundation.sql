@@ -200,3 +200,42 @@ create policy "attachments_owner_update" on public.attachments for update to aut
 -- for two companies and two projects (including cross-project access).
 -- Attachments must use a private storage bucket with its own storage.objects RLS.
 -- No public buckets, no anonymous inserts, no service-role keys in browser.
+
+
+-- Tenant-consistency constraints: prevent linking objects to a different company.
+alter table public.profiles add constraint profiles_company_id_id_unique unique(company_id,id);
+alter table public.company_members add constraint company_members_company_id_id_unique unique(company_id,id);
+alter table public.projects add constraint projects_company_id_id_unique unique(company_id,id);
+alter table public.job_categories add constraint job_categories_company_id_id_unique unique(company_id,id);
+alter table public.tasks add constraint tasks_company_id_id_unique unique(company_id,id);
+alter table public.timesheets add constraint timesheets_company_id_id_unique unique(company_id,id);
+alter table public.materials add constraint materials_company_id_id_unique unique(company_id,id);
+alter table public.expenses add constraint expenses_company_id_id_unique unique(company_id,id);
+alter table public.quotes add constraint quotes_company_id_id_unique unique(company_id,id);
+alter table public.quote_lines add constraint quote_lines_company_id_id_unique unique(company_id,id);
+alter table public.invoices add constraint invoices_company_id_id_unique unique(company_id,id);
+alter table public.payments add constraint payments_company_id_id_unique unique(company_id,id);
+alter table public.schedule_events add constraint schedule_events_company_id_id_unique unique(company_id,id);
+alter table public.messages add constraint messages_company_id_id_unique unique(company_id,id);
+alter table public.attachments add constraint attachments_company_id_id_unique unique(company_id,id);
+alter table public.job_categories add constraint job_categories_project_id_same_company foreign key(company_id,project_id) references public.projects(company_id,id);
+alter table public.tasks add constraint tasks_project_id_same_company foreign key(company_id,project_id) references public.projects(company_id,id);
+alter table public.tasks add constraint tasks_category_id_same_company foreign key(company_id,category_id) references public.job_categories(company_id,id);
+alter table public.timesheets add constraint timesheets_project_id_same_company foreign key(company_id,project_id) references public.projects(company_id,id);
+alter table public.materials add constraint materials_project_id_same_company foreign key(company_id,project_id) references public.projects(company_id,id);
+alter table public.expenses add constraint expenses_project_id_same_company foreign key(company_id,project_id) references public.projects(company_id,id);
+alter table public.quotes add constraint quotes_project_id_same_company foreign key(company_id,project_id) references public.projects(company_id,id);
+alter table public.quote_lines add constraint quote_lines_quote_id_same_company foreign key(company_id,quote_id) references public.quotes(company_id,id);
+alter table public.invoices add constraint invoices_project_id_same_company foreign key(company_id,project_id) references public.projects(company_id,id);
+alter table public.invoices add constraint invoices_quote_id_same_company foreign key(company_id,quote_id) references public.quotes(company_id,id);
+alter table public.payments add constraint payments_project_id_same_company foreign key(company_id,project_id) references public.projects(company_id,id);
+alter table public.payments add constraint payments_invoice_id_same_company foreign key(company_id,invoice_id) references public.invoices(company_id,id);
+alter table public.schedule_events add constraint schedule_events_project_id_same_company foreign key(company_id,project_id) references public.projects(company_id,id);
+alter table public.messages add constraint messages_project_id_same_company foreign key(company_id,project_id) references public.projects(company_id,id);
+alter table public.attachments add constraint attachments_project_id_same_company foreign key(company_id,project_id) references public.projects(company_id,id);
+alter table public.attachments add constraint attachments_task_id_same_company foreign key(company_id,task_id) references public.tasks(company_id,id);
+-- Message sender and upload author cannot impersonate another user.
+drop policy if exists messages_owner_insert on public.messages;
+create policy messages_owner_insert on public.messages for insert to authenticated with check (sender_id = (select auth.uid()) and exists (select 1 from public.companies c where c.id=company_id and c.owner_id=(select auth.uid())));
+drop policy if exists attachments_owner_insert on public.attachments;
+create policy attachments_owner_insert on public.attachments for insert to authenticated with check (uploaded_by = (select auth.uid()) and exists (select 1 from public.companies c where c.id=company_id and c.owner_id=(select auth.uid())));
