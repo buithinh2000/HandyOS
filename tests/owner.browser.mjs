@@ -57,6 +57,17 @@ assert.match(await page.locator("#screen").innerText(),/\$7,350\.00/);
 assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0].remainingCostEx),500);
 await page.locator("#remainingCostEx").fill("0");
 await page.locator("#saveJob").click();
+await page.locator('summary').filter({hasText:"Optional: approved contract variations & overhead"}).click();
+await page.locator("#approvedVariationInc").fill("2200");
+await page.locator("#overheadAllocationEx").fill("300");
+await page.locator("#saveJob").click();
+assert.match(await page.locator("#screen").innerText(),/Adjusted contract value ex GST/);
+assert.match(await page.locator("#screen").innerText(),/\$13,200\.00/);
+assert.match(await page.locator("#screen").innerText(),/\$1,980\.00/);
+assert.match(await page.locator("#screen").innerText(),/\$9,220\.00/);
+const adjusted=await page.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0]);
+assert.equal(adjusted.approvedVariationInc,2200);
+assert.equal(adjusted.overheadAllocationEx,300);
 
 await page.locator("#payRef").fill("No GST receipt");
 await page.locator("#payAmount").fill("200");
