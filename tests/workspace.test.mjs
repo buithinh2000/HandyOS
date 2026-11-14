@@ -372,7 +372,7 @@ test("job-first journey moves from main tasks to materials, quote and review",()
  const {element,stored}=bootstrap();
  element("name").value="Bathroom journey";element("create").onclick();
  assert.match(element("body").innerHTML,/Main tasks/);
- assert.match(element("journey").innerHTML,/1 · Tasks/);
+ assert.match(element("journey").innerHTML,/>Tasks</);
  element("mainTaskName").value="Bathroom";
  element("mainTaskPreset").value="Bathroom";
  element("body").onclick({target:{closest:()=>({id:"addTask",dataset:{}})}});
@@ -398,7 +398,7 @@ test("primary navigation keeps quote journey separate from business controls",()
  const {element}=bootstrap();
  element("name").value="Sample project";element("create").onclick();
  assert.match(html,/class="workspace-pane"/);
- assert.match(html,/class="workspace-main"/);
+ assert.match(html,/class="card workspace-main"/);
  assert.match(html,/Business tools & job overview/);
  assert.match(element("journey").innerHTML,/Tasks/);
  assert.match(element("journey").innerHTML,/Materials/);
