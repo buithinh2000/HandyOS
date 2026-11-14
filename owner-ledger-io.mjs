@@ -23,6 +23,7 @@ export function parseOwnerBackup(json){
   if(count>MAX_LINES)throw new Error("Backup has too many entries.");
  }
  if(input.payrollSettlements!==undefined&&!arr(input.payrollSettlements))throw new Error("Invalid payroll settlement records.");
+ if(input.staff!==undefined&&(!arr(input.staff)||input.staff.some(x=>typeof x.id!=="string"||typeof x.name!=="string"||!x.name.trim())))throw new Error("Invalid staff directory.");
  // Do not change input records until the entire backup is validated.
  return normalize(input);
 }
@@ -41,12 +42,14 @@ export function ownerExports(state){
  const hours=jobs.flatMap(j=>(j.timesheets||[]).map(x=>[j.name,x.worker||"",x.date||"",x.hours??"",x.rate??"",(Number(x.hours)||0)*(Number(x.rate)||0)]));
  const wagePayments=jobs.flatMap(j=>(j.workerPayments||[]).map(x=>[j.name,x.worker||"",x.paidOn||"",x.amount??""]));
  const expenses=jobs.flatMap(j=>(j.expenses||[]).map(x=>[j.name,x.date||"",x.kind||"",x.title||"",x.amount??"",x.gstBasis||"",Number.isFinite(expenseEx(x))?expenseEx(x):"Unknown",x.paidStatus||""]));
- const clientPayments=jobs.flatMap(j=>(j.payments||[]).map(x=>[j.name,x.date||"",x.reference||"",x.status||"",x.amount??""]));
+ const clientPayments=jobs.flatMap(j=>(j.payments||[]).map(x=>[j.name,x.date||"",x.reference||"",x.status||"",x.gstBasis||"inc (legacy)",x.enteredAmount??x.amount??"",x.gstAmount??(x.amount!=null?Math.round(Number(x.amount)/11*100)/100:""),x.netAmount??(x.amount!=null?Math.round(Number(x.amount)/1.1*100)/100:""),x.amount??""]));
+ const staff=(state.staff||[]).map(x=>[x.name,x.role||"",x.rate??"",x.active===false?"inactive":"active"]);
  return{
   "jobs":csv(["Job","Code","Stage","Contract incl GST","Cash received","Expenses ex GST","Labour earned","Estimated profit ex GST","Wages paid","Wages outstanding"],jobRows),
   "labour-hours":csv(["Job","Employee","Work date","Hours","Hourly cost AUD","Wages earned AUD"],hours),
   "wage-payments":csv(["Job","Employee","Paid date","Amount AUD"],wagePayments),
   "expenses":csv(["Job","Date","Category","Description","Entered amount AUD","GST basis","Cost ex GST AUD","Paid status"],expenses),
-  "client-payments":csv(["Job","Date","Reference","Status","Amount incl GST"],clientPayments)
+  "client-payments":csv(["Job","Date","Reference","Status","GST basis","Amount entered AUD","GST portion AUD","Net of GST AUD","Actual cash AUD"],clientPayments),
+  "staff":csv(["Name","Role / trade","Default hourly cost AUD","Status"],staff)
  };
 }
