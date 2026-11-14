@@ -184,3 +184,21 @@ test("material takeoff rejects zero pack size",()=>{
  element("body").onclick({target:{closest:()=>({id:"addMaterial",dataset:{}})}});
  assert.equal(JSON.parse(stored.get("handyos-workspace-v07")).jobs[0].materials.length,0);
 });
+
+test("printed quote explicitly shows estimated material line and supplier provenance",()=>{
+ const {element}=bootstrap();
+ element("name").value="Plaster job";element("create").onclick();
+ element("tabs").onclick({target:{closest:()=>({dataset:{tab:"materials"}})}});
+ element("matName").value="Plasterboard";element("matSupplier").value="Bunnings";
+ element("matSku").value="0731415";element("matUnit").value="m²";
+ element("matQty").value="20";element("matWaste").value="10";
+ element("matPack").value="2.88";element("matPrice").value="27.68";
+ element("matUrl").value="";element("matStore").value="Owner-selected store";
+ element("body").onclick({target:{closest:()=>({id:"addMaterial",dataset:{}})}});
+ element("tabs").onclick({target:{closest:()=>({dataset:{tab:"quote"}})}});
+ element("body").onclick({target:{closest:()=>({id:"printQuote",dataset:{}})}});
+ assert.match(element("report").innerHTML,/Material: Plasterboard/);
+ assert.match(element("report").innerHTML,/0731415/);
+ assert.match(element("report").innerHTML,/Owner-selected store/);
+ assert.match(element("report").innerHTML,/Owner-entered estimate/);
+});
