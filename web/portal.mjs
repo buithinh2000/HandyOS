@@ -70,7 +70,7 @@ async function loadTasks(id){
  $("taskResults").innerHTML=tasks.map(t=>'<div class="task"><b>'+html(t.title)+'</b><small>'+html(t.status)+'</small></div>').join("")||"<p>Chưa có task được chia sẻ.</p>";
 }
 $("login").addEventListener("click",()=>signIn().catch(e=>status(e.message,true)));
-$("logout").addEventListener("click",()=>{accessToken=null;activeTenant=null;$("app").hidden=true;$("auth").hidden=false;$("taskResults").textContent="";status("Đã thoát phiên ứng dụng. Đăng nhập lại nếu cần.");});
+$("logout").addEventListener("click",()=>{accessToken=null;activeTenant=null;sessionStorage.removeItem("handyos.oauth.state");sessionStorage.removeItem("handyos.oauth.verifier");$("app").hidden=true;$("auth").hidden=false;$("taskResults").textContent="";if(configured()){const url=new URL("/logout",config.cognitoDomain);url.searchParams.set("client_id",config.cognitoClientId);url.searchParams.set("logout_uri",new URL("/",config.redirectUri).href);location.assign(url.toString())}else status("Đã thoát phiên ứng dụng.");});
 $("jobs").addEventListener("click",e=>{const b=e.target.closest("[data-id]");if(b)loadTasks(b.dataset.id).catch(err=>status(err.message,true))});
 $("newJob").addEventListener("submit",async e=>{
  e.preventDefault();
