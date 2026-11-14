@@ -1,88 +1,45 @@
-# HandyOS — Product Roadmap
+# HandyOS — Product Roadmap (Owner-approved V1 scope)
 
-**Vision:** A commercial renovation/construction operating system for owners, employees, subcontractors and homeowners. A renovation checklist is only one component of the end-to-end workflow.
+## Product goal
+HandyOS is a renovation/construction operations system. **V1 is single-owner use only**, for the owner's real business workflow. The V1 user is the Owner; staff, homeowner, subcontractor and partner accounts are deliberately deferred. Do not turn V1 into a generic multi-user platform.
 
-**Locked architecture:** AWS for Cognito identity, backend APIs, PostgreSQL, S3 media and audit; Cloudflare for domain, frontend, HTTPS and edge security; GitHub for source/CI/CD. Strictly isolate HandyOS from all other BuiTai ventures.
+**Canonical architecture:** Cloudflare frontend/DNS/security + isolated AWS Cognito, API, PostgreSQL, S3 and monitoring; GitHub CI/CD. No Supabase, no shared BuiTai Core database or identity.
 
-## Phase 0 — Working foundation (highest priority)
+## V1 — OWNER OPERATIONS, production priority
 
-- One central project and tenant model: customer enquiry → site inspection → scope → estimate/quote → approval → delivery → variation → payment → handover.
-- Real owner login, secure database, role-based access (Owner, Manager, Worker, Homeowner), company and project isolation.
-- Staging deployment, automated tests, backup/restore and baseline audit logging.
-- Never treat public GitHub Pages or browser localStorage as secure production storage.
-- **Exit criteria:** Owner can sign in on two devices and see the same synthetic job; unauthorised account cannot retrieve data, even by direct API calls.
+The Owner uses one account (initial intended email: vinb.buitai@gmail.com) to run jobs from start to finish on phone and desktop.
 
-## Phase 1 — Commercial owner operations
+1. **Secure Owner login:** Cognito verified email sign-in; no password in GitHub/client source; deny unauthenticated API calls. V1 does not require Google federation, invitations or multi-user role administration.
+2. **Owner dashboard:** all jobs, stage/status, receivables, cost and margin summaries, upcoming work and overdue actions; drill down into a job.
+3. **Jobs and renovation scope:** create/edit jobs, client/site reference and notes; 21 trade categories, 111 starter tasks, custom categories, subtasks, task notes, dates, status and measures.
+4. **Estimation and quotes:** labour, material, subcontractor, allowances, waste, unit costs, configurable markup, correct ex-/inc-GST arithmetic, versioned printable customer quote, scope exclusions, quote status.
+5. **Materials:** supplier and Bunnings public price reference, date checked, manually verified values; no PowerPass integration in V1.
+6. **Costing and labour:** Owner records job costs and staff timesheets/amounts (staff do NOT log in); estimated vs actual and gross margin including explicit GST basis.
+7. **Schedule and progress:** Owner sets task dates, reminders/checklists, stages, notes, progress statuses, photos/video for **owner-only records** (subject to storage readiness).
+8. **Payments and handover:** Owner records progress claims/invoices, amounts paid/overdue, project defects, completion and handover checklist. No customer portal/online approval yet.
+9. **Operational basics:** AWS database, backups, exports, error handling, activity audit, production monitoring, staging tests and rollbacks.
 
-- Owner dashboard: jobs, job stages, forecast vs actual margin, receivables, labour, overdue work and alerts.
-- Flexible renovation scope: restumping, subfloor, hybrid/laminate/carpet/tile floors, partitions, doors, plaster, painting, bathroom, WC, laundry, ceiling, roofing, windows, kitchen, mini bar, custom trade and nested tasks/notes.
-- Materials catalogue with public Bunnings references and timestamped price checks (no PowerPass connection).
-- Quote versions, inclusions/exclusions, line items, GST, allowances, subcontractors, print/share PDF and customer approvals.
-- Work schedule, assignments, daily timesheets, staff approval, cost capture, progress claims, payment status and change orders.
-- **Exit criteria:** One synthetic job can proceed through quote, work, cost and payment without duplicate data entry.
+**V1 main flow:** Owner signs in → creates renovation job → selects categories and edits tasks → estimates/quotes → manages work & labour → records costs and claims → monitors profitability → closes/handover. One shared project ID and backend; no disconnected browser stores.
 
-## Phase 2 — Client Collaboration & Shared Project Workspace (required)
+**V1 production acceptance:** Verified Owner sign-in on two devices with the same AWS records; unauthenticated API access denied; no data leaks; Postgres migration and backup/restore verified; automated end-to-end synthetic test through the main flow; secure HTTPS and Cloudflare deployment; no real data until gates pass.
 
-Goal: Owner, workers and homeowner coordinate in **one shared project room**; no fragmented chat apps, disconnected photo galleries, or unverifiable verbal sign-offs.
+## V2 — Multi-user and collaboration (after V1 accepted)
 
-### 2.1 Project conversations
-- Private project-scoped chat with owner/manager, invited homeowner and individually authorised workers.
-- Thread messages by stage, task, variation or inspection; notifications, read/unread and mentions.
-- Attach photos/video/files and keep timestamps, sender, attachments and an audit trail.
-- Internal-only threads and client-visible conversations are clearly separated; customer cannot access internal costing, staff wages, business profit or unshared notes.
+- Employee/manager accounts, invitations, per-role job permissions, own timesheets and assignments.
+- Customer/homeowner project portal and partner/subcontractor access, with independent project-level permissions.
+- **Shared chat per job**, threaded discussion linked to tasks, stages, quotes and variations, with notifications and read receipts.
+- **Shared task board and progress timeline**: owner, worker and homeowner can see/act only on the tasks explicitly shared with them.
+- **Photos/video by construction stage**, before/during/after, owner-upload and worker-upload with client-visible flags, metadata and controlled private S3 access.
+- **Stage acceptance (nghiệm thu)**: owner marks ready, shares evidence; customer accepts or requests rework; signed and timestamped decision/audit trail. Homeowner acceptance does not replace trade/statutory inspection.
+- Formal quote and variation approvals, customer messages, reminders and collaborative defect closure.
+- Integrations and multi-business/partner marketplace considerations after validated customer demand.
 
-### 2.2 Shared task board and progress tracking
-- Owner/manager can share selected tasks with homeowners; assign responsibility and due dates as appropriate.
-- Both parties can view status, comment, request clarifications and acknowledge completion.
-- Distinguish **contractor-completed**, **ready for client review**, **client accepted**, and **rework requested**; a tick on a checklist is NOT formal acceptance.
-- Clarify which client-facing requests are just comments, proposed variations, or approved scope changes.
-- Maintain change history and who changed what, without silent overwrites.
+**V2 security gate:** No worker/customer can access internal margin, supplier prices, wages, other projects, private notes or media. Test direct API and signed media URLs as well as UI.
 
-### 2.3 Media updates by construction stage
-- Owner/worker uploads site photos/video into S3; associate each with job + stage + task + timestamp, uploader and visibility.
-- Timeline/gallery shows Before → During → After for demolition, restumping, framing, plaster, waterproofing, tiling, painting, fit-off and handover as applicable.
-- Group updates by stage and date; client receives only approved/shared media.
-- Support phone-first uploads, compression, thumbnails, retry on poor onsite connectivity, meaningful captions and private originals.
-- Use private encrypted object storage, short-lived authorised media URLs, per-job access controls and clear retention/deletion policy.
+## V3 — Expansion
+- Accounting integrations, deeper supplier catalogue and purchase orders.
+- Advanced scheduling/resource optimization, performance insights, AI estimating and project-risk assistance.
+- Commercial multi-company onboarding, subscription billing and marketplace only after V1/V2 product quality is established.
 
-### 2.4 Stage inspection and sign-off (nghiệm thu)
-- Manager marks a stage **ready for inspection**, attaches checklist/evidence (photos/video, measurements, supporting certificates where required).
-- Homeowner receives a review request, may approve, comment, or request rework; track decisions and dates.
-- Explicitly record the approved checklist/scope version, decision, approver identity, evidence links, notes and timestamps.
-- Rework opens follow-up tasks and requires another inspection; no automatic approval simply because time has passed.
-- Capture formal confirmation/e-signature only when legally appropriate, with jurisdiction-specific contractual review.
-- Keep statutory and trade-required inspections/certifications separate from customer acceptance: homeowner sign-off does not replace licensed inspections or compliance certificates.
-
-### 2.5 Shared handover
-- Defect/punch-list with responsible party, due dates, photo evidence and closure review.
-- Handover package: as-built photos, warranties, manuals, certifications, outstanding items and payment summary appropriate for the homeowner.
-- Store acceptance history, change orders and handover receipt.
-
-**Phase 2 exit criteria (automated E2E):**
-1. Owner invites homeowner to Job A; homeowner cannot discover Job B.
-2. Worker can update an assigned task/upload progress without seeing supplier costs, profits or other employees' pay.
-3. Owner uploads stage photo/video; homeowner sees only approved shared assets.
-4. Homeowner comments on a task; owner receives notification and both see the same thread.
-5. Manager requests inspection; homeowner requests rework, then approves the corrected stage; evidence and history remain intact.
-6. Internal-only message/file/notes are inaccessible from homeowner's token and direct media URL.
-7. Final handover pack is generated from the same project data with all accepted stages.
-
-## Phase 3 — Commercial expansion
-
-- Recurring servicing, maintenance and defects/warranty follow-up.
-- Supplier price revisions, purchase orders, cost forecasts and scheduling automation.
-- Customer-facing project updates and reminders via preferred channels (opt-in where required).
-- KPI reporting and optional accounting integrations with audited reconciliation.
-- AI project assistant using permission-filtered evidence for estimating, missed scope, schedule conflicts and cost anomalies; never silently accept variations or final stage sign-offs.
-
-## Workflow rules
-
-- All entities share stable tenant_id and project_id; no duplicative independent localStorage stores in production.
-- Internal and customer-visible objects are explicit and access-tested at API and storage layers.
-- Chat is not approval: formal quote, variation, inspection and payment transitions are separate audit events.
-- No real client/employee/financial data until AWS Cognito, PostgreSQL, RLS/authorization, private S3 and backup gates pass.
-- A production release requires synthetic end-to-end tests across Owner, Worker and Homeowner plus a negative cross-project access test.
-
-## Current position — 2026-11-15
-
-Public demo: renovation scope, estimate and simple cost/payment workflow using browser storage. AWS backend/auth foundation exists only on draft development PR; database, secure login, shared client collaboration, S3 uploads and inspections are NOT deployed.
+## Current verified status (2026-11-15)
+Public GitHub Pages prototype has browser-local features only. Source-only AWS backend and PostgreSQL schema/tenant isolation tests have passed CI; **no verified AWS service deployment, working Cognito login or live cloud database**. The existing static demo must not be used for real sensitive data.
