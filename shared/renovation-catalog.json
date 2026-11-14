@@ -1,0 +1,241 @@
+{
+  "version": 1,
+  "categories": [
+    {
+      "code": "REN-001",
+      "name": "Site preparation",
+      "tasks": [
+        "Inspection & measure",
+        "Site protection",
+        "Demolition & waste",
+        "Site clean"
+      ]
+    },
+    {
+      "code": "REN-002",
+      "name": "Restumping",
+      "tasks": [
+        "Engineer / scope review",
+        "Temporary supports",
+        "Replace stumps",
+        "Level & inspect"
+      ]
+    },
+    {
+      "code": "REN-003",
+      "name": "Subfloor",
+      "tasks": [
+        "Inspect framing",
+        "Repair joists / bearers",
+        "Moisture / ventilation",
+        "Subfloor sheeting"
+      ]
+    },
+    {
+      "code": "REN-004",
+      "name": "Hybrid flooring",
+      "tasks": [
+        "Remove old floor",
+        "Level / moisture check",
+        "Underlay",
+        "Hybrid flooring",
+        "Trims / skirting"
+      ]
+    },
+    {
+      "code": "REN-005",
+      "name": "Laminate flooring",
+      "tasks": [
+        "Remove old floor",
+        "Level substrate",
+        "Underlay",
+        "Laminate floor",
+        "Skirting"
+      ]
+    },
+    {
+      "code": "REN-006",
+      "name": "Carpet",
+      "tasks": [
+        "Remove old carpet",
+        "Prepare substrate",
+        "Underlay & gripper",
+        "Carpet installation"
+      ]
+    },
+    {
+      "code": "REN-007",
+      "name": "Tiles",
+      "tasks": [
+        "Prepare substrate",
+        "Waterproof where required",
+        "Lay tiles",
+        "Grout & silicone"
+      ]
+    },
+    {
+      "code": "REN-008",
+      "name": "Room partition",
+      "tasks": [
+        "Set out",
+        "Wall framing",
+        "Electrical rough-in",
+        "Insulation",
+        "Plasterboard",
+        "Stopping & paint"
+      ]
+    },
+    {
+      "code": "REN-009",
+      "name": "New door",
+      "tasks": [
+        "Measure opening",
+        "Frame / jamb",
+        "Door hanging",
+        "Hardware & lock",
+        "Architraves"
+      ]
+    },
+    {
+      "code": "REN-010",
+      "name": "Plaster",
+      "tasks": [
+        "Measure",
+        "Plasterboard installation",
+        "Joint stopping",
+        "Sanding",
+        "Cornice"
+      ]
+    },
+    {
+      "code": "REN-011",
+      "name": "Painting",
+      "tasks": [
+        "Protection",
+        "Patch & sand",
+        "Primer",
+        "Topcoat",
+        "Touch ups"
+      ]
+    },
+    {
+      "code": "REN-012",
+      "name": "Bathroom",
+      "tasks": [
+        "Demolition",
+        "Plumbing rough-in",
+        "Electrical rough-in",
+        "Waterproofing",
+        "Wall tiles",
+        "Floor tiles",
+        "Shower screen",
+        "Shower base / mixer",
+        "Toilet",
+        "Vanity",
+        "Mirror & accessories",
+        "Silicone & tests"
+      ]
+    },
+    {
+      "code": "REN-013",
+      "name": "Toilet",
+      "tasks": [
+        "Strip out",
+        "Plumbing",
+        "Waterproof if needed",
+        "Tiling",
+        "New toilet",
+        "Accessories"
+      ]
+    },
+    {
+      "code": "REN-014",
+      "name": "Laundry",
+      "tasks": [
+        "Demolition",
+        "Plumbing",
+        "Cabinetry",
+        "Laundry sink",
+        "Benchtop",
+        "Splashback",
+        "Appliance connection"
+      ]
+    },
+    {
+      "code": "REN-015",
+      "name": "Ceiling",
+      "tasks": [
+        "Framing / battens",
+        "Insulation",
+        "Ceiling sheets",
+        "Cornice",
+        "Stopping & painting"
+      ]
+    },
+    {
+      "code": "REN-016",
+      "name": "Roof",
+      "tasks": [
+        "Roof assessment",
+        "Access / scaffolding",
+        "Roof framing",
+        "Sheet / tile repair",
+        "Flashing",
+        "Gutters / downpipes"
+      ]
+    },
+    {
+      "code": "REN-017",
+      "name": "Window",
+      "tasks": [
+        "Measure",
+        "Remove old window",
+        "Frame preparation",
+        "Install glazing / window",
+        "Flashing / sealing",
+        "Trim"
+      ]
+    },
+    {
+      "code": "REN-018",
+      "name": "Kitchen",
+      "tasks": [
+        "Design & measure",
+        "Demolition",
+        "Cabinets",
+        "Benchtop",
+        "Sink & tapware",
+        "Splashback",
+        "Appliances",
+        "Finishing"
+      ]
+    },
+    {
+      "code": "REN-019",
+      "name": "Bar / mini kitchen",
+      "tasks": [
+        "Cabinet base",
+        "Sink & plumbing",
+        "Benchtop",
+        "Splashback",
+        "Finishing"
+      ]
+    },
+    {
+      "code": "REN-020",
+      "name": "Deck / outdoor",
+      "tasks": [
+        "Footings",
+        "Framing",
+        "Decking",
+        "Stairs / railing",
+        "Coating"
+      ]
+    },
+    {
+      "code": "REN-021",
+      "name": "Other / custom",
+      "tasks": []
+    }
+  ]
+}
