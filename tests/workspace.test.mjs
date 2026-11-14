@@ -14,7 +14,7 @@ test("renovation catalogue lists complete key trades",()=>{
 function bootstrap(){
  const elements=new Map(),stored=new Map();
  const element=id=>{
-  if(!elements.has(id))elements.set(id,{id,value:"",innerHTML:"",textContent:"",onclick:null,onchange:null});
+  if(!elements.has(id))elements.set(id,{id,value:"",innerHTML:"",textContent:"",onclick:null,onchange:null,addEventListener(){}});
   return elements.get(id);
  };
  const context={document:{getElementById:element,addEventListener(){},createElement(){return {click(){}}}},localStorage:{getItem:k=>stored.get(k)||null,setItem:(k,v)=>stored.set(k,v)},Intl,Math,Date,JSON,Number,String,Array,Set,Map,Error,Blob:class{},URL:{createObjectURL:()=>"",revokeObjectURL(){}},setTimeout(){},confirm:()=>true,alert:()=>{},prompt:()=>null,window:{print(){}},console};
