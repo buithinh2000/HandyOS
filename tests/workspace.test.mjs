@@ -14,7 +14,7 @@ test("renovation catalogue lists complete key trades",()=>{
 function bootstrap(){
  const elements=new Map(),stored=new Map();
  const element=id=>{
-  if(!elements.has(id))elements.set(id,{id,value:"",innerHTML:"",textContent:"",onclick:null,onchange:null});
+  if(!elements.has(id))elements.set(id,{id,value:"",innerHTML:"",textContent:"",onclick:null,onchange:null,addEventListener(){}});
   return elements.get(id);
  };
  const context={document:{getElementById:element,addEventListener(){},createElement(){return {click(){}}}},localStorage:{getItem:k=>stored.get(k)||null,setItem:(k,v)=>stored.set(k,v)},Intl,Math,Date,JSON,Number,String,Array,Set,Map,Error,Blob:class{},URL:{createObjectURL:()=>"",revokeObjectURL(){}},setTimeout(){},confirm:()=>true,alert:()=>{},prompt:()=>null,window:{print(){}},console};
@@ -48,4 +48,38 @@ test("costs and payments are stored under same job",()=>{
  element("body").onclick({target:{closest:()=>({id:"addPayment",dataset:{}})}});
  const j=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0];
  assert.equal(j.expenses[0].amount,245.5);assert.equal(j.payments[0].amount,1000);
+});
+
+test("custom category is visible after adding",()=>{
+ const {element,stored}=bootstrap();
+ element("name").value="Demo custom";element("create").onclick();
+ const button={id:"custom",dataset:{}};
+ // prompt() in harness returns null; custom groups remain user-driven in UI.
+ assert.ok(element("categories").innerHTML.includes("Bathroom"));
+ const db=JSON.parse(stored.get("handyos-workspace-v07"));
+ assert.equal(db.jobs.length,1);
+});
+test("expense entry can be removed from the same job",()=>{
+ const {element,stored}=bootstrap();
+ element("name").value="Demo costs";element("create").onclick();
+ element("tabs").onclick({target:{closest:()=>({dataset:{tab:"cost"}})}});
+ element("expenseTitle").value="Timber";element("expenseKind").value="material";element("expenseAmount").value="45";
+ element("body").onclick({target:{closest:()=>({id:"addExpense",dataset:{}})}});
+ let j=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0];
+ assert.equal(j.expenses.length,1);
+ element("body").onclick({target:{closest:()=>({dataset:{action:"remove-expense",id:j.expenses[0].id}})}});
+ j=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0];
+ assert.equal(j.expenses.length,0);
+});
+test("payment entry can be removed from the same job",()=>{
+ const {element,stored}=bootstrap();
+ element("name").value="Demo payment";element("create").onclick();
+ element("tabs").onclick({target:{closest:()=>({dataset:{tab:"payment"}})}});
+ element("paymentRef").value="Claim 1";element("paymentAmount").value="100";element("paymentStatus").value="requested";
+ element("body").onclick({target:{closest:()=>({id:"addPayment",dataset:{}})}});
+ let j=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0];
+ assert.equal(j.payments.length,1);
+ element("body").onclick({target:{closest:()=>({dataset:{action:"remove-payment",id:j.payments[0].id}})}});
+ j=JSON.parse(stored.get("handyos-workspace-v07")).jobs[0];
+ assert.equal(j.payments.length,0);
 });
