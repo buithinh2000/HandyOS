@@ -351,3 +351,22 @@ test("Owner V1 jobs overview exposes status counts, payment progress and schedul
  const html=readFileSync(new URL("../owner-v1.html",import.meta.url),"utf8");
  for(const token of ["Jobs Overview","Planning / Quoting","In Progress","Finished","Schedule · Next 14 days","No job booked","startDate","endDate","paymentProgress"]){assert.ok(html.includes(token),token)}
 });
+
+test("approved variations control overpayment warnings and closed job receivables",()=>{
+ const j={id:"variation",name:"Renovation",stage:"active",contract:11000,approvedVariationInc:2200,taxReservePct:15,remainingCostEx:0,overheadAllocationEx:0,expenses:[],timesheets:[],workerPayments:[],payments:[{id:"received",reference:"Deposit",status:"received",amount:12000}]};
+ const before=summary(j);
+ assert.equal(before.totalContractInc,13200);
+ assert.equal(before.remaining,1200);
+ assert.equal(before.profit,10020); // 13200 ex GST = 12000, reserve 1980
+ assert.equal(before.risks.some(x=>x.includes("exceeds the adjusted contract")),false,"payments above base contract can be valid after approved variations");
+ j.payments.push({id:"extra",reference:"Additional cash",status:"received",amount:1400});
+ const after=summary(j);
+ assert.equal(after.received,13400);
+ assert.equal(after.remaining,-200);
+ assert.ok(after.risks.some(x=>x.includes("exceeds the adjusted contract")));
+ assert.equal(after.profit,10020,"cashflow does not alter contract profitability");
+ j.payments.pop();
+ j.stage="closed";
+ const closed=summary(j);
+ assert.ok(closed.risks.some(x=>x.includes("cash remains outstanding")));
+});
