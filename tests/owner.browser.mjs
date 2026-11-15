@@ -727,5 +727,34 @@ assert.equal(crewStorage.jobs[0].timesheets[0].rate,250);
 assert.equal(await crewPage.locator("#crewCheckIn").count(),1);
 await crewPage.close();
 
+// Weekly bonus from employee mobile detail accrues but does not record payment.
+const bonusPage=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+bonusPage.on("dialog",d=>d.type()==="prompt"?d.accept("Bonus sample job"):d.accept());
+await bonusPage.goto(address);
+await bonusPage.locator('[data-page="employees"]').click();
+await bonusPage.locator("#toggleStaffForm").click();
+await bonusPage.locator("#staffName").fill("Bonus Alex");
+await bonusPage.locator("#staffRate").fill("250");
+await bonusPage.locator("#staffBasis").selectOption("day");
+await bonusPage.locator("#addStaff").click();
+await bonusPage.locator('[data-page="jobs"]').click();
+await bonusPage.locator("#newJob").click();
+await bonusPage.locator("#contract").fill("11000");
+await bonusPage.locator("#stage").selectOption("scheduled");
+await bonusPage.locator("#saveJob").click();
+await bonusPage.locator('[data-page="employees"]').click();
+await bonusPage.locator('[data-open="worker"][data-name="Bonus Alex"]').first().click();
+await bonusPage.locator("#bonusJob").selectOption({index:1});
+await bonusPage.locator("#bonusDate").fill("2026-11-20");
+await bonusPage.locator("#bonusAmount").fill("100");
+await bonusPage.locator("#bonusReason").fill("Weekly performance");
+await bonusPage.locator("#addWeeklyBonus").click();
+const bonusData=await bonusPage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")));
+assert.equal(bonusData.jobs[0].wageAdjustments.length,1);
+assert.equal(bonusData.jobs[0].wageAdjustments[0].weekStart,"2026-11-16");
+assert.equal(bonusData.jobs[0].workerPayments.length,0);
+assert.match(await bonusPage.locator("#weeklyBonusPanel").innerText(),/\$100\.00/);
+await bonusPage.close();
+
 console.log("OWNER_BROWSER_QA_PASS");
 }finally{if(browser)await browser.close();await new Promise(ok=>server.close(ok))}
