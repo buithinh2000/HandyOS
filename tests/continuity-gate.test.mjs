@@ -72,3 +72,12 @@ test("current V1 design contract preserves lean Owner scope and clearly defers o
  assert.match(design,/adjusted_contract_inc \* owner_selected_pct/);
  assert.match(design,/browser-local synthetic-data demo only/i);
 });
+
+test("cross-chat handoff identifies the approved Owner homepage and separates source state from deployment",()=>{
+ const handoff=read("docs/HANDOFF.md");
+ assert.match(handoff,/Verified current status/);
+ assert.match(handoff,/PR #56/);
+ assert.match(handoff,/index\.html.*owner-v1\.html/);
+ assert.match(handoff,/NO confirmed public Pages rollout/);
+ assert.match(handoff,/Historical next action \(superseded/);
+});
