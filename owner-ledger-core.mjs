@@ -174,7 +174,7 @@ export function scheduleDays(jobs,from,days=14){
  for(let index=0;index<days;index++){
   const d=new Date(anchor.getTime()+index*86400000),date=d.toISOString().slice(0,10);
   const booked=jobs.filter(j=>{
-   if(jobGroup(j)==="finished")return false;
+   if(!["booked","active"].includes(jobGroup(j)))return false;
    const e=scheduleEntry(j);
    return e.scheduled&&e.start<=date&&date<=e.end;
   });
