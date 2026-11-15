@@ -130,7 +130,7 @@ export function expenseSummary(jobs,{jobId="",kind="",year="",month=""}={}){
 }
 // Date-scoped management view. Cash movements and accrued wages are distinct.
 export function financialPeriodSummary(state,{from="",to=""}={}){
- const inside=d=>isISODate(d)&&(!from||d>=from)&&(!to||d<=to);
+ const inside=d=>!from&&!to||isISODate(d)&&(!from||d>=from)&&(!to||d<=to);
  const jobs=state.jobs||[];
  const earned=round2(jobs.reduce((n,j)=>n+labourRows(j).filter(t=>inside(t.date)).reduce((a,t)=>a+t.total,0),0));
  const wagePaid=round2(jobs.reduce((n,j)=>n+(j.workerPayments||[]).filter(p=>inside(p.paidOn)).reduce((a,p)=>a+(money(p.amount)||0),0),0));
