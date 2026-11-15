@@ -418,5 +418,26 @@ assert.equal(await settlePage.locator("#screen").getByText("Up to date").count()
 assert.equal(await settlePage.locator("#screen").getByText("Changed since close").count(),1);
 await settlePage.close();
 
+// The native beforeunload guard must protect unsaved financial edits on refresh/close.
+const reloadGuardPage=await browser.newPage();
+reloadGuardPage.on("dialog",d=>d.accept());
+await reloadGuardPage.goto(address);
+await reloadGuardPage.locator('[data-page="jobs"]').click();
+await reloadGuardPage.locator("#newJob").click();
+await reloadGuardPage.locator("#contract").fill("5500");
+await reloadGuardPage.locator("#saveJob").click();
+const leaveWouldBeBlocked=()=>reloadGuardPage.evaluate(()=>{
+ const event=new Event("beforeunload",{cancelable:true});
+ window.dispatchEvent(event);
+ return event.defaultPrevented;
+});
+assert.equal(await leaveWouldBeBlocked(),false,"Saved contract must not trigger browser leave warning");
+await reloadGuardPage.locator("#taxReservePct").fill("15");
+assert.equal(await leaveWouldBeBlocked(),true,"Uncommitted reserve change must trigger browser leave warning");
+assert.equal(await reloadGuardPage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0].taxReservePct),0);
+await reloadGuardPage.locator("#saveJob").click();
+assert.equal(await leaveWouldBeBlocked(),false,"After saving reserve, leave warning must clear");
+await reloadGuardPage.close();
+
 console.log("OWNER_BROWSER_QA_PASS");
 }finally{if(browser)await browser.close();await new Promise(ok=>server.close(ok))}
