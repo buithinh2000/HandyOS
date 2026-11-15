@@ -68,7 +68,7 @@ export function csv(headers,rows){
 export function ownerExports(state){
  const jobs=state.jobs||[];
  const jobRows=jobs.map(j=>{const s=summary(j);return[j.name,j.code||"",j.stage||"",s.agreedInc??"",s.approvedVariationInc??"",s.totalContractInc??"",s.totalContractEx??"",s.received,s.expensesEx,s.otherExpensesEx,s.labour,s.remainingCostEx??"",s.overheadAllocationEx??"",s.profitBeforeReserve??"",s.taxReservePct??"",s.taxReserveAmount??"",s.profit??"",s.wagesPaid,s.wagesOutstanding]});
- const hours=jobs.flatMap(j=>labourRows(j).map(x=>[j.name,x.worker||"",x.date||"",x.hours??"",x.days??"",x.payBasis||"hour",x.startTime||"",x.endTime||"",x.breakMinutes??"",x.notes||"",x.rate??"",x.total]));
+ const hours=jobs.flatMap(j=>labourRows(j).filter(x=>x.payBasis!=="bonus").map(x=>[j.name,x.worker||"",x.date||"",x.hours??"",x.days??"",x.payBasis||"hour",x.startTime||"",x.endTime||"",x.breakMinutes??"",x.notes||"",x.rate??"",x.total]));
  const bonuses=jobs.flatMap(j=>(j.wageAdjustments||[]).map(a=>[j.name,a.worker,a.weekStart,a.date,a.amount,a.notes||""]));
  const wagePayments=jobs.flatMap(j=>(j.workerPayments||[]).map(x=>[j.name,x.worker||"",x.paidOn||"",x.amount??""]));
  const expenses=jobs.flatMap(j=>(j.expenses||[]).map(x=>[j.name,x.date||"",x.kind||"",x.title||"",x.amount??"",x.gstBasis||"",Number.isFinite(expenseEx(x))?expenseEx(x):"Unknown",x.paidStatus||""]));
