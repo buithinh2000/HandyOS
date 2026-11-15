@@ -27,8 +27,8 @@ jobs:
       - name: Bundle all runtime source and AWS SDK into deploy-compatible handler
         run: |
           mkdir -p dist/cloud
-          ./cloud/build/node_modules/.bin/esbuild cloud/lambda.mjs \
-            --bundle --platform=node --target=node22 --format=cjs --packages=bundle --node-path=cloud/build/node_modules \
+          NODE_PATH="$PWD/cloud/build/node_modules" ./cloud/build/node_modules/.bin/esbuild cloud/lambda.mjs \
+            --bundle --platform=node --target=node22 --format=cjs --packages=bundle \
             --outfile=dist/cloud/lambda.js
           cp cloud/build/package-lock.json dist/package-lock.build.json
           node --check dist/cloud/lambda.js
