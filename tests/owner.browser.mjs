@@ -420,7 +420,7 @@ await settlePage.close();
 
 // The native beforeunload guard must protect unsaved financial edits on refresh/close.
 const reloadGuardPage=await browser.newPage();
-reloadGuardPage.on("dialog",d=>d.accept());
+reloadGuardPage.on("dialog",d=>d.type()==="prompt"?d.accept("Refresh guard sample"):d.accept());
 await reloadGuardPage.goto(address);
 await reloadGuardPage.locator('[data-page="jobs"]').click();
 await reloadGuardPage.locator("#newJob").click();
