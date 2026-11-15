@@ -59,3 +59,19 @@ The Lambda has no user-facing publicly callable Function URL. Never put a client
 - Written Owner approval before applying any AWS/IAM/DNS/Secrets changes
 
 **Current result:** source files and unit-test scaffolding only. No infrastructure created, no user authentication active, no cloud data persisted.
+
+
+## Browser sync contract — prepared, NOT enabled
+
+\`cloud/owner-sync-client.mjs\` is a source-only browser-side adapter. It is **not imported by** public \`owner-v1.html\`, and it does not provide login by itself.
+
+- The future Cognito Authorization Code + PKCE flow must obtain a short-lived access token only after Owner sign-in, with proper issuer, audience/client and token lifetime validation enforced by API Gateway.
+- Keep the bearer token in **memory**; do not store it in localStorage, sessionStorage, a URL parameter or backup JSON. Do not issue cloud requests until a valid authenticated session exists.
+- The API URL must be fixed HTTPS \`/owner-ledger\` with no query parameters, embedded credentials, or fragments.
+- Load remote ledger first, then explicitly compare with the browser's local ledger. A mismatch requires deliberate Owner resolution and a downloaded local backup; there is **no automatic merge or upload**.
+- First creation requires a confirmed \`If-None-Match: *\` save. Updates require the last exact server ETag via \`If-Match\`. On \`409\`, stop; never retry an overwrite or silently reset revision.
+- If authentication, networking or server write confirmation fails, the locally entered data remains unchanged and must be clearly shown as **NOT synced**.
+- Before release, test a genuine login/logout/refresh sequence, two-tab conflict handling, backup download, a restore from S3 versions, and attempts from a non-Owner Cognito account.
+- For production login, do not use the static demo's browser-local storage as a secure source of truth; expose a separate authorized Owner app shell only after authentication and security verification.
+
+**Activation gate remains RED:** the Cognito client, API Gateway routes/authorizer, Lambda IAM, private S3/KMS bucket and real restore tests have not been deployed or verified. These modules must not be described as a working cloud login.
