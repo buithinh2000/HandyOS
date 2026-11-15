@@ -41,7 +41,7 @@ jobs:
         run: |
           cd dist
           sha256sum cloud/lambda.js package-lock.build.json > SHA256SUMS.txt
-          zip -q -r owner-lambda-review.zip cloud/lambda.mjs
+          zip -q -r owner-lambda-review.zip cloud/lambda.js
           sha256sum owner-lambda-review.zip >> SHA256SUMS.txt
           printf 'source_commit=%s\n' "$GITHUB_SHA" > SOURCE-COMMIT.txt
           printf 'deployment_status=NOT_UPLOADED_TO_AWS\n' >> SOURCE-COMMIT.txt
