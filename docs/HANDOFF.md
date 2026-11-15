@@ -35,3 +35,6 @@ Review found that two open Owner V1 tabs each hold an in-memory workspace; savin
 
 ## Payroll invalid-date period grouping fix — source-only, 2026-11-15
 Review found `weeklyStart` and `workerByPeriod` used regex/date roll-over for synthetic malformed dates such as `2026-02-30`, potentially assigning hours or payments to a false wage period. This branch uses the existing strict `isISODate` checker for weekly, monthly and yearly grouping. Existing records stay untouched; source amounts/totals aren't modified. Regression test verifies invalid rows do not appear in a made-up period while valid leap/calendar dates continue to group. **Pending latest-HEAD CI and merge verification.** No AWS/production data access.
+
+## Browser saved-data schema gate (source-only, 2026-11-15)
+A parseable JSON object could contain structurally invalid records (e.g. `staff` string or missing `jobs`) and previously be normalized into an empty roster/ledger, risking later overwrite. Owner V1 startup now uses the existing strict `parseOwnerBackup` validation before loading saved bytes; malformed saved data triggers PR44 fail-closed recovery with original bytes preserved and downloads allowed. Added browser test for schema-invalid JSON and valid legacy shapes. No AWS, finances, real data or storage-key changes. **Pending exact-head CI and merge verification.**
