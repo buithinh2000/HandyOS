@@ -29,7 +29,7 @@ export function labourRows(job) {
  return (job.timesheets||[]).map(t=>({...t,hours:Number(t.hours)||0,rate:Number(t.rate)||0,total:round2((Number(t.hours)||0)*(Number(t.rate)||0))}));
 }
 export function weeklyStart(day) {
- if(!/^\d{4}-\d{2}-\d{2}$/.test(String(day||"")))return "";
+ if(!isISODate(day))return "";
  const d=new Date(day+"T12:00:00Z");
  if(!Number.isFinite(d.getTime()))return "";
  const weekday=(d.getUTCDay()+6)%7;d.setUTCDate(d.getUTCDate()-weekday);return d.toISOString().slice(0,10);
@@ -37,7 +37,7 @@ export function weeklyStart(day) {
 export function labourByPeriod(job,period) {
  const grouped=new Map();
  for(const t of labourRows(job)){
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(t.date||"")))continue;
+  if(!isISODate(t.date))continue;
   const key=period==="month"?t.date.slice(0,7):weeklyStart(t.date);
   const row=grouped.get(key)||{period:key,hours:0,total:0,entries:0};
   row.hours+=t.hours;row.total=round2(row.total+t.total);row.entries++;
@@ -67,7 +67,7 @@ export function workerTotals(jobs,name,jobId=""){
 }
 export function workerByPeriod(jobs,name,period="week",jobId=""){
  const data=workerTotals(jobs,name,jobId);const rows=new Map();
- const keyFor=d=>period==="month"?String(d||"").slice(0,7):period==="year"?String(d||"").slice(0,4):weeklyStart(d);
+ const keyFor=d=>!isISODate(d)?"":period==="month"?d.slice(0,7):period==="year"?d.slice(0,4):weeklyStart(d);
  for(const t of data.earned){const k=keyFor(t.date);if(!k)continue;const row=rows.get(k)||{period:k,hours:0,earned:0,paid:0};row.hours=round2(row.hours+t.hours);row.earned=round2(row.earned+t.total);rows.set(k,row)}
  for(const p of data.payments){const k=keyFor(p.periodStart||p.paidOn);if(!k)continue;const row=rows.get(k)||{period:k,hours:0,earned:0,paid:0};row.paid=round2(row.paid+p.amount);rows.set(k,row)}
  return [...rows.values()].sort((a,b)=>b.period.localeCompare(a.period)).map(x=>({...x,outstanding:round2(x.earned-x.paid)}));
