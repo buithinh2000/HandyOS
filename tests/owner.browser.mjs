@@ -272,5 +272,25 @@ assert.equal(await filterPage.locator("table tbody tr").count(),1,"Worker roster
 assert.equal(await filterPage.evaluate(()=>localStorage.getItem("handyos-workspace-v07")),historicRaw,"No historical records are rewritten by viewing filters");
 await filterPage.close();
 
+// Legacy "finished" must obey the same closed read-only detail rules as "closed".
+const finishedPage=await browser.newPage();
+finishedPage.on("dialog",d=>d.accept());
+await finishedPage.goto(address);
+const oldFinished=JSON.stringify({jobs:[{id:"legacy-done",name:"Legacy finished job",stage:"finished",contract:11000,taxReservePct:10,remainingCostEx:0,approvedVariationInc:0,overheadAllocationEx:0,startDate:"2026-11-01",endDate:"2026-11-10",expenses:[],timesheets:[],payments:[],workerPayments:[],tasks:[],categories:[],materials:[]}],staff:[],payrollSettlements:[]});
+await finishedPage.evaluate(raw=>localStorage.setItem("handyos-workspace-v07",raw),oldFinished);
+await finishedPage.reload();
+await finishedPage.locator('[data-page="jobs"]').click();
+await finishedPage.locator("details.job-group").last().locator("summary").click();
+await finishedPage.locator('[data-open="job"][data-id="legacy-done"]').first().click();
+assert.equal(await finishedPage.locator("#reopenJob").count(),1);
+for(const id of ["#saveJob","#closeJob","#addPayment","#addExpense","#addHours"]){
+ assert.equal(await finishedPage.locator(id).count(),0,id+" must not allow writes to finished legacy job");
+}
+assert.equal(await finishedPage.evaluate(()=>localStorage.getItem("handyos-workspace-v07")),oldFinished,"Viewing finished job must not rewrite its historic state");
+await finishedPage.locator("#reopenJob").click();
+assert.equal(await finishedPage.locator("#saveJob").count(),1);
+assert.equal(await finishedPage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0].stage),"active");
+await finishedPage.close();
+
 console.log("OWNER_BROWSER_QA_PASS");
 }finally{if(browser)await browser.close();await new Promise(ok=>server.close(ok))}
