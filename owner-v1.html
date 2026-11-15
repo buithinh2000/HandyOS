@@ -111,11 +111,13 @@ body>main>.muted{margin:4px 0 0}
 .bill-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.bill-actions button{min-height:44px;font-size:13px}
 @media(max-width:850px){.bill-list{grid-template-columns:1fr}}
 @media(max-width:430px){.bill-item{grid-template-columns:72px minmax(0,1fr);gap:9px}.bill-item-photo{min-height:78px}.bill-actions button{flex:1}}
+.attendance-actions{display:flex;flex-wrap:wrap;gap:8px}.attendance-actions button{min-height:44px}
+@media(max-width:700px){.attendance-actions{flex-direction:column}.attendance-actions button{width:100%}}
 </style></head><body>
 <header><strong>HandyOS / Owner V1</strong><div class="header-tools"><button id="exportCsv">Export CSV</button><button id="backup">Backup JSON</button><button id="restore">Restore backup</button></div></header><main><h1>Business Manager</h1><p class="muted">Jobs, employees, expenses, progress payments and estimated profit.</p><p class="notice"><b>Browser-only demo.</b> No secure login or cloud sync. Do not enter real employee, customer or payroll information. Personal employee links are deferred.</p>
 <nav id="nav" class="nav" aria-label="Owner sections"><button data-page="company">Today</button><button data-page="jobs">Jobs</button><button data-page="employees">People</button><button data-page="expenses">Money</button><button data-page="receipts">Bills</button></nav><section id="screen"></section><footer class="muted" style="font-size:12px;margin-top:36px"><details><summary style="cursor:pointer">Older prototypes (separate demo data)</summary><p>These older tools are not the current Owner V1 and do not share all records with it.</p><p><a href="legacy-dashboard.html">Legacy dashboard</a> · <a href="workspace.html">Workspace</a> · <a href="renovation.html">Job Planner</a> · <a href="operations.html">Operations</a> · <a href="quotes.html">Quote Studio</a></p></details></footer></main>
 <script type="module">
-import {STORE_KEY,normalize,money,dollars,summary,jobGroup,paymentProgress,scheduleDays,scheduleEntry,isISODate,canClose,snapshot,workerKey,workerNames,workerTotals,workerByPeriod,employeesSummary,customerPayment,paymentBreakdown,wageYearSummary,periodSettlement,isSettlementCurrent,companySummary,expenseSummary,financialPeriodSummary,materialBillSummary,startCrewSession,finishCrewSession,recordWeeklyBonus,weeklyStart} from "./owner-ledger-core.mjs";
+import {STORE_KEY,normalize,money,dollars,summary,jobGroup,paymentProgress,scheduleDays,scheduleEntry,isISODate,canClose,snapshot,workerKey,workerNames,workerTotals,workerByPeriod,employeesSummary,customerPayment,paymentBreakdown,wageYearSummary,periodSettlement,isSettlementCurrent,companySummary,expenseSummary,financialPeriodSummary,materialBillSummary,startCrewSession,finishCrewSession,recordWeeklyBonus,weeklyStart,setAttendanceDayOff} from "./owner-ledger-core.mjs";
 import {parseOwnerBackup,ownerExports} from "./owner-ledger-io.mjs";
 const $=id=>document.getElementById(id),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])),today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-")},uid=()=>crypto.randomUUID();
 // Unreadable browser data is never replaced silently by an empty ledger.
@@ -217,11 +219,22 @@ function employeeAttendance(){
  const selected=editingAttendanceId?row.find(t=>t.id===editingAttendanceId):null;
  const member=state.staff.find(x=>workerKey(x.name)===workerKey(person)),basis=selected?.payBasis||member?.payBasis||"hour";
  const daily=selected?.payBasis==="day",rate=selected?.rate??member?.rate??"";
- const days=Array.from({length:offset},()=>'<span></span>').concat(Array.from({length:last},(_,i)=>{const d=attendanceMonth+"-"+String(i+1).padStart(2,"0"),count=records.filter(x=>x.date===d).length;return '<button type="button" data-attendance-day="'+esc(d)+'" style="min-height:46px;'+(d===attendanceDate?"border:2px solid #2177b6;":"")+'">'+(i+1)+(count?" ✓":"")+'</button>'})).join("");
+ const days=Array.from({length:offset},()=>'<span></span>').concat(Array.from({length:last},(_,i)=>{
+  const d=attendanceMonth+"-"+String(i+1).padStart(2,"0"),entries=records.filter(x=>x.date===d),
+   marker=entries.some(x=>x.dayOff!==true)?" ✓":entries.length?" ○":"";
+  return '<button type="button" data-attendance-day="'+esc(d)+'" style="min-height:46px;'+(d===attendanceDate?"border:2px solid #2177b6;":"")+'">'+(i+1)+marker+'</button>';
+ })).join("");
  return '<div class="card"><h3>Attendance calendar</h3><p class="muted">Select a day to record or correct work. Start/finish minus unpaid break determines worked hours. Daily wages use 1 or 0.5 paid day; a daily rate is never added to an hourly rate.</p>'+
  '<div class="fields">'+field("Month","attendanceMonth",attendanceMonth,"month")+'</div><div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;text-align:center">'+["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d=>'<b>'+d+'</b>').join("")+days+'</div>'+
  '<h3 style="margin-top:20px">'+esc(attendanceDate)+'</h3>'+
- (row.length?table(["Job","Work","Wage","Notes",""],row.map(t=>'<tr><td>'+esc(t.jobName)+'</td><td>'+esc(t.startTime||"Manual")+(t.endTime?"–"+esc(t.endTime):"")+'</td><td>'+cash((t.payBasis==="day"?Number(t.days):Number(t.hours))*Number(t.rate))+'</td><td>'+esc(t.notes||"")+'</td><td><button data-edit-attendance="'+esc(t.id)+'" data-attendance-job="'+esc(t.jobId)+'">Edit</button></td></tr>')):'<p class="muted">No work recorded for this day.</p>')+
+ (row.length?table(["Job","Status","Wage","Actions"],row.map(t=>{
+ const off=t.dayOff===true,job=state.jobs.find(j=>j.id===t.jobId),locked=jobGroup(job)==="finished";
+ const wage=off?0:(t.payBasis==="day"?Number(t.days):Number(t.hours))*Number(t.rate);
+ return '<tr><td>'+esc(t.jobName)+'<div class="muted">'+esc(t.startTime||"Manual")+(t.endTime?"–"+esc(t.endTime):"")+'</div></td>'+
+ '<td>'+(off?'<b>Day off · Unpaid</b>':'Work recorded')+'</td><td>'+cash(wage)+'</td><td>'+
+ '<div class="attendance-actions"><button data-edit-attendance="'+esc(t.id)+'" data-attendance-job="'+esc(t.jobId)+'">Edit</button>'+
+ '<button data-toggle-day-off="'+esc(t.id)+'" data-attendance-job="'+esc(t.jobId)+'" data-day-off="'+(off?"false":"true")+'" '+(locked?"disabled":"")+'>'+(off?"Restore work":"Mark Day off")+'</button></div></td></tr>';
+})):'<p class="muted">No work recorded for this day.</p>')+
  '<div class="fields"><div><label>Job</label><select id="attendanceJob">'+opt("","Select job",selected?.jobId||"")+state.jobs.filter(j=>jobGroup(j)!=="finished"||j.id===selected?.jobId).map(j=>opt(j.id,j.name,selected?.jobId||"")).join("")+'</select></div>'+
  field("Start time","attendanceStart",selected?.startTime||"07:00","time")+field("Finish time","attendanceEnd",selected?.endTime||"15:30","time")+field("Unpaid break (minutes)","attendanceBreak",selected?.breakMinutes??30,"number")+
  '<div><label>Wage method</label><select id="attendanceBasis">'+["hour","day"].map(v=>opt(v,v==="day"?"Hourly"===v?"Hourly":"Daily":"Hourly",basis)).join("")+'</select></div>'+
@@ -243,7 +256,7 @@ return '<div class="row"><h2>Employees</h2><button id="toggleStaffForm" class="p
  const memberBonuses=state.jobs.flatMap(j=>(j.wageAdjustments||[]).filter(a=>workerKey(a.worker)===workerKey(person))
    .map(a=>({...a,jobName:j.name}))).sort((a,b)=>b.date.localeCompare(a.date));
  const member=state.staff.find(x=>x.name.trim().toLowerCase()===person.trim().toLowerCase()),w=workerTotals(state.jobs,person),rows=workerByPeriod(state.jobs,person,period),settlements=state.payrollSettlements.filter(x=>x.worker.trim().toLowerCase()===person.trim().toLowerCase()),seenClosePeriods=new Set();
- return '<button class="back" data-back="employees">← All employees</button><h2>'+esc(person)+'</h2><div class="metrics">'+metric("Hours",w.hours)+metric("Days",w.days)+metric("Earned",cash(w.due))+metric("Paid",cash(w.paid))+metric("Outstanding",cash(w.outstanding))+'</div>'+
+ return '<button class="back" data-back="employees">← All employees</button><h2>'+esc(person)+'</h2><div class="metrics">'+metric("Hours",w.hours)+metric("Days",w.days)+metric("Earned",cash(w.due))+metric("Paid",cash(w.paid))+metric("Outstanding",cash(w.outstanding))+'</div>'+(w.outstanding<0?'<p class="notice"><b>Payroll needs review.</b> Wages paid exceed corrected earned wages by '+cash(-w.outstanding)+'. No payment has been reversed.</p>':'')+
  employeeAttendance()+
 
  '<div class="card" id="weeklyBonusPanel"><h3>Weekly bonus</h3><p class="muted">Bonus adds to earned wages and Job costs once. It is not money paid, Other Expenses or staff reimbursement.</p>'+
@@ -457,6 +470,18 @@ $("screen").onclick=event=>{
  if(b.id==="addTaxPayment"){const amount=positive("taxAmount"),date=$("taxDate").value,kind=$("taxKind").value,notes=$("taxNotes").value.trim().slice(0,500);if(!amount||!isISODate(date)||!["GST / BAS","PAYG","Income tax","Other tax / fee"].includes(kind))return alert("Enter a valid tax payment date and positive amount.");if(!confirm("Record an actual tax or fee payment of "+cash(amount)+"? Avoid duplicating this in job expenses."))return;state.taxPayments.push({id:uid(),date,kind,amount,notes});persist();return}
  if(b.dataset.deleteTax){const entry=state.taxPayments.find(x=>x.id===b.dataset.deleteTax);if(!entry||!confirm("Delete actual tax payment "+cash(entry.amount)+"?"))return;state.taxPayments=state.taxPayments.filter(x=>x.id!==entry.id);persist();return}
  if(b.dataset.attendanceDay){if(!canLeaveAttendance())return;attendanceDate=b.dataset.attendanceDay;editingAttendanceId="";render();return}
+ if(b.dataset.toggleDayOff){
+  if(!canLeaveAttendance())return;
+  const job=state.jobs.find(j=>j.id===b.dataset.attendanceJob);
+  const entry=job?.timesheets.find(t=>t.id===b.dataset.toggleDayOff);
+  if(!entry||workerKey(entry.worker)!==workerKey(person))return alert("Attendance does not match this worker.");
+  const dayOff=b.dataset.dayOff==="true";
+  if(!confirm(dayOff?
+   "Mark Day off (unpaid)? Original work data stays saved, but earned wages for this day become zero. Previous payments are NOT reversed.":
+   "Restore this workday and its original wage? Saved payroll settlements may need review."))return;
+  try{setAttendanceDayOff(state,{jobId:job.id,entryId:entry.id,dayOff,changedAt:localClock(),reason:dayOff?"Owner corrected attendance":"Owner restored attendance"});editingAttendanceId="";persist()}catch(err){alert(err.message)}
+  return;
+ }
  if(b.dataset.editAttendance){if(!canLeaveAttendance())return;const target=state.jobs.find(j=>j.id===b.dataset.attendanceJob),t=target?.timesheets.find(x=>x.id===b.dataset.editAttendance);if(!t)return;attendanceDate=t.date;attendanceMonth=t.date.slice(0,7);editingAttendanceId=t.id;render();return}
  if(b.id==="cancelAttendanceEdit"){if(!canLeaveAttendance())return;editingAttendanceId="";render();return}
  if(b.id==="saveAttendance"){
@@ -472,7 +497,7 @@ $("screen").onclick=event=>{
   const old=editingAttendanceId?state.jobs.flatMap(j=>j.timesheets.filter(t=>t.id===editingAttendanceId).map(t=>({j,t})))[0]:null;
   if(old&&jobGroup(old.j)==="finished")return alert("Reopen the original finished job before changing its attendance.");
   if(old&&old.j.id!==job.id){if(!confirm("Move this attendance entry to a different Job? Job-level wage totals will change."))return;old.j.timesheets=old.j.timesheets.filter(t=>t.id!==old.t.id)}
-  const entry={id:old?.t.id||uid(),worker:person,date,payBasis:basis,startTime:start,endTime:end,breakMinutes:breaks,notes,
+  const entry={id:old?.t.id||uid(),worker:person,date,payBasis:basis,startTime:start,endTime:end,breakMinutes:breaks,notes,dayOff:old?.t.dayOff===true,statusHistory:old?.t.statusHistory||[],
    workedHours:Math.round(worked*100)/100,hours:basis==="hour"?Math.round(worked*100)/100:0,days:basis==="day"?days:0,rate};
   if(old&&old.j.id===job.id){const index=job.timesheets.findIndex(t=>t.id===old.t.id);job.timesheets[index]=entry}else job.timesheets.push(entry);
   editingAttendanceId="";persist();return

@@ -47,8 +47,31 @@ export function recordWeeklyBonus(job,{id,worker,date,amount,notes=""}){
  return entry;
 }
 export function labourRows(job) {
- const work=(job.timesheets||[]).map(t=>{const daily=t.payBasis==="day";const units=daily?Number(t.days)||0:Number(t.hours)||0;const rate=Number(t.rate)||0;return {...t,payBasis:daily?"day":"hour",hours:daily?(Number(t.workedHours)||0):units,days:daily?units:0,rate,total:round2(units*rate)};});
+ const work=(job.timesheets||[]).map(t=>{
+  const dayOff=t.dayOff===true,daily=t.payBasis==="day";
+  const units=daily?Number(t.days)||0:Number(t.hours)||0,rate=Number(t.rate)||0;
+  return {...t,payBasis:daily?"day":"hour",dayOff,
+   hours:dayOff?0:daily?(Number(t.workedHours)||0):units,
+   days:dayOff?0:daily?units:0,
+   rate,total:dayOff?0:round2(units*rate)};
+ });
  return [...work,...wageBonusRows(job)];
+}
+// Attendance corrections keep original time/rate and a local change history.
+// A day off is unpaid by default; historical wage payments are never rewritten.
+export function setAttendanceDayOff(state,{jobId,entryId,dayOff,reason="",changedAt}){
+ const job=(state.jobs||[]).find(j=>j.id===jobId);
+ if(!job||jobGroup(job)==="finished")throw new Error("Reopen this Job before changing attendance.");
+ const t=(job.timesheets||[]).find(x=>x.id===entryId);
+ if(!t)throw new Error("Attendance entry not found.");
+ if(typeof dayOff!=="boolean"||typeof reason!=="string"||reason.length>250||
+    typeof changedAt!=="string"||!/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/.test(changedAt)||!isISODate(changedAt.slice(0,10)))
+  throw new Error("Invalid attendance correction.");
+ if((t.dayOff===true)===dayOff)return false;
+ t.dayOff=dayOff;
+ t.statusHistory??=[];
+ t.statusHistory.push({at:changedAt,dayOff,reason:reason.trim()});
+ return true;
 }
 // Clock entries are local same-day shifts. No overnight, automatic overtime or award rules.
 export function workedHours(start,end,breakMinutes=0){
