@@ -1,7 +1,7 @@
 // HandyOS Owner cloud API (source-only, NOT deployed).
 // Designed exclusively for API Gateway HTTP API v2 with a validated JWT authorizer.
 // The browser must never possess AWS credentials or S3 access.
-import {parseOwnerBackup} from "./owner-ledger-io.mjs";
+import {parseOwnerBackup} from "../owner-ledger-io.mjs";
 
 const MAX_BYTES=2*1024*1024; // much smaller than S3 limit; deliberately bounded
 const JSON_TYPE="application/json; charset=utf-8";
