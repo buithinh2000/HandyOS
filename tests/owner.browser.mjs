@@ -694,5 +694,38 @@ await receiptRow.click();
 assert.equal(await receiptPage.locator("#billPanel [data-edit-bill='"+billId+"']").count(),1);
 await receiptPage.close();
 
+// Mobile-first crew clock: a check-in is not a wage transaction until checkout.
+const crewPage=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+crewPage.on("dialog",d=>d.type()==="prompt"?d.accept("Crew sample job"):d.accept());
+await crewPage.goto(address);
+await crewPage.locator('[data-page="employees"]').click();
+await crewPage.locator("#toggleStaffForm").click();
+await crewPage.locator("#staffName").fill("Crew Alex");
+await crewPage.locator("#staffRate").fill("250");
+await crewPage.locator("#staffBasis").selectOption("day");
+await crewPage.locator("#addStaff").click();
+await crewPage.locator('[data-page="jobs"]').click();
+await crewPage.locator("#newJob").click();
+await crewPage.locator("#contract").fill("11000");
+await crewPage.locator("#stage").selectOption("scheduled");
+await crewPage.locator("#saveJob").click();
+await crewPage.locator('[data-page="company"]').click();
+assert.equal(await crewPage.locator("#crewPanel").count(),1);
+await crewPage.locator("#crewJob").selectOption({index:1});
+await crewPage.locator("[data-crew-staff]").check();
+await crewPage.locator("#crewCheckIn").click();
+let crewStorage=await crewPage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")));
+assert.equal(crewStorage.crewSessions.length,1);
+assert.equal(crewStorage.jobs[0].timesheets.length,0,"check-in must not accrue wages");
+assert.equal(await crewPage.locator("#crewCheckOut").count(),1);
+await crewPage.locator("#crewFinishTime").fill("23:59");
+await crewPage.locator("#crewCheckOut").click();
+crewStorage=await crewPage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")));
+assert.equal(crewStorage.jobs[0].timesheets.length,1);
+assert.equal(crewStorage.jobs[0].timesheets[0].days,1);
+assert.equal(crewStorage.jobs[0].timesheets[0].rate,250);
+assert.equal(await crewPage.locator("#crewCheckIn").count(),1);
+await crewPage.close();
+
 console.log("OWNER_BROWSER_QA_PASS");
 }finally{if(browser)await browser.close();await new Promise(ok=>server.close(ok))}

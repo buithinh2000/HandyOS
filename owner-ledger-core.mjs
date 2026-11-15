@@ -304,3 +304,53 @@ export function snapshot(job,closedAt) {
  const s=summary(job);
  return {closedAt,contractInc:s.agreedInc,contractEx:s.agreedEx,approvedVariationInc:s.approvedVariationInc,totalContractInc:s.totalContractInc,totalContractEx:s.totalContractEx,overheadAllocationEx:s.overheadAllocationEx,expensesEx:s.expensesEx,otherExpensesEx:s.otherExpensesEx,remainingCostEx:s.remainingCostEx,labour:s.labour,taxReservePct:s.taxReservePct,taxReserveAmount:s.taxReserveAmount,profitBeforeReserve:s.profitBeforeReserve,profitEstimate:s.profit,receivedInc:s.received,remainingContractInc:s.remaining,expenseCount:job.expenses.length,paymentCount:job.payments.length,timesheetCount:job.timesheets.length,wagesPaid:s.wagesPaid,wagesOutstanding:s.wagesOutstanding};
 }
+
+/**
+ * Owner-only crew clock for the browser demo. Check-in creates no wages.
+ * Check-out atomically records one existing timesheet per selected worker/day.
+ * One crew shares the recorded shift and unpaid break; staff rates remain individual.
+ * Same-day only; no overtime/award or payroll withholding assessment.
+ */
+export function startCrewSession(state,{jobId,staffIds,at,id}){
+ const job=state.jobs.find(x=>x.id===jobId);
+ if(!job||!["booked","active"].includes(jobGroup(job)))throw new Error("Choose a booked or in-progress Job.");
+ if(!Array.isArray(staffIds)||!staffIds.length||new Set(staffIds).size!==staffIds.length)throw new Error("Select at least one unique employee.");
+ if(!/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/.test(at)||!isISODate(at.slice(0,10)))throw new Error("Invalid check-in date or time.");
+ if((state.crewSessions||[]).some(x=>!x.checkOutAt))throw new Error("Finish the active crew session first.");
+ const members=staffIds.map(key=>state.staff.find(x=>x.id===key&&x.active!==false));
+ if(members.some(x=>!x)||new Set(members.map(x=>workerKey(x.name))).size!==members.length)throw new Error("Select valid, distinct employees.");
+ const date=at.slice(0,10);
+ for(const member of members){
+  if(state.jobs.some(j=>(j.timesheets||[]).some(t=>t.date===date&&workerKey(t.worker)===workerKey(member.name))))
+   throw new Error(member.name+" already has attendance on this date. Edit that record instead.");
+  if(!["hour","day"].includes(member.payBasis)||!Number.isFinite(Number(member.rate))||Number(member.rate)<0)throw new Error("Employee has an invalid wage rate.");
+ }
+ const entry={id,jobId,staffIds:[...staffIds],workDate:date,checkInAt:at,checkOutAt:null};
+ if(!id||typeof id!=="string"||(state.crewSessions||[]).some(x=>x.id===id))throw new Error("Invalid session ID.");
+ state.crewSessions??=[];state.crewSessions.push(entry);
+ return entry;
+}
+export function finishCrewSession(state,{at,breakMinutes=30,dayPortion=1,notes="",ids=[]}){
+ const session=(state.crewSessions||[]).find(x=>!x.checkOutAt);
+ if(!session)throw new Error("No active crew session.");
+ const job=state.jobs.find(x=>x.id===session.jobId);
+ if(!job||jobGroup(job)==="finished")throw new Error("The job is finished. Reopen it before check-out.");
+ if(typeof at!=="string"||!/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/.test(at)||!isISODate(at.slice(0,10))||at.slice(0,10)!==session.workDate)throw new Error("Check-out must be on the same work date.");
+ if(!Number.isInteger(breakMinutes)||breakMinutes<0||breakMinutes>600)throw new Error("Invalid unpaid break.");
+ if(![0.5,1].includes(dayPortion))throw new Error("Select full or half-day rate.");
+ const hours=workedHours(session.checkInAt.slice(11),at.slice(11),breakMinutes);
+ if(hours===null)throw new Error("Check-out must be after check-in, less the unpaid break.");
+ if(!Array.isArray(ids)||ids.length!==session.staffIds.length||new Set(ids).size!==ids.length||ids.some(x=>typeof x!=="string"||!x))throw new Error("Invalid attendance IDs.");
+ const newRows=session.staffIds.map((staffId,i)=>{
+  const member=state.staff.find(x=>x.id===staffId);
+  if(!member||!["hour","day"].includes(member.payBasis)||!Number.isFinite(Number(member.rate))||Number(member.rate)<0)throw new Error("Invalid employee rate. Fix it before check-out.");
+  if(state.jobs.some(j=>(j.timesheets||[]).some(t=>t.date===session.workDate&&workerKey(t.worker)===workerKey(member.name))))throw new Error(member.name+" already has recorded wages for this date.");
+  return {id:ids[i],worker:member.name,date:session.workDate,payBasis:member.payBasis,
+   startTime:session.checkInAt.slice(11),endTime:at.slice(11),breakMinutes,
+   workedHours:hours,hours:member.payBasis==="hour"?hours:0,days:member.payBasis==="day"?dayPortion:0,
+   rate:Number(member.rate),notes:String(notes).trim().slice(0,500),crewSessionId:session.id};
+ });
+ job.timesheets.push(...newRows);
+ session.checkOutAt=at;session.breakMinutes=breakMinutes;session.dayPortion=dayPortion;
+ return newRows;
+}
