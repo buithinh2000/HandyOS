@@ -19,15 +19,19 @@ export function normalize(db) {
  if(!Array.isArray(state.staff))state.staff=[];
  if(!Array.isArray(state.payrollSettlements))state.payrollSettlements=[];
  if(!Array.isArray(state.taxPayments))state.taxPayments=[];
+ if(!Array.isArray(state.crewSessions))state.crewSessions=[];
  for(const job of state.jobs) {
   for(const field of ["tasks","categories","materials","timesheets","expenses","payments"])if(!Array.isArray(job[field]))job[field]=[];
   if(!Array.isArray(job.workerPayments))job.workerPayments=[];
+  if(!Array.isArray(job.wageAdjustments))job.wageAdjustments=[];
   job.stage=job.stage||"active";
  }
  return state;
 }
 export function labourRows(job) {
- return (job.timesheets||[]).map(t=>{const daily=t.payBasis==="day";const units=daily?Number(t.days)||0:Number(t.hours)||0;const rate=Number(t.rate)||0;return {...t,payBasis:daily?"day":"hour",hours:daily?(Number(t.workedHours)||0):units,days:daily?units:0,rate,total:round2(units*rate)};});
+ const timesheets=(job.timesheets||[]).map(t=>{const daily=t.payBasis==="day";const units=daily?Number(t.days)||0:Number(t.hours)||0;const rate=Number(t.rate)||0;return {...t,category:"base",payBasis:daily?"day":"hour",hours:daily?(Number(t.workedHours)||0):units,days:daily?units:0,rate,total:round2(units*rate)};});
+ const adjustments=(job.wageAdjustments||[]).filter(a=>["bonus","allowance"].includes(a.kind)&&validMoney(a.amount)).map(a=>({...a,category:a.kind,payBasis:a.kind,hours:0,days:0,rate:0,total:round2(Number(a.amount))}));
+ return [...timesheets,...adjustments];
 }
 // Clock entries are local same-day shifts. No overnight, automatic overtime or award rules.
 export function workedHours(start,end,breakMinutes=0){
@@ -63,7 +67,7 @@ export const workerKey = name=>String(name||"").trim().toLowerCase();
 export function workerNames(jobs,staff=[]){
  const names=new Map();
  for(const member of staff){const n=String(member.name||"").trim();if(n&&!names.has(workerKey(n)))names.set(workerKey(n),n)}
- for(const job of jobs)for(const t of [...(job.timesheets||[]),...(job.workerPayments||[])]){
+ for(const job of jobs)for(const t of [...(job.timesheets||[]),...(job.workerPayments||[]),...(job.wageAdjustments||[])]){
    const n=String(t.worker||"").trim();if(n&&!names.has(workerKey(n)))names.set(workerKey(n),n);
  }
  return [...names.values()].sort((a,b)=>a.localeCompare(b));
@@ -76,13 +80,14 @@ export function workerTotals(jobs,name,jobId=""){
   for(const p of job.workerPayments||[])if(workerKey(p.worker)===key&&validMoney(p.amount))payments.push({...p,amount:money(p.amount),jobId:job.id,jobName:job.name});
  }
  const due=round2(earned.reduce((a,t)=>a+t.total,0)),paid=round2(payments.reduce((a,p)=>a+p.amount,0));
- return{earned, payments, due, paid, outstanding:round2(due-paid),hours:round2(earned.reduce((a,t)=>a+t.hours,0)),days:round2(earned.reduce((a,t)=>a+t.days,0))};
+ const base=round2(earned.filter(t=>t.category==="base").reduce((a,t)=>a+t.total,0)),bonus=round2(earned.filter(t=>t.category==="bonus").reduce((a,t)=>a+t.total,0)),allowance=round2(earned.filter(t=>t.category==="allowance").reduce((a,t)=>a+t.total,0));
+ return{earned, payments, base,bonus,allowance,due, paid, outstanding:round2(due-paid),hours:round2(earned.reduce((a,t)=>a+t.hours,0)),days:round2(earned.reduce((a,t)=>a+t.days,0))};
 }
 export function workerByPeriod(jobs,name,period="week",jobId=""){
  const data=workerTotals(jobs,name,jobId);const rows=new Map();
  const keyFor=d=>!isISODate(d)?"":period==="month"?d.slice(0,7):period==="year"?d.slice(0,4):weeklyStart(d);
- for(const t of data.earned){const k=keyFor(t.date);if(!k)continue;const row=rows.get(k)||{period:k,hours:0,days:0,earned:0,paid:0};row.hours=round2(row.hours+t.hours);row.days=round2(row.days+t.days);row.earned=round2(row.earned+t.total);rows.set(k,row)}
- for(const p of data.payments){const k=keyFor(p.periodStart||p.paidOn);if(!k)continue;const row=rows.get(k)||{period:k,hours:0,days:0,earned:0,paid:0};row.paid=round2(row.paid+p.amount);rows.set(k,row)}
+ for(const t of data.earned){const k=keyFor(t.date);if(!k)continue;const row=rows.get(k)||{period:k,hours:0,days:0,base:0,bonus:0,allowance:0,earned:0,paid:0};row.hours=round2(row.hours+t.hours);row.days=round2(row.days+t.days);row[t.category]=round2(row[t.category]+t.total);row.earned=round2(row.earned+t.total);rows.set(k,row)}
+ for(const p of data.payments){const k=keyFor(p.periodStart||p.paidOn);if(!k)continue;const row=rows.get(k)||{period:k,hours:0,days:0,base:0,bonus:0,allowance:0,earned:0,paid:0};row.paid=round2(row.paid+p.amount);rows.set(k,row)}
  return [...rows.values()].sort((a,b)=>b.period.localeCompare(a.period)).map(x=>({...x,outstanding:round2(x.earned-x.paid)}));
 }
 export function wageYearSummary(jobs,year="",staff=[]){
@@ -101,10 +106,10 @@ export function periodSettlement(jobs,worker,period,key,jobId=""){
  if(!/^\d{4}-\d{2}(-\d{2})?$/.test(key))throw new Error("Invalid settlement period.");
  const row=workerByPeriod(jobs,worker,period,jobId).find(x=>x.period===key);
  if(!row)throw new Error("No recorded work or payments in this period.");
- return{worker,period,key,jobId,hours:row.hours,days:row.days,earned:row.earned,paid:row.paid,balance:row.outstanding};
+ return{worker,period,key,jobId,hours:row.hours,days:row.days,base:row.base,bonus:row.bonus,allowance:row.allowance,earned:row.earned,paid:row.paid,balance:row.outstanding};
 }
 export function isSettlementCurrent(jobs,s){
- try{const actual=periodSettlement(jobs,s.worker,s.period,s.key,s.jobId||"");return actual.hours===s.hours&&(s.days===undefined||actual.days===s.days)&&actual.earned===s.earned&&actual.paid===s.paid}catch{return false}
+ try{const actual=periodSettlement(jobs,s.worker,s.period,s.key,s.jobId||"");return actual.hours===s.hours&&(s.days===undefined||actual.days===s.days)&&(s.base===undefined||actual.base===s.base)&&(s.bonus===undefined||actual.bonus===s.bonus)&&(s.allowance===undefined||actual.allowance===s.allowance)&&actual.earned===s.earned&&actual.paid===s.paid}catch{return false}
 }
 export function employeesSummary(jobs,staff=[]){
  return workerNames(jobs,staff).map(name=>({name,...workerTotals(jobs,name)}));
