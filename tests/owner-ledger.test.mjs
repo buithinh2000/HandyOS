@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {normalize,expenseEx,weeklyStart,workerTotals,workerByPeriod,employeesSummary,expenseSummary,companySummary,summary,canClose,snapshot,wageYearSummary,periodSettlement,isSettlementCurrent,workerNames,customerPayment,paymentBreakdown} from "../owner-ledger-core.mjs";
+import {normalize,expenseEx,weeklyStart,workerTotals,workerByPeriod,employeesSummary,expenseSummary,companySummary,summary,canClose,snapshot,wageYearSummary,periodSettlement,isSettlementCurrent,workerNames,jobGroup,paymentProgress,scheduleEntry,scheduleDays,isISODate,customerPayment,paymentBreakdown} from "../owner-ledger-core.mjs";
 
 const j=(id,name)=>({id,name,stage:"active",contract:11000,tasks:[],categories:[],materials:[],expenses:[],timesheets:[],payments:[],workerPayments:[]});
 const worker=(name,date,hours,rate)=>({id:name+date,worker:name,date,hours,rate});
@@ -314,4 +314,40 @@ test("Job V1 keeps variation and overhead optional while exposing profit breakdo
  assert.match(html,/approvedVariationInc/);
  assert.match(html,/overheadAllocationEx/);
  assert.match(html,/Adjusted contract value ex GST/);
+});
+
+test("jobs group into booked, active and finished without losing legacy stages",()=>{
+ const a=j("a","Preparing"),b=j("b","Building"),c=j("c","Completed");
+ a.stage="scheduled";b.stage="active";c.stage="closed";
+ assert.equal(jobGroup(a),"booked");assert.equal(jobGroup(b),"active");assert.equal(jobGroup(c),"finished");
+ a.stage="survey";assert.equal(jobGroup(a),"booked");
+ b.stage="handover";assert.equal(jobGroup(b),"active");
+});
+test("payment progress uses RECEIVED cash and adjusted GST-inclusive contract only",()=>{
+ const a=j("a","Bathroom");a.contract=11000;a.approvedVariationInc=2200;
+ a.payments.push({status:"received",amount:6600},{status:"requested",amount:4400});
+ const p=paymentProgress(a);assert.equal(p.percent,50);
+ assert.equal(p.received,6600);assert.equal(p.contract,13200);assert.equal(p.remaining,6600);
+ assert.equal(p.overpaid,false);
+ a.payments.push({status:"received",amount:8000});
+ assert.equal(paymentProgress(a).overpaid,true);
+ a.contract=0;assert.equal(paymentProgress(a).percent,null);
+});
+test("simple schedule shows only recorded bookings, excluding finished jobs",()=>{
+ const a=j("a","Kitchen"),b=j("b","Bathroom"),c=j("c","Finished");
+ a.stage="scheduled";a.startDate="2026-11-16";a.endDate="2026-11-18";
+ b.stage="active";b.startDate="2026-11-17";b.endDate="2026-11-20";
+ c.stage="closed";c.startDate="2026-11-16";c.endDate="2026-11-19";
+ const days=scheduleDays([a,b,c],"2026-11-16",5);
+ assert.deepEqual(days.map(d=>d.bookedCount),[1,2,2,1,1]);
+ assert.equal(days[0].booked[0].name,"Kitchen");
+ assert.equal(scheduleDays([a],"2026-11-21",1)[0].unrecorded,true);
+ assert.equal(scheduleEntry(a).scheduled,true);
+ assert.equal(isISODate("2026-02-30"),false);
+ assert.equal(isISODate("2026-11-18"),true);
+ b.endDate="2026-11-15";assert.equal(scheduleEntry(b).invalid,true);
+});
+test("Owner V1 jobs overview exposes status counts, payment progress and schedule dates",()=>{
+ const html=readFileSync(new URL("../owner-v1.html",import.meta.url),"utf8");
+ for(const token of ["Jobs Overview","Booked / Preparing","In Progress","Finished","Schedule · Next 14 days","No job booked","startDate","endDate","paymentProgress"]){assert.ok(html.includes(token),token)}
 });
