@@ -27,8 +27,28 @@ export function normalize(db) {
  }
  return state;
 }
+// Separate weekly bonus rows accrue wages without creating fictional hours or days.
+// A bonus is never a payment and must not be re-entered as a Job Expense.
+export function wageBonusRows(job){
+ return (job.wageAdjustments||[]).filter(a=>a.kind==="bonus"&&isISODate(a.date)&&
+   weeklyStart(a.date)===a.weekStart&&validMoney(a.amount)&&Number(a.amount)>0)
+  .map(a=>({id:a.id,worker:a.worker,date:a.date,weekStart:a.weekStart,
+   payBasis:"bonus",hours:0,days:0,rate:0,total:money(a.amount),
+   kind:"bonus",notes:a.notes||""}));
+}
+export function recordWeeklyBonus(job,{id,worker,date,amount,notes=""}){
+ if(!job||jobGroup(job)==="finished")throw new Error("Reopen the Job before adding a bonus.");
+ if(typeof id!=="string"||!id||typeof worker!=="string"||!worker.trim()||
+   !isISODate(date)||!validMoney(amount)||Number(amount)<=0||typeof notes!=="string")
+  throw new Error("Enter a worker, valid date and positive bonus.");
+ if((job.wageAdjustments||[]).some(a=>a.id===id))throw new Error("Duplicate bonus ID.");
+ const entry={id,worker:worker.trim(),date,weekStart:weeklyStart(date),amount:money(amount),kind:"bonus",notes:notes.trim().slice(0,250)};
+ job.wageAdjustments??=[];job.wageAdjustments.push(entry);
+ return entry;
+}
 export function labourRows(job) {
- return (job.timesheets||[]).map(t=>{const daily=t.payBasis==="day";const units=daily?Number(t.days)||0:Number(t.hours)||0;const rate=Number(t.rate)||0;return {...t,payBasis:daily?"day":"hour",hours:daily?(Number(t.workedHours)||0):units,days:daily?units:0,rate,total:round2(units*rate)};});
+ const work=(job.timesheets||[]).map(t=>{const daily=t.payBasis==="day";const units=daily?Number(t.days)||0:Number(t.hours)||0;const rate=Number(t.rate)||0;return {...t,payBasis:daily?"day":"hour",hours:daily?(Number(t.workedHours)||0):units,days:daily?units:0,rate,total:round2(units*rate)};});
+ return [...work,...wageBonusRows(job)];
 }
 // Clock entries are local same-day shifts. No overnight, automatic overtime or award rules.
 export function workedHours(start,end,breakMinutes=0){
@@ -64,7 +84,7 @@ export const workerKey = name=>String(name||"").trim().toLowerCase();
 export function workerNames(jobs,staff=[]){
  const names=new Map();
  for(const member of staff){const n=String(member.name||"").trim();if(n&&!names.has(workerKey(n)))names.set(workerKey(n),n)}
- for(const job of jobs)for(const t of [...(job.timesheets||[]),...(job.workerPayments||[])]){
+ for(const job of jobs)for(const t of [...(job.timesheets||[]),...(job.workerPayments||[]),...(job.wageAdjustments||[])]){
    const n=String(t.worker||"").trim();if(n&&!names.has(workerKey(n)))names.set(workerKey(n),n);
  }
  return [...names.values()].sort((a,b)=>a.localeCompare(b));
