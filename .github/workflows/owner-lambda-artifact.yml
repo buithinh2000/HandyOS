@@ -28,7 +28,7 @@ jobs:
         run: |
           mkdir -p dist/cloud
           ./cloud/build/node_modules/.bin/esbuild cloud/lambda.mjs \
-            --bundle --platform=node --target=node22 --format=cjs --packages=bundle \
+            --bundle --platform=node --target=node22 --format=cjs --packages=bundle --node-path=cloud/build/node_modules \
             --outfile=dist/cloud/lambda.js
           cp cloud/build/package-lock.json dist/package-lock.build.json
           node --check dist/cloud/lambda.js
