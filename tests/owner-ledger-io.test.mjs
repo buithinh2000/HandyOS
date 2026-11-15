@@ -115,3 +115,20 @@ test("attendance CSV includes clock times, notes, and single daily-rate cost",()
  assert.match(out,/Wage basis/);
  assert.match(out,/"day","07:00","15:30","30","Kitchen framing","280","280"/);
 });
+
+test("receipt-image backup validates material reimbursements and CSV omits private photo bytes",()=>{
+ const data=fixture();
+ const image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/7QAAAABJRU5ErkJggg==";
+ data.materialBills=[{id:"bill1",jobId:data.jobs[0].id,date:"2026-11-15",reference:"Store receipt",amount:130,status:"sent",image,notes:"Paint"}];
+ const restored=parseOwnerBackup(JSON.stringify(data));
+ assert.equal(restored.materialBills.length,1);
+ assert.equal(restored.materialBills[0].image,image);
+ const report=ownerExports(restored)["material-reimbursements"];
+ assert.match(report,/Store receipt/);
+ assert.match(report,/sent/);
+ assert.doesNotMatch(report,/iVBORw/);
+ const bad={...data,materialBills:[{...data.materialBills[0],image:"https://public.example/photo.jpg"}]};
+ assert.throws(()=>parseOwnerBackup(JSON.stringify(bad)),/receipt image/);
+ const wrongJob={...data,materialBills:[{...data.materialBills[0],jobId:"nonexistent"}]};
+ assert.throws(()=>parseOwnerBackup(JSON.stringify(wrongJob)),/missing Job/);
+});
