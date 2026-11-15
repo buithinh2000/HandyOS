@@ -3,6 +3,11 @@
 Status: PROPOSED / SOURCE-ONLY. This document does not establish deployment, test pass, or Owner approval on its own.
 Updated: 2026-11-15 (Australia/Melbourne).
 
+## First files to read
+- [Owner decision ledger](docs/DECISION-LEDGER.md): dated decisions, source links, superseded quote-first V1 scope and precise accounting formula.
+- [Cross-chat handoff](docs/HANDOFF.md): last verified snapshot, blockers and next exact work.
+- [Architecture](ARCHITECTURE.md) and [Owner cloud security gate](cloud/SECURITY-GATE.md): non-negotiable production boundaries.
+
 ## Why it exists
 Across chat sessions VIN must not improvise a new HandyOS scope or claim unfinished work is done. Project state lives in reviewed GitHub source, code tests, and decisions explicitly approved by Owner. Chat history provides context, not release evidence. This document is a continuity entrypoint, not a substitute for code review.
 
@@ -15,14 +20,14 @@ Across chat sessions VIN must not improvise a new HandyOS scope or claim unfinis
 Conflicts: BLOCK implementation; describe what disagrees, select no silent default, request Owner resolution only if essential. Never rewrite prior decisions retrospectively.
 
 ## Identity and scope
-HandyOS is a construction/renovation business operating system. The first practical slice is Owner V1 (jobs, employees, timesheets/payroll closeout, expenses, customer payments, profitability and overview), with phased extension to quotes, tasks, customer/worker surfaces, and production infrastructure. Do not turn a deferred feature into an implemented one.
+HandyOS is a construction/renovation business operating system. The current Owner-approved V1 entry is a lean owner-only business manager (jobs, employees, timesheets/payroll closeout, expenses, customer payments, profitability and overview); **NO AI, material takeoff, or quote wizard in the V1 entry**. This 2026-11-15 PR24 scope cut supersedes earlier quote-first design for V1. Older quote/task pages are historical/legacy; do not delete or reintroduce them by assumption. Do not turn a deferred feature into an implemented one.
 
 ## Owner V1 decisions to preserve (re-verify against code on each change)
 - Employees: high-level list first; click into each employee to edit their details and review work, earned pay, paid pay and outstanding balance. Wage closeout/settlement history must be traceable.
 - Employee personal share link: deferred; never present public link exposing payroll as secure functionality.
 - Payments: actual cash paid by customer is different from contract revenue and GST. Support explicit excluding-GST inputs/outputs without double counting.
 - Jobs: other expense classification, remaining cost estimate and unallocated overhead are needed to calculate estimated profit.
-- Tax and reserve: ONE combined configurable percentage set by Owner. It is an internal planning reserve, NOT tax compliance advice or a separate expense to subtract twice.
+- Tax and reserve: ONE combined configurable percentage (0–100%) set by Owner, applied to **adjusted contract INCLUDING GST** (base contract plus approved variations) and subtracted ONCE from pre-reserve profit. NOT a percentage of profit, not a tax compliance assessment, and not a separate expense to subtract twice. Verified against merged PR28/PR30 and owner-ledger-core.mjs.
 - Profit: adjusted approved contract excluding GST minus qualifying ex-GST costs, estimated remaining costs and unbooked overhead, then minus combined tax/reserve amount. If required inputs invalid or unclassified, show not-ready rather than fabricate profit. Compare customer cash received to adjusted contract including approved variations, not to original contract.
 - Task structure: job -> main tasks -> optional subtasks; avoid artificial bulk-generated tasks.
 - Scope: Owner-first flow. Multi-user/client/worker views are future stages unless independently proven deployed.
