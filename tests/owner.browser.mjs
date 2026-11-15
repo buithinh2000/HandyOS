@@ -340,5 +340,30 @@ await navGuardPage.locator('[data-open="job"]').first().click();
 assert.equal(await navGuardPage.locator("#taxReservePct").inputValue(),"0");
 await navGuardPage.close();
 
+// Historical editable job stages must not silently turn into "survey" when Save is clicked.
+const legacyStagePage=await browser.newPage();
+legacyStagePage.on("dialog",d=>d.accept());
+await legacyStagePage.goto(address);
+const legacyStages={jobs:[
+ {id:"legacy-booked",name:"Legacy booked",stage:"booked",contract:1100,expenses:[],timesheets:[],payments:[],workerPayments:[],tasks:[],categories:[],materials:[]},
+ {id:"legacy-progress",name:"Legacy working",stage:"in_progress",contract:2200,expenses:[],timesheets:[],payments:[],workerPayments:[],tasks:[],categories:[],materials:[]}
+],staff:[],payrollSettlements:[]};
+await legacyStagePage.evaluate(raw=>localStorage.setItem("handyos-workspace-v07",raw),JSON.stringify(legacyStages));
+await legacyStagePage.reload();
+await legacyStagePage.locator('[data-page="jobs"]').click();
+for(const [id,stage] of [["legacy-booked","booked"],["legacy-progress","in_progress"]]){
+ await legacyStagePage.locator('[data-open="job"][data-id="'+id+'"]').first().click();
+ assert.equal(await legacyStagePage.locator("#stage").inputValue(),stage,"Current legacy stage must remain selected");
+ await legacyStagePage.locator("#saveJob").click();
+ const jobs=await legacyStagePage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs);
+ assert.equal(jobs.find(j=>j.id===id).stage,stage,"Saving without changing stage must preserve legacy value");
+ await legacyStagePage.locator('[data-back="jobs"]').click();
+}
+await legacyStagePage.locator('[data-open="job"][data-id="legacy-booked"]').first().click();
+await legacyStagePage.locator("#stage").selectOption("active");
+await legacyStagePage.locator("#saveJob").click();
+assert.equal(await legacyStagePage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0].stage),"active","Explicit stage change remains supported");
+await legacyStagePage.close();
+
 console.log("OWNER_BROWSER_QA_PASS");
 }finally{if(browser)await browser.close();await new Promise(ok=>server.close(ok))}
