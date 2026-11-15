@@ -349,5 +349,15 @@ test("simple schedule shows only recorded bookings, excluding finished jobs",()=
 });
 test("Owner V1 jobs overview exposes status counts, payment progress and schedule dates",()=>{
  const html=readFileSync(new URL("../owner-v1.html",import.meta.url),"utf8");
- for(const token of ["Jobs Overview","Planning / Quoting","In Progress","Finished","Schedule · Next 14 days","No job booked","startDate","endDate","paymentProgress"]){assert.ok(html.includes(token),token)}
+ for(const token of ["Jobs Overview","Planning / Quoting","In Progress","Finished","Schedule · 14 days","No job booked","startDate","endDate","paymentProgress"]){assert.ok(html.includes(token),token)}
+});
+
+test("a planning or quoting job with tentative dates never marks those days booked",()=>{
+ const tentative=j("quote","Not confirmed");tentative.stage="quoted";tentative.startDate="2026-12-01";tentative.endDate="2026-12-04";
+ const booked=j("booked","Confirmed");booked.stage="approved";booked.startDate="2026-12-02";booked.endDate="2026-12-03";
+ const days=scheduleDays([tentative,booked],"2026-12-01",5);
+ assert.deepEqual(days.map(x=>x.bookedCount),[0,1,1,0,0]);
+ assert.equal(days[0].unrecorded,true);
+ const html=readFileSync(new URL("../owner-v1.html",import.meta.url),"utf8");
+ for(const txt of ['data-calendar="-14"','data-calendar="14"','data-calendar="today"'])assert.ok(html.includes(txt));
 });
