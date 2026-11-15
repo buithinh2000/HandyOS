@@ -22,6 +22,19 @@ export function parseOwnerBackup(json){
   if(j.categories!==undefined&&!Array.isArray(j.categories))throw new Error("Invalid categories.");
   if(count>MAX_LINES)throw new Error("Backup has too many entries.");
  }
+ if(input.crewSessions!==undefined){
+  if(!arr(input.crewSessions)||input.crewSessions.length>10000)throw new Error("Invalid crew sessions.");
+  const sessionIds=new Set();let active=0;
+  for(const c of input.crewSessions){
+   if(typeof c.id!=="string"||!c.id||sessionIds.has(c.id)||typeof c.jobId!=="string"||!seen.has(c.jobId)||
+    !isISODate(c.workDate)||typeof c.checkInAt!=="string"||!/^\\d{4}-\\d{2}-\\d{2}T(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(c.checkInAt)||!c.checkInAt.startsWith(c.workDate)||
+    !Array.isArray(c.staffIds)||!c.staffIds.length||c.staffIds.some(x=>typeof x!=="string"||!x)||new Set(c.staffIds).size!==c.staffIds.length||
+    !(c.checkOutAt===null||typeof c.checkOutAt==="string"&&/^\\d{4}-\\d{2}-\\d{2}T(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(c.checkOutAt)&&c.checkOutAt.startsWith(c.workDate)&&c.checkOutAt>c.checkInAt))
+     throw new Error("Invalid crew session record.");
+   sessionIds.add(c.id);if(!c.checkOutAt)active++;
+  }
+  if(active>1)throw new Error("Multiple active crew sessions.");
+ }
  if(input.payrollSettlements!==undefined&&!arr(input.payrollSettlements))throw new Error("Invalid payroll settlement records.");
  if(input.taxPayments!==undefined&&(!arr(input.taxPayments)||input.taxPayments.some(x=>!isISODate(x.date)||!Number.isFinite(Number(x.amount))||Number(x.amount)<=0)))throw new Error("Invalid actual tax payment records.");
  if(input.materialBills!==undefined&&(!arr(input.materialBills)||input.materialBills.some(b=>typeof b.id!=="string"||typeof b.jobId!=="string"||!isISODate(b.date)||typeof b.reference!=="string"||!Number.isFinite(Number(b.amount))||Number(b.amount)<=0||!["draft","sent","reimbursed"].includes(b.status)||typeof b.image!=="string"||b.image.length>260000||!/^data:image\/(?:jpeg|png|webp);base64,/.test(b.image))))throw new Error("Invalid material bill or receipt image.");
