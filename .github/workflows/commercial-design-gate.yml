@@ -1,0 +1,25 @@
+name: HandyOS commercial design blueprint gate
+on:
+  pull_request:
+    paths:
+      - "design/**"
+      - "docs/COMMERCIAL-*.md"
+      - "tests/owner-commercial-prototype.test.mjs"
+      - ".github/workflows/commercial-design-gate.yml"
+  push:
+    paths:
+      - "design/**"
+      - "docs/COMMERCIAL-*.md"
+      - "tests/owner-commercial-prototype.test.mjs"
+      - ".github/workflows/commercial-design-gate.yml"
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node --test tests/owner-commercial-prototype.test.mjs
