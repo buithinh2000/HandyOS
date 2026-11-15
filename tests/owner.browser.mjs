@@ -44,6 +44,17 @@ await page.locator("#stage").selectOption("scheduled");
 await page.locator("#startDate").fill("2026-11-16");
 await page.locator("#endDate").fill("2026-11-19");
 await page.locator("#saveJob").click();
+// Closing with an unsaved reserve edit must not snapshot stale contract figures.
+await page.locator("#taxReservePct").fill("13");
+const blockedClose=page.waitForEvent("dialog");
+await page.locator("#closeJob").click();
+assert.match((await blockedClose).message(),/Save contract before closing/);
+const beforeClose=await page.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0]);
+assert.equal(beforeClose.stage,"scheduled");
+assert.equal(beforeClose.taxReservePct,0);
+assert.equal(beforeClose.closeSnapshot,undefined);
+// Owner can return to saved values; closing must not mutate records from rejected attempt.
+await page.locator("#taxReservePct").fill("0");
 await page.locator("#expenseTitle").fill("Sample material");
 await page.locator("#expenseAmount").fill("110");
 await page.locator("#expenseDate").fill("");
