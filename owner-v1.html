@@ -186,6 +186,8 @@ function company(){
  '<div class="card dashboard-section"><h3>Actual tax payments</h3><p class="muted">Record taxes only when actually paid (GST/BAS, PAYG, income tax or other). Do not enter the same payment here and as a job expense. Owner Tax & Reserve % is a forecast, not tax paid.</p>'+
  '<div class="fields">'+field("Paid on","taxDate",today(),"date")+'<div><label>Tax / fee type</label><select id="taxKind">'+["GST / BAS","PAYG","Income tax","Other tax / fee"].map(x=>opt(x,x,"GST / BAS")).join("")+'</select></div>'+field("Amount actually paid AUD","taxAmount","","number")+field("Notes / reference","taxNotes")+'</div><button id="addTaxPayment">+ Record tax paid</button>'+
  table(["Paid date","Type","Amount","Notes",""],(state.taxPayments||[]).slice().reverse().map(t=>'<tr><td>'+esc(t.date)+'</td><td>'+esc(t.kind)+'</td><td>'+cash(t.amount)+'</td><td>'+esc(t.notes||"")+'</td><td><button data-delete-tax="'+esc(t.id)+'">Delete</button></td></tr>'))+'</div>'+
+ '<div class="card dashboard-section"><h3>Employee wage overview</h3><p class="muted">Select an employee to open attendance, hourly/daily wages and individual settlement history. Period earned and paid are separate; outstanding is all-time.</p>'+
+ table(["Employee","Earned this period","Paid this period","Outstanding all time",""],employeesSummary(state.jobs,state.staff).map(w=>{const earned=w.earned.filter(t=>isISODate(t.date)&&(!window.from||t.date>=window.from)&&(!window.to||t.date<=window.to)).reduce((n,t)=>n+t.total,0);const paid=w.payments.filter(t=>isISODate(t.paidOn)&&(!window.from||t.paidOn>=window.from)&&(!window.to||t.paidOn<=window.to)).reduce((n,t)=>n+t.amount,0);return '<tr data-open="worker" data-name="'+esc(w.name)+'"><td><b>'+esc(w.name)+'</b></td><td>'+cash(earned)+'</td><td>'+cash(paid)+'</td><td>'+cash(w.outstanding)+'</td><td><button data-open="worker" data-name="'+esc(w.name)+'">Details</button></td></tr>'}))+'</div>'+
  '<div class="card dashboard-report dashboard-section"><h3>Profit by job</h3><p class="muted">Estimated profit after reserve. Click a job to review expenses, cash, wages and forecasts.</p>'+(rows.length?simple:'<p class="muted">No jobs yet.</p>')+'</div>'+
  '<details class="card dashboard-more" id="financialDetails"><summary>Full financial breakdown</summary><div class="metrics">'+metric("Wages earned all time",cash(x.labourDue))+metric("Wages paid all time",cash(x.wagesPaid))+metric("Expenses ex GST all time",cash(x.expensesEx))+metric("Paid expenses (entered)",cash(x.expensesPaid))+'</div>'+full+'</details>';
 }
@@ -224,7 +226,7 @@ $("screen").onclick=event=>{
  if(b.id==="downloadCorrupt"&&storageBlocked&&damagedRaw!==null){download("HandyOS-unreadable-recovery-"+today()+".txt",damagedRaw,"text/plain;charset=utf-8");return}
  if(storageBlocked)return;
  if(b.dataset.open==="job"){page="jobs";jobId=b.dataset.id;editingPaymentId="";render();return}
- if(b.dataset.open==="worker"){person=b.dataset.name;period="week";attendanceMonth=today().slice(0,7);attendanceDate=today();editingAttendanceId="";render();return}
+ if(b.dataset.open==="worker"){page="employees";person=b.dataset.name;period="week";attendanceMonth=today().slice(0,7);attendanceDate=today();editingAttendanceId="";render();return}
  if(b.dataset.back==="jobs"){if(!canLeaveJobDetails())return;jobId="";editingPaymentId="";render();return}
  if(b.dataset.back==="employees"){person="";render();return}
  if(b.dataset.period){period=b.dataset.period;render();return}
@@ -239,7 +241,7 @@ $("screen").onclick=event=>{
    basis=$("attendanceBasis").value,start=$("attendanceStart").value,end=$("attendanceEnd").value,
    breaks=Number($("attendanceBreak").value),rate=money($("attendanceRate").value),
    days=Number($("attendanceDays").value),notes=$("attendanceNotes").value.trim().slice(0,500);
-  const minutes=x=>{const m=/^([01]\\d|2[0-3]):([0-5]\\d)$/.exec(x);return m?Number(m[1])*60+Number(m[2]):NaN};
+  const minutes=x=>{const m=/^([01][0-9]|2[0-3]):([0-5][0-9])$/.exec(x);return m?Number(m[1])*60+Number(m[2]):NaN};
   const worked=(minutes(end)-minutes(start)-breaks)/60;
   if(!job||jobGroup(job)==="finished"||!isISODate(date)||!["hour","day"].includes(basis)||!Number.isInteger(breaks)||breaks<0||!Number.isFinite(worked)||worked<=0||worked>24||!Number.isFinite(rate)||rate<0||(basis==="day"&&![0.5,1].includes(days)))return alert("Check Job, start/finish, unpaid break, wage method and rate. Finish must be later than start on the same day.");
   const matches=state.jobs.flatMap(j=>j.timesheets.filter(t=>workerKey(t.worker)===workerKey(person)&&t.date===date&&t.id!==editingAttendanceId).map(t=>({j,t})));
