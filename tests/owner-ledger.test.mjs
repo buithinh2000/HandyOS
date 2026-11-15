@@ -320,7 +320,7 @@ test("jobs group into booked, active and finished without losing legacy stages",
  const a=j("a","Preparing"),b=j("b","Building"),c=j("c","Completed");
  a.stage="scheduled";b.stage="active";c.stage="closed";
  assert.equal(jobGroup(a),"booked");assert.equal(jobGroup(b),"active");assert.equal(jobGroup(c),"finished");
- a.stage="survey";assert.equal(jobGroup(a),"booked");
+ a.stage="survey";assert.equal(jobGroup(a),"planning");
  b.stage="handover";assert.equal(jobGroup(b),"active");
 });
 test("payment progress uses RECEIVED cash and adjusted GST-inclusive contract only",()=>{
