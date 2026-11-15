@@ -27,9 +27,9 @@ export function parseOwnerBackup(json){
   const sessionIds=new Set();let active=0;
   for(const c of input.crewSessions){
    if(typeof c.id!=="string"||!c.id||sessionIds.has(c.id)||typeof c.jobId!=="string"||!seen.has(c.jobId)||
-    !isISODate(c.workDate)||typeof c.checkInAt!=="string"||!/^\\d{4}-\\d{2}-\\d{2}T(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(c.checkInAt)||!c.checkInAt.startsWith(c.workDate)||
+    !isISODate(c.workDate)||typeof c.checkInAt!=="string"||!/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/.test(c.checkInAt)||!c.checkInAt.startsWith(c.workDate)||
     !Array.isArray(c.staffIds)||!c.staffIds.length||c.staffIds.some(x=>typeof x!=="string"||!x)||new Set(c.staffIds).size!==c.staffIds.length||
-    !(c.checkOutAt===null||typeof c.checkOutAt==="string"&&/^\\d{4}-\\d{2}-\\d{2}T(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(c.checkOutAt)&&c.checkOutAt.startsWith(c.workDate)&&c.checkOutAt>c.checkInAt))
+    !(c.checkOutAt===null||typeof c.checkOutAt==="string"&&/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/.test(c.checkOutAt)&&c.checkOutAt.startsWith(c.workDate)&&c.checkOutAt>c.checkInAt))
      throw new Error("Invalid crew session record.");
    sessionIds.add(c.id);if(!c.checkOutAt)active++;
   }
