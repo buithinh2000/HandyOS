@@ -70,9 +70,34 @@ body>main>.muted{margin:4px 0 0}
 @media(max-width:900px){.command-grid{grid-template-columns:1fr}}
 @media(max-width:700px){header{align-items:flex-start;flex-direction:column}.header-tools{width:100%}.header-tools button{font-size:11px}.nav{width:100%;overflow-x:auto;flex-wrap:nowrap}.nav button{padding:9px 12px;flex:1}.dashboard-primary{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-primary .metric{padding:13px;min-height:94px}.dashboard-primary .metric b{font-size:21px}.command-heading{align-items:flex-start}.command-heading .period-control{width:100%}.command-heading .period-control select{flex:1}.card{padding:15px}}
 @media(max-width:390px){.nav button{font-size:12px;padding:8px 7px}.dashboard-primary .metric b{font-size:19px}}
- </style></head><body>
+ 
+/* Mobile-first Owner daily actions: source-only browser demo, no sync or checkout claims. */
+.daily-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0 20px}
+.daily-action{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:5px;text-align:left;min-height:96px;padding:16px 18px;background:#fff;border:1px solid #d6e3ee;border-radius:14px;box-shadow:0 3px 12px #143c5410}
+.daily-action strong{font-size:16px;color:#163a54}.daily-action small{font-size:12px;color:#61798b;line-height:1.3}
+.daily-action.primary{background:#176fbe;border-color:#176fbe}.daily-action.primary strong,.daily-action.primary small{color:#fff}
+@media(max-width:700px){
+ body{padding-bottom:calc(83px + env(safe-area-inset-bottom,0px))}
+ main{padding-bottom:24px}
+ header .header-tools{overflow:auto;flex-wrap:nowrap;max-width:100%}
+ header .header-tools button{white-space:nowrap;min-height:44px}
+ .nav{position:fixed;bottom:0;left:0;right:0;z-index:30;width:100%;max-width:none;margin:0;padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px));border:0;border-top:1px solid #d7e2ec;border-radius:0;background:#fff;box-shadow:0 -5px 18px #18374c14;overflow:visible}
+ .nav button{min-width:0;min-height:48px;font-size:13px;font-weight:700;padding:10px 5px}
+ .nav .active{background:#e5f2ff;color:#124c79;box-shadow:none}
+ .fields{grid-template-columns:1fr}
+ input,select,button{min-height:44px;font-size:16px}
+ input[type=file]{width:100%}
+ .daily-action{min-height:92px;padding:13px}
+ .daily-action strong{font-size:15px}
+ .command-heading{gap:8px}
+ .command-grid{grid-template-columns:minmax(0,1fr)}
+ .card{min-width:0}
+ .wrap{-webkit-overflow-scrolling:touch}
+}
+@media(max-width:365px){.daily-actions{gap:8px}.daily-action{padding:11px}.daily-action strong{font-size:14px}}
+</style></head><body>
 <header><strong>HandyOS / Owner V1</strong><div class="header-tools"><button id="exportCsv">Export CSV</button><button id="backup">Backup JSON</button><button id="restore">Restore backup</button></div></header><main><h1>Business Manager</h1><p class="muted">Jobs, employees, expenses, progress payments and estimated profit.</p><p class="notice"><b>Browser-only demo.</b> No secure login or cloud sync. Do not enter real employee, customer or payroll information. Personal employee links are deferred.</p>
-<nav id="nav" class="nav" aria-label="Owner sections"><button data-page="company">Overview</button><button data-page="jobs">Jobs</button><button data-page="employees">Employees</button><button data-page="expenses">Expenses</button></nav><section id="screen"></section><footer class="muted" style="font-size:12px;margin-top:36px"><details><summary style="cursor:pointer">Older prototypes (separate demo data)</summary><p>These older tools are not the current Owner V1 and do not share all records with it.</p><p><a href="legacy-dashboard.html">Legacy dashboard</a> · <a href="workspace.html">Workspace</a> · <a href="renovation.html">Job Planner</a> · <a href="operations.html">Operations</a> · <a href="quotes.html">Quote Studio</a></p></details></footer></main>
+<nav id="nav" class="nav" aria-label="Owner sections"><button data-page="company">Today</button><button data-page="jobs">Jobs</button><button data-page="employees">People</button><button data-page="expenses">Money</button></nav><section id="screen"></section><footer class="muted" style="font-size:12px;margin-top:36px"><details><summary style="cursor:pointer">Older prototypes (separate demo data)</summary><p>These older tools are not the current Owner V1 and do not share all records with it.</p><p><a href="legacy-dashboard.html">Legacy dashboard</a> · <a href="workspace.html">Workspace</a> · <a href="renovation.html">Job Planner</a> · <a href="operations.html">Operations</a> · <a href="quotes.html">Quote Studio</a></p></details></footer></main>
 <script type="module">
 import {STORE_KEY,normalize,money,dollars,summary,jobGroup,paymentProgress,scheduleDays,scheduleEntry,isISODate,canClose,snapshot,workerKey,workerNames,workerTotals,workerByPeriod,employeesSummary,customerPayment,paymentBreakdown,wageYearSummary,periodSettlement,isSettlementCurrent,companySummary,expenseSummary,financialPeriodSummary,materialBillSummary} from "./owner-ledger-core.mjs";
 import {parseOwnerBackup,ownerExports} from "./owner-ledger-io.mjs";
@@ -251,7 +276,10 @@ function company(){
  const full=table(["Job","Adjusted contract inc GST","Recorded cost ex GST","Remaining costs ex GST","Overhead ex GST","Tax & Reserve Fund","Estimated profit"],rows.map(({job,figures:s})=>'<tr><td>'+esc(job.name)+'</td><td>'+(s.totalContractInc===null?"Not ready":cash(s.totalContractInc))+'</td><td>'+cash(s.costEx)+'</td><td>'+(s.remainingCostEx===null?"Invalid":cash(s.remainingCostEx))+'</td><td>'+(s.overheadAllocationEx===null?"Invalid":cash(s.overheadAllocationEx))+'</td><td>'+(s.taxReserveAmount===null?"Not ready":cash(s.taxReserveAmount))+'</td><td>'+(s.profit===null?"Not ready":cash(s.profit))+'</td></tr>'));
  const overviewJobs=focusJobs.length?table(["Job","Received","Profit forecast",""],focusJobs.map(({job,figures:s})=>'<tr data-open="job" data-id="'+esc(job.id)+'"><td><b>'+esc(job.name)+'</b></td><td>'+cash(s.received)+'</td><td>'+(s.profit===null?"Not ready":cash(s.profit))+'</td><td><button data-open="job" data-id="'+esc(job.id)+'">View</button></td></tr>')):'<div class="dashboard-empty">No active jobs yet. Create a job in Jobs.</div>';
  const overviewStaff=focusStaff.length?table(["Employee","Earned","Paid",""],focusStaff.map(w=>{const earned=w.earned.filter(t=>!window.from||isISODate(t.date)&&t.date>=window.from&&t.date<=window.to).reduce((n,t)=>n+t.total,0);const paid=w.payments.filter(t=>!window.from||isISODate(t.paidOn)&&t.paidOn>=window.from&&t.paidOn<=window.to).reduce((n,t)=>n+t.amount,0);return '<tr data-open="worker" data-name="'+esc(w.name)+'"><td><b>'+esc(w.name)+'</b></td><td>'+cash(earned)+'</td><td>'+cash(paid)+'</td><td><button data-open="worker" data-name="'+esc(w.name)+'">View</button></td></tr>'})):'<div class="dashboard-empty">No employees yet. Add staff in Employees.</div>';
- return '<div class="command-heading"><div><h2>Company overview</h2><p class="muted">Your daily business snapshot · '+esc(window.label)+'</p></div><div class="period-control"><label for="dashboardPeriod">Period</label><select id="dashboardPeriod">'+["week","month","year","all"].map((v,i)=>opt(v,["This week","This month","This year","All time"][i],dashboardPeriod)).join("")+'</select></div></div>'+
+ return '<div class="daily-actions" aria-label="Daily shortcuts">'+
+ '<button class="daily-action primary" id="quickAttendance"><strong>Record attendance</strong><small>Choose staff → daily work and hours</small></button>'+
+ '<button class="daily-action" id="quickBill"><strong>Capture a bill</strong><small>iPhone camera or photo library</small></button></div>'+
+ '<div class="command-heading"><div><h2>Company overview</h2><p class="muted">Your daily business snapshot · '+esc(window.label)+'</p></div><div class="period-control"><label for="dashboardPeriod">Period</label><select id="dashboardPeriod">'+["week","month","year","all"].map((v,i)=>opt(v,["This week","This month","This year","All time"][i],dashboardPeriod)).join("")+'</select></div></div>'+
  '<div class="metrics dashboard-primary">'+metric("Customer cash received",cash(p.receipts))+metric("Wages paid",cash(p.wagePaid))+metric("Expenses marked paid",cash(p.expensesPaid))+metric("Net cash movement*",cash(p.netCash))+'</div>'+
  '<div class="dashboard-subline"><span>Wages outstanding <strong>'+cash(x.wagesOutstanding)+'</strong></span><span>Tax paid this period <strong>'+cash(p.taxesPaid)+'</strong></span><span>Job profit forecast <strong>'+(notReady?"Incomplete · "+notReady+" jobs":cash(profit))+'</strong></span></div>'+
  '<div class="command-grid">'+
@@ -314,6 +342,8 @@ $("screen").onclick=event=>{
  if(b.id==="downloadCorrupt"&&storageBlocked&&damagedRaw!==null){download("HandyOS-unreadable-recovery-"+today()+".txt",damagedRaw,"text/plain;charset=utf-8");return}
  if(storageBlocked)return;
  if(b.dataset.pageShortcut){if(!canLeaveJobDetails()||!canLeaveAttendance())return;page=b.dataset.pageShortcut;jobId="";person="";render();return}
+ if(b.id==="quickAttendance"){if(!canLeaveJobDetails()||!canLeaveAttendance())return;page="employees";jobId="";person="";render();return}
+ if(b.id==="quickBill"){billEditorOpen=true;editingBillId="";billImageDraft=null;render();$("billPanel")?.scrollIntoView({behavior:"smooth",block:"start"});return}
  if(b.dataset.open==="job"){page="jobs";jobId=b.dataset.id;editingPaymentId="";render();return}
  if(b.dataset.open==="worker"){if(!canLeaveAttendance())return;page="employees";person=b.dataset.name;period="week";attendanceMonth=today().slice(0,7);attendanceDate=today();editingAttendanceId="";render();return}
  if(b.dataset.back==="jobs"){if(!canLeaveJobDetails())return;jobId="";editingPaymentId="";render();return}
