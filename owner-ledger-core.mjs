@@ -31,7 +31,7 @@ export function labourRows(job) {
 }
 // Clock entries are local same-day shifts. No overnight, automatic overtime or award rules.
 export function workedHours(start,end,breakMinutes=0){
- const clock=x=>typeof x==="string"&&/^([01]\\d|2[0-3]):[0-5]\\d$/.test(x)?Number(x.slice(0,2))*60+Number(x.slice(3)):NaN;
+ const clock=x=>typeof x==="string"&&/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(x)?Number(x.slice(0,2))*60+Number(x.slice(3)):NaN;
  const a=clock(start),b=clock(end),rest=Number(breakMinutes);
  if(!Number.isFinite(a)||!Number.isFinite(b)||b<=a||!Number.isInteger(rest)||rest<0||rest>=b-a)return null;
  return Math.round((b-a-rest)/60*100)/100;
