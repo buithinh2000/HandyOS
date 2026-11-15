@@ -256,7 +256,8 @@ function company(){
  '<div class="dashboard-subline"><span>Wages outstanding <strong>'+cash(x.wagesOutstanding)+'</strong></span><span>Tax paid this period <strong>'+cash(p.taxesPaid)+'</strong></span><span>Job profit forecast <strong>'+(notReady?"Incomplete · "+notReady+" jobs":cash(profit))+'</strong></span></div>'+
  '<div class="command-grid">'+
  '<div class="card command-card"><div class="card-top"><div><h3>Jobs in progress</h3><p class="muted">'+x.open+' open jobs · Showing up to 5</p></div><button data-page-shortcut="jobs">All jobs</button></div>'+overviewJobs+'</div>'+
- '<div class="card command-card"><div class="card-top"><div><h3>Employee wage overview</h3><p class="muted">Individual wages · '+staff.length+' employees</p></div><button data-page-shortcut="employees">All employees</button></div>'+overviewStaff+'</div></div>'+\n billCapturePanel()+
+ '<div class="card command-card"><div class="card-top"><div><h3>Employee wage overview</h3><p class="muted">Individual wages · '+staff.length+' employees</p></div><button data-page-shortcut="employees">All employees</button></div>'+overviewStaff+'</div></div>'+
+ billCapturePanel()
  '<details class="card dashboard-panel" id="periodFinancial"><summary>Period financial details <span class="muted">Earned wages, expenses and cash reconciliation</span></summary>'+
  '<div class="metrics">'+metric("Wages earned",cash(p.earned))+metric("Expenses accrued ex GST",cash(p.expensesEx))+metric("Tax payments entered",cash(p.taxesPaid))+metric("Unknown GST lines",p.unknownGst)+'</div>'+
  '<p class="muted">* Cash movement = received payments − wages paid − expenses marked paid − tax payments recorded. It is not accounting profit or available bank balance. Do not double-enter wages or taxes as job expenses.</p></details>'+
