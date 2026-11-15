@@ -162,6 +162,13 @@ function canLeaveJobDetails(){
  return !job||jobGroup(job)==="finished"||!hasUnsavedJobDetails(job)||
   confirm("This job has unsaved contract, reserve, schedule or status edits. Leave without saving?");
 }
+// Browser refresh/close also discards uncommitted job financial edits; use the native leave warning.
+window.addEventListener("beforeunload",event=>{
+ const job=page==="jobs"&&jobId?jNow():null;
+ if(!job||jobGroup(job)==="finished"||!$("contract")||!hasUnsavedJobDetails(job))return;
+ event.preventDefault();
+ event.returnValue="";
+});
 const positive=id=>{const n=money($(id)?.value);return Number.isFinite(n)&&n>0?n:null};
 $("nav").onclick=event=>{const b=event.target.closest("[data-page]");if(!b||!canLeaveJobDetails())return;page=b.dataset.page;jobId="";person="";render()};
 $("screen").onchange=event=>{const id=event.target.id,value=event.target.value;if(id==="workerName"){const member=state.staff.find(x=>x.name.trim().toLowerCase()===String(value).trim().toLowerCase());if(member&&Number.isFinite(Number(member.rate)))$("workRate").value=member.rate;return}if(id==="yearFilter"){year=value;expenseMonth="";render()}else if(id==="monthFilter"){expenseMonth=value;render()}else if(id==="kindFilter"){expenseKind=value;render()}else if(id==="jobFilter"){expenseJob=value;render()}else if(id==="wageYearFilter"){wageYear=value;render()}};
