@@ -95,11 +95,18 @@ body>main>.muted{margin:4px 0 0}
  .wrap{-webkit-overflow-scrolling:touch}
 }
 @media(max-width:365px){.daily-actions{gap:8px}.daily-action{padding:11px}.daily-action strong{font-size:14px}}
+/* Daily crew clock: usable as a single-thumb mobile workflow. */
+.crew-panel{border:1px solid #ccdeec;background:#fff;border-radius:15px;padding:18px;margin:0 0 18px;box-shadow:0 5px 24px #1439570b}
+.crew-panel h3{margin:0 0 5px}.crew-staff{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}
+.crew-worker{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #d6e3ed;border-radius:10px;min-height:50px;font-size:14px}
+.crew-worker input{width:20px;height:20px;flex-shrink:0;accent-color:#176fbe}
+.crew-primary{width:100%;background:#176fbe!important;color:white!important;min-height:52px}
+@media(max-width:700px){.crew-panel{padding:14px}.crew-staff{grid-template-columns:1fr}.crew-worker{min-height:54px}.crew-panel button{min-height:52px}}
 </style></head><body>
 <header><strong>HandyOS / Owner V1</strong><div class="header-tools"><button id="exportCsv">Export CSV</button><button id="backup">Backup JSON</button><button id="restore">Restore backup</button></div></header><main><h1>Business Manager</h1><p class="muted">Jobs, employees, expenses, progress payments and estimated profit.</p><p class="notice"><b>Browser-only demo.</b> No secure login or cloud sync. Do not enter real employee, customer or payroll information. Personal employee links are deferred.</p>
 <nav id="nav" class="nav" aria-label="Owner sections"><button data-page="company">Today</button><button data-page="jobs">Jobs</button><button data-page="employees">People</button><button data-page="expenses">Money</button></nav><section id="screen"></section><footer class="muted" style="font-size:12px;margin-top:36px"><details><summary style="cursor:pointer">Older prototypes (separate demo data)</summary><p>These older tools are not the current Owner V1 and do not share all records with it.</p><p><a href="legacy-dashboard.html">Legacy dashboard</a> · <a href="workspace.html">Workspace</a> · <a href="renovation.html">Job Planner</a> · <a href="operations.html">Operations</a> · <a href="quotes.html">Quote Studio</a></p></details></footer></main>
 <script type="module">
-import {STORE_KEY,normalize,money,dollars,summary,jobGroup,paymentProgress,scheduleDays,scheduleEntry,isISODate,canClose,snapshot,workerKey,workerNames,workerTotals,workerByPeriod,employeesSummary,customerPayment,paymentBreakdown,wageYearSummary,periodSettlement,isSettlementCurrent,companySummary,expenseSummary,financialPeriodSummary,materialBillSummary} from "./owner-ledger-core.mjs";
+import {STORE_KEY,normalize,money,dollars,summary,jobGroup,paymentProgress,scheduleDays,scheduleEntry,isISODate,canClose,snapshot,workerKey,workerNames,workerTotals,workerByPeriod,employeesSummary,customerPayment,paymentBreakdown,wageYearSummary,periodSettlement,isSettlementCurrent,companySummary,expenseSummary,financialPeriodSummary,materialBillSummary,startCrewSession,finishCrewSession} from "./owner-ledger-core.mjs";
 import {parseOwnerBackup,ownerExports} from "./owner-ledger-io.mjs";
 const $=id=>document.getElementById(id),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])),today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-")},uid=()=>crypto.randomUUID();
 // Unreadable browser data is never replaced silently by an empty ledger.
@@ -116,6 +123,8 @@ try{
 }catch(err){storageBlocked=true;storageError=String(err?.message||err);state=normalize({})}
 let page="company",jobId="",person="",period="week",year="",expenseKind="",expenseJob="",expenseMonth="",wageYear="",editingPaymentId="",attendanceMonth=today().slice(0,7),attendanceDate=today(),editingAttendanceId="",dashboardPeriod="month",attendanceBaseline=null,editingBillId="",billEditorOpen=false,billImageDraft=null;
 const jNow=()=>state.jobs.find(j=>j.id===jobId),cash=dollars;
+const localClock=()=>{const d=new Date();return today()+"T"+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")};
+
 const field=(label,id,value="",type="text")=>'<div><label for="'+esc(id)+'">'+esc(label)+'</label><input type="'+type+'" id="'+esc(id)+'" value="'+esc(value)+'"></div>';
 const opt=(key,value,selected)=>'<option value="'+esc(key)+'" '+(key===selected?"selected":"")+'>'+esc(value)+'</option>';
 const metric=(label,value)=>'<div class="metric">'+esc(label)+'<b>'+esc(value)+'</b></div>';
@@ -263,6 +272,24 @@ function billCapturePanel(jobFilter=""){
  '<p class="dashboard-empty">No material bills yet.</p>')+
  '<p class="muted">Pass-through reimbursements do not automatically alter contract income, Profit or Job Expenses. Record materials included in the agreed contract using Job Expenses instead.</p></div>';
 }
+function crewPanel(){
+ const active=(state.crewSessions||[]).find(x=>!x.checkOutAt);
+ const eligible=state.jobs.filter(j=>["booked","active"].includes(jobGroup(j)));
+ const staff=state.staff.filter(x=>x.active!==false);
+ const job=active?state.jobs.find(j=>j.id===active.jobId):null;
+ const members=active?.staffIds.map(id=>state.staff.find(x=>x.id===id)?.name||"Unknown employee")||[];
+ const begin='<section class="crew-panel" id="crewPanel" aria-label="Crew check-in and check-out"><h3>Today · Crew clock</h3><p class="muted">Browser-only demo. Do not enter real workers or payroll details.</p>';
+ if(active)return begin+'<p><b>Checked in · '+esc(job?.name||"Unknown Job")+'</b></p><p class="muted">Started '+esc(active.checkInAt.replace("T"," "))+'. Crew: '+esc(members.join(", "))+'</p>'+
+ '<div class="fields">'+field("Finish time","crewFinishTime",localClock().slice(11),"time")+field("Unpaid break (minutes)","crewBreak","30","number")+
+ '<div><label for="crewDayPortion">Daily wage portion</label><select id="crewDayPortion">'+opt("1","Full day", "1")+opt("0.5","Half day","1")+'</select></div>'+
+ field("Notes","crewNotes")+'</div>'+
+ '<p class="muted">All selected staff share these times and break. Hourly rates use actual hours; daily rates use the chosen day portion. Review each worker before saving.</p>'+
+ '<button class="crew-primary" id="crewCheckOut">Check out · Record wages</button></section>';
+ return begin+'<div class="fields"><div><label for="crewJob">Today\'s Job</label><select id="crewJob">'+opt("","Select booked / active Job","")+eligible.map(j=>opt(j.id,j.name,"")).join("")+'</select></div></div>'+
+ '<p class="muted">Select workers present today. Check-in does not add wages; checkout records the day once.</p>'+
+ '<div class="crew-staff">'+(staff.length?staff.map(x=>'<label class="crew-worker"><input type="checkbox" data-crew-staff="'+esc(x.id)+'"> <span>'+esc(x.name)+' · '+cash(x.rate)+' / '+esc(x.payBasis||"hour")+'</span></label>').join(""):'<p class="muted">Add workers under People first.</p>')+'</div>'+
+ '<button class="crew-primary" id="crewCheckIn" '+(!staff.length||!eligible.length?"disabled":"")+'>Check in crew now</button></section>';
+}
 function company(){
  const x=companySummary(state.jobs),window=dashboardWindow(dashboardPeriod),p=financialPeriodSummary(state,window);
  const all=financialPeriodSummary(state);
@@ -276,7 +303,7 @@ function company(){
  const full=table(["Job","Adjusted contract inc GST","Recorded cost ex GST","Remaining costs ex GST","Overhead ex GST","Tax & Reserve Fund","Estimated profit"],rows.map(({job,figures:s})=>'<tr><td>'+esc(job.name)+'</td><td>'+(s.totalContractInc===null?"Not ready":cash(s.totalContractInc))+'</td><td>'+cash(s.costEx)+'</td><td>'+(s.remainingCostEx===null?"Invalid":cash(s.remainingCostEx))+'</td><td>'+(s.overheadAllocationEx===null?"Invalid":cash(s.overheadAllocationEx))+'</td><td>'+(s.taxReserveAmount===null?"Not ready":cash(s.taxReserveAmount))+'</td><td>'+(s.profit===null?"Not ready":cash(s.profit))+'</td></tr>'));
  const overviewJobs=focusJobs.length?table(["Job","Received","Profit forecast",""],focusJobs.map(({job,figures:s})=>'<tr data-open="job" data-id="'+esc(job.id)+'"><td><b>'+esc(job.name)+'</b></td><td>'+cash(s.received)+'</td><td>'+(s.profit===null?"Not ready":cash(s.profit))+'</td><td><button data-open="job" data-id="'+esc(job.id)+'">View</button></td></tr>')):'<div class="dashboard-empty">No active jobs yet. Create a job in Jobs.</div>';
  const overviewStaff=focusStaff.length?table(["Employee","Earned","Paid",""],focusStaff.map(w=>{const earned=w.earned.filter(t=>!window.from||isISODate(t.date)&&t.date>=window.from&&t.date<=window.to).reduce((n,t)=>n+t.total,0);const paid=w.payments.filter(t=>!window.from||isISODate(t.paidOn)&&t.paidOn>=window.from&&t.paidOn<=window.to).reduce((n,t)=>n+t.amount,0);return '<tr data-open="worker" data-name="'+esc(w.name)+'"><td><b>'+esc(w.name)+'</b></td><td>'+cash(earned)+'</td><td>'+cash(paid)+'</td><td><button data-open="worker" data-name="'+esc(w.name)+'">View</button></td></tr>'})):'<div class="dashboard-empty">No employees yet. Add staff in Employees.</div>';
- return '<div class="daily-actions" aria-label="Daily shortcuts">'+
+ return crewPanel()+ '<div class="daily-actions" aria-label="Daily shortcuts">'+
  '<button class="daily-action primary" id="quickAttendance"><strong>Record attendance</strong><small>Choose staff → daily work and hours</small></button>'+
  '<button class="daily-action" id="quickBill"><strong>Capture a bill</strong><small>iPhone camera or photo library</small></button></div>'+
  '<div class="command-heading"><div><h2>Company overview</h2><p class="muted">Your daily business snapshot · '+esc(window.label)+'</p></div><div class="period-control"><label for="dashboardPeriod">Period</label><select id="dashboardPeriod">'+["week","month","year","all"].map((v,i)=>opt(v,["This week","This month","This year","All time"][i],dashboardPeriod)).join("")+'</select></div></div>'+
@@ -343,6 +370,20 @@ $("screen").onclick=event=>{
  if(storageBlocked)return;
  if(b.dataset.pageShortcut){if(!canLeaveJobDetails()||!canLeaveAttendance())return;page=b.dataset.pageShortcut;jobId="";person="";render();return}
  if(b.id==="quickAttendance"){if(!canLeaveJobDetails()||!canLeaveAttendance())return;page="employees";jobId="";person="";render();return}
+ if(b.id==="crewCheckIn"){
+  const jobId=$("crewJob")?.value,staffIds=[...document.querySelectorAll("[data-crew-staff]:checked")].map(x=>x.dataset.crewStaff);
+  try{startCrewSession(state,{jobId,staffIds,at:localClock(),id:uid()});persist()}catch(err){alert(err.message)}
+  return;
+ }
+ if(b.id==="crewCheckOut"){
+  const at=today()+"T"+($("crewFinishTime")?.value||""),breakMinutes=Number($("crewBreak")?.value),
+   dayPortion=Number($("crewDayPortion")?.value),notes=$("crewNotes")?.value||"";
+  const active=(state.crewSessions||[]).find(x=>!x.checkOutAt);
+  if(!active)return alert("No active crew.");
+  if(!confirm("Finish this crew shift and record wages for "+active.staffIds.length+" employees? Check hours, break and daily portion first."))return;
+  try{finishCrewSession(state,{at,breakMinutes,dayPortion,notes,ids:active.staffIds.map(()=>uid())});persist()}catch(err){alert(err.message)}
+  return;
+ }
  if(b.id==="quickBill"){billEditorOpen=true;editingBillId="";billImageDraft=null;render();$("billPanel")?.scrollIntoView({behavior:"smooth",block:"start"});return}
  if(b.dataset.open==="job"){page="jobs";jobId=b.dataset.id;editingPaymentId="";render();return}
  if(b.dataset.open==="worker"){if(!canLeaveAttendance())return;page="employees";person=b.dataset.name;period="week";attendanceMonth=today().slice(0,7);attendanceDate=today();editingAttendanceId="";render();return}
