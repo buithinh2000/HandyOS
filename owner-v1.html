@@ -277,7 +277,7 @@ function company(){
  const overviewJobs=focusJobs.length?table(["Job","Received","Profit forecast",""],focusJobs.map(({job,figures:s})=>'<tr data-open="job" data-id="'+esc(job.id)+'"><td><b>'+esc(job.name)+'</b></td><td>'+cash(s.received)+'</td><td>'+(s.profit===null?"Not ready":cash(s.profit))+'</td><td><button data-open="job" data-id="'+esc(job.id)+'">View</button></td></tr>')):'<div class="dashboard-empty">No active jobs yet. Create a job in Jobs.</div>';
  const overviewStaff=focusStaff.length?table(["Employee","Earned","Paid",""],focusStaff.map(w=>{const earned=w.earned.filter(t=>!window.from||isISODate(t.date)&&t.date>=window.from&&t.date<=window.to).reduce((n,t)=>n+t.total,0);const paid=w.payments.filter(t=>!window.from||isISODate(t.paidOn)&&t.paidOn>=window.from&&t.paidOn<=window.to).reduce((n,t)=>n+t.amount,0);return '<tr data-open="worker" data-name="'+esc(w.name)+'"><td><b>'+esc(w.name)+'</b></td><td>'+cash(earned)+'</td><td>'+cash(paid)+'</td><td><button data-open="worker" data-name="'+esc(w.name)+'">View</button></td></tr>'})):'<div class="dashboard-empty">No employees yet. Add staff in Employees.</div>';
  return '<div class="daily-actions" aria-label="Daily shortcuts">'+
- '<button class="daily-action primary" data-page-shortcut="employees" id="quickAttendance"><strong>Record attendance</strong><small>Choose staff → daily work and hours</small></button>'+
+ '<button class="daily-action primary" id="quickAttendance"><strong>Record attendance</strong><small>Choose staff → daily work and hours</small></button>'+
  '<button class="daily-action" id="quickBill"><strong>Capture a bill</strong><small>iPhone camera or photo library</small></button></div>'+
  '<div class="command-heading"><div><h2>Company overview</h2><p class="muted">Your daily business snapshot · '+esc(window.label)+'</p></div><div class="period-control"><label for="dashboardPeriod">Period</label><select id="dashboardPeriod">'+["week","month","year","all"].map((v,i)=>opt(v,["This week","This month","This year","All time"][i],dashboardPeriod)).join("")+'</select></div></div>'+
  '<div class="metrics dashboard-primary">'+metric("Customer cash received",cash(p.receipts))+metric("Wages paid",cash(p.wagePaid))+metric("Expenses marked paid",cash(p.expensesPaid))+metric("Net cash movement*",cash(p.netCash))+'</div>'+
@@ -342,6 +342,7 @@ $("screen").onclick=event=>{
  if(b.id==="downloadCorrupt"&&storageBlocked&&damagedRaw!==null){download("HandyOS-unreadable-recovery-"+today()+".txt",damagedRaw,"text/plain;charset=utf-8");return}
  if(storageBlocked)return;
  if(b.dataset.pageShortcut){if(!canLeaveJobDetails()||!canLeaveAttendance())return;page=b.dataset.pageShortcut;jobId="";person="";render();return}
+ if(b.id==="quickAttendance"){if(!canLeaveJobDetails()||!canLeaveAttendance())return;page="employees";jobId="";person="";render();return}
  if(b.id==="quickBill"){billEditorOpen=true;editingBillId="";billImageDraft=null;render();$("billPanel")?.scrollIntoView({behavior:"smooth",block:"start"});return}
  if(b.dataset.open==="job"){page="jobs";jobId=b.dataset.id;editingPaymentId="";render();return}
  if(b.dataset.open==="worker"){if(!canLeaveAttendance())return;page="employees";person=b.dataset.name;period="week";attendanceMonth=today().slice(0,7);attendanceDate=today();editingAttendanceId="";render();return}
