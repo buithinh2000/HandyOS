@@ -145,8 +145,9 @@ export function jobGroup(job){
  const stage=String(job.stage||"").toLowerCase();
  if(stage==="closed"||stage==="finished")return "finished";
  if(["active","handover","in_progress"].includes(stage))return "active";
- // Existing approved/scheduled statuses from prior demo are treated as booked.
- return "booked";
+ if(["approved","scheduled","booked"].includes(stage))return "booked";
+ // Surveys, drafts and unapproved quotes are NOT confirmed bookings.
+ return "planning";
 }
 export function paymentProgress(job){
  const s=summary(job);
