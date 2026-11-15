@@ -38,3 +38,6 @@ Review found `weeklyStart` and `workerByPeriod` used regex/date roll-over for sy
 
 ## Browser saved-data schema gate (source-only, 2026-11-15)
 A parseable JSON object could contain structurally invalid records (e.g. `staff` string or missing `jobs`) and previously be normalized into an empty roster/ledger, risking later overwrite. Owner V1 startup now uses the existing strict `parseOwnerBackup` validation before loading saved bytes; malformed saved data triggers PR44 fail-closed recovery with original bytes preserved and downloads allowed. Added browser test for schema-invalid JSON and valid legacy shapes. No AWS, finances, real data or storage-key changes. **Pending exact-head CI and merge verification.**
+
+## Date validation at payroll entry (source-only, 2026-11-15)
+The Owner V1 Add Hours and Add Wage Payment controls still accepted date-shaped strings without real-calendar validation while PR46's downstream period grouping strictly rejected them. This branch applies existing `isISODate` at both entry points so bad dates cannot be appended and silently disappear from period views. Browser QA covers rejection and successful valid date entry. No change to financial formulas, saved schema, legacy records, calendar or cloud. **Pending exact-head CI and merge check.**
