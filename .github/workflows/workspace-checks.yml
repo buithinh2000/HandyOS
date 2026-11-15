@@ -11,6 +11,9 @@ on:
   pull_request:
     paths:
       - "workspace.html"
+      - "owner-v1.html"
+      - "owner-ledger-core.mjs"
+      - "owner-ledger-io.mjs"
       - "tests/**"
       - ".github/workflows/workspace-checks.yml"
 permissions:
