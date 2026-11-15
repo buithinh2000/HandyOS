@@ -219,7 +219,11 @@ function employeeAttendance(){
  const selected=editingAttendanceId?row.find(t=>t.id===editingAttendanceId):null;
  const member=state.staff.find(x=>workerKey(x.name)===workerKey(person)),basis=selected?.payBasis||member?.payBasis||"hour";
  const daily=selected?.payBasis==="day",rate=selected?.rate??member?.rate??"";
- const days=Array.from({length:offset},()=>'<span></span>').concat(Array.from({length:last},(_,i)=>{const d=attendanceMonth+"-"+String(i+1).padStart(2,"0"),count=records.filter(x=>x.date===d).length;return '<button type="button" data-attendance-day="'+esc(d)+'" style="min-height:46px;'+(d===attendanceDate?"border:2px solid #2177b6;":"")+'">'+(i+1)+(count?" ✓":"")+'</button>'})).join("");
+ const days=Array.from({length:offset},()=>'<span></span>').concat(Array.from({length:last},(_,i)=>{
+  const d=attendanceMonth+"-"+String(i+1).padStart(2,"0"),entries=records.filter(x=>x.date===d),
+   marker=entries.some(x=>x.dayOff!==true)?" ✓":entries.length?" ○":"";
+  return '<button type="button" data-attendance-day="'+esc(d)+'" style="min-height:46px;'+(d===attendanceDate?"border:2px solid #2177b6;":"")+'">'+(i+1)+marker+'</button>';
+ })).join("");
  return '<div class="card"><h3>Attendance calendar</h3><p class="muted">Select a day to record or correct work. Start/finish minus unpaid break determines worked hours. Daily wages use 1 or 0.5 paid day; a daily rate is never added to an hourly rate.</p>'+
  '<div class="fields">'+field("Month","attendanceMonth",attendanceMonth,"month")+'</div><div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;text-align:center">'+["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d=>'<b>'+d+'</b>').join("")+days+'</div>'+
  '<h3 style="margin-top:20px">'+esc(attendanceDate)+'</h3>'+
@@ -252,7 +256,7 @@ return '<div class="row"><h2>Employees</h2><button id="toggleStaffForm" class="p
  const memberBonuses=state.jobs.flatMap(j=>(j.wageAdjustments||[]).filter(a=>workerKey(a.worker)===workerKey(person))
    .map(a=>({...a,jobName:j.name}))).sort((a,b)=>b.date.localeCompare(a.date));
  const member=state.staff.find(x=>x.name.trim().toLowerCase()===person.trim().toLowerCase()),w=workerTotals(state.jobs,person),rows=workerByPeriod(state.jobs,person,period),settlements=state.payrollSettlements.filter(x=>x.worker.trim().toLowerCase()===person.trim().toLowerCase()),seenClosePeriods=new Set();
- return '<button class="back" data-back="employees">← All employees</button><h2>'+esc(person)+'</h2><div class="metrics">'+metric("Hours",w.hours)+metric("Days",w.days)+metric("Earned",cash(w.due))+metric("Paid",cash(w.paid))+metric("Outstanding",cash(w.outstanding))+'</div>'+
+ return '<button class="back" data-back="employees">← All employees</button><h2>'+esc(person)+'</h2><div class="metrics">'+metric("Hours",w.hours)+metric("Days",w.days)+metric("Earned",cash(w.due))+metric("Paid",cash(w.paid))+metric("Outstanding",cash(w.outstanding))+'</div>'+(w.outstanding<0?'<p class="notice"><b>Payroll needs review.</b> Wages paid exceed corrected earned wages by '+cash(-w.outstanding)+'. No payment has been reversed.</p>':'')+
  employeeAttendance()+
 
  '<div class="card" id="weeklyBonusPanel"><h3>Weekly bonus</h3><p class="muted">Bonus adds to earned wages and Job costs once. It is not money paid, Other Expenses or staff reimbursement.</p>'+
