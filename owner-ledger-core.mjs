@@ -157,7 +157,7 @@ export function paymentProgress(job){
  return {percent,received:s.received,contract:s.totalContractInc,remaining:s.remaining,overpaid:percent!==null&&percent>100};
 }
 export function isISODate(value){
- if(typeof value!=="string"||!/^\\d{4}-\\d{2}-\\d{2}$/.test(value))return false;
+ if(typeof value!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;
  const date=new Date(value+"T12:00:00Z");
  return Number.isFinite(date.getTime())&&date.toISOString().slice(0,10)===value;
 }
