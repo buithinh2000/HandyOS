@@ -128,3 +128,22 @@ This does **not** authorize cloud deployment. The Cognito Owner identity, IAM/st
 ## Lockfile promotion evidence
 
 The 69,260-byte committed npm lockfile was materialized on a temporary isolated feature branch and its SHA-256 verified against a previously reviewed GitHub Actions artifact. The temporary write-capable workflow was removed **before merging** this branch. The regular build and source tests remain `contents: read` and cannot deploy or modify AWS. Production/staging remain NO-GO until live AWS identity checks, restore rehearsal, cost approval and Owner permission.
+
+## Safe AWS metadata preflight — source only, no deployment
+
+File: `cloud/preflight-readonly.mjs`. This tool uses the existing locally configured AWS CLI credentials in CloudShell. It never accesses Secrets Manager contents, staff records, database contents, tokens or payroll data; it prints only PASS/BLOCKED per check. Run it only with authorized *read-only* credentials and actual verified values supplied by the Owner, never guessed values:
+
+```bash
+# Existing authorized AWS CloudShell with AWS CLI v2, Node.js 22+
+export HANDYOS_EXPECTED_ACCOUNT='<12-digit AWS account ID>'
+export HANDYOS_EXPECTED_REGION='ap-southeast-1'
+export HANDYOS_USER_POOL_ID='<verified existing Cognito pool ID>'
+export HANDYOS_APP_CLIENT_ID='<verified existing public app client ID>'
+export HANDYOS_OWNER_ORIGIN='https://handyos.buitai.com'
+export HANDYOS_ARTIFACT_BUCKET='<approved versioned artifact bucket name>'
+export HANDYOS_ARTIFACT_KEY='<reviewed Lambda ZIP object key>'
+export HANDYOS_ARTIFACT_VERSION='<exact object version ID>'
+node cloud/preflight-readonly.mjs
+```
+
+The script issues only `sts:GetCallerIdentity`, `cognito-idp:DescribeUserPool`, `cognito-idp:DescribeUserPoolClient`, `s3:GetBucketVersioning` and `s3:HeadObject`. It checks account, region, pool/client metadata, OAuth authorization-code/openid configuration, exact callback, bucket versioning and encrypted exact-version artifact. **PASS is metadata-only, not permission to deploy.** A `BLOCKED` result requires stopping; do not expand permissions automatically. The following remain unverified even if all checks PASS: immutable Owner Cognito subject and actual owner login, artifact SHA-256 and source provenance, KMS key policy and IAM negative testing, staging costs, actual restore rehearsal, Change Set and signed Owner approval. No AWS checks have been executed in this conversation.
