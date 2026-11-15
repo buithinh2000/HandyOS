@@ -116,3 +116,11 @@ The template can incur charges for a KMS key, Lambda/API requests, CloudWatch lo
 **Reproducibility limitation:** the generated npm lock is retained with the build artifact, but not yet committed. Separate runs can resolve different transitive dependencies. No claim of fully reproducible builds until a reviewed complete lock is committed and the workflow uses npm ci alone. Before AWS activation, verify bundle hash, object version, Cognito configuration, IAM preflight and Change Set, then explicitly approve deployment.
 
 **No deployments or real-data writes** have been performed in this change.
+
+## Reviewed dependency-tree digest guard — November 15, 2026
+
+Evidence sourced from the successful GitHub Actions build run `43667413206`, artifact ID `14143100562` (review artifact). Independently verified local archive contents: exact `cloud/lambda.js` inner ZIP, SDK `@aws-sdk/client-s3` version `3.901.0`, esbuild `0.25.12`, npm lockfile v3 containing 117 package entries. SHA-256 of the full reviewed dependency lock: `a2f22aba6b58609521c1815c2914905d1f4772dfcaa9a9f92c9bbcc3d267921f`; review-only Lambda inner ZIP: `9371670a93851037976f43b7ab688ad14e98b7034341c0b48963a93165446ecc`.
+
+The build now **fails before `npm ci`** if npm's regenerated lock has a different SHA-256. This makes unexpected transitive dependency changes block release. The lock itself is still stored in the reviewed build artifact, not committed into Git. Reproducibility is therefore *digest-guarded*, not yet guaranteed bit-for-bit across independent runs. The approved full lockfile should ultimately be committed and installed by `npm ci` without `npm install` or lock regeneration; update lock digest only with a newly reviewed artifact and its checksums.
+
+This does **not** authorize cloud deployment. The Cognito Owner identity, IAM/stack change set, private KMS/S3 restore rehearsal, staging cost ceiling and Owner approval remain unverified/required. Keep the public Owner V1 demo browser-local and avoid sensitive production data.
