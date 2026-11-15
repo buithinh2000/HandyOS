@@ -328,7 +328,7 @@ $("screen").onclick=event=>{
     status=$("billStatus").value,notes=$("billNotes").value.trim().slice(0,500),
     original=(state.materialBills||[]).find(x=>x.id===editingBillId),image=billImageDraft||original?.image;
   if(!job||!isISODate(date)||!reference||!Number.isFinite(amount)||amount<=0||!["draft","sent","reimbursed"].includes(status)||!image)return alert("Choose a Job, date, store/reference, positive amount and receipt photo.");
-  if(!/^data:image\\/(?:jpeg|png|webp);base64,/.test(image)||image.length>260000)return alert("Invalid or oversized receipt image.");
+  if(!/^data:image\/(?:jpeg|png|webp);base64,/.test(image)||image.length>260000)return alert("Invalid or oversized receipt image.");
   if(original&&original.status==="reimbursed"&&!confirm("Update an already reimbursed bill? This changes reimbursement history."))return;
   const entry={id:original?.id||uid(),jobId:job.id,date,reference,amount,status,notes,image};
   if(original)state.materialBills=state.materialBills.map(x=>x.id===original.id?entry:x);
