@@ -19,7 +19,7 @@ function expenseForm(){return '<div class="fields">'+field("Date","expenseDate",
 function hoursForm(){const people=workerNames(state.jobs,state.staff);return '<div class="fields"><div><label>Employee name</label><select id="workerName"><option value="">Select employee</option>'+people.map(name=>opt(name,name,"")).join("")+'</select></div>'+field("Work date","workDate",today(),"date")+field("Hours","workHours","","number")+field("Hourly cost AUD","workRate","","number")+'</div><button id="addHours">+ Add hours</button><p class="muted">Add staff from the Employees tab first. Select their name here; the stored rate can be adjusted for this job.</p>'}
 function jobs(){
  const j=jNow();if(!j){
- const groups=[["booked","Booked / Preparing"],["active","In Progress"],["finished","Finished"]];
+ const groups=[["planning","Planning / Quoting"],["booked","Booked"],["active","In Progress"],["finished","Finished"]];
  const counts=groups.map(([key])=>state.jobs.filter(x=>jobGroup(x)===key).length);
  const dayRows=scheduleDays(state.jobs,today(),14);
  const views=groups.map(([key,label],i)=>'<div class="card"><div class="row"><h3>'+label+'</h3><span class="pill">'+counts[i]+' jobs</span></div>'+
@@ -30,7 +30,7 @@ function jobs(){
   return '<tr data-open="job" data-id="'+esc(x.id)+'"><td><b>'+esc(x.name)+'</b></td><td>'+cash(sum.received)+'</td><td>'+percent+bar+(m.overpaid?'<span class="warn">Over 100%</span>':"")+'</td><td>'+(sum.profit===null?"Not ready":cash(sum.profit))+'</td><td>'+(range.scheduled?esc(range.start+" – "+range.end):range.invalid?"Check dates":"Not scheduled")+'</td><td><button data-open="job" data-id="'+esc(x.id)+'">Open</button></td></tr>'}))+'</div>').join("");
  const calendar='<div class="card"><div class="row"><h3>Schedule · Next 14 days</h3><span class="pill">Recorded bookings only</span></div><p class="muted">Days without a recorded booking may still be unavailable due to staff, travel or other commitments. Check before confirming customers.</p><div class="schedule-grid">'+dayRows.map(x=>'<div class="schedule-day '+(x.bookedCount?"busy":"unbooked")+'"><b>'+esc(x.date.slice(5))+'</b><span>'+ (x.bookedCount?x.bookedCount+' job'+(x.bookedCount===1?"":"s"):"No job booked")+'</span><small>'+esc(x.booked.map(j=>j.name).join(", ").slice(0,80))+'</small></div>').join("")+'</div></div>';
  return '<div class="row"><h2>Jobs Overview</h2><button class="primary" id="newJob">+ New job</button></div>'+
- '<div class="metrics">'+metric("Booked / Preparing",counts[0])+metric("In Progress",counts[1])+metric("Finished",counts[2])+metric("Total jobs",state.jobs.length)+'</div>'+
+ '<div class="metrics">'+metric("Planning",counts[0])+metric("Booked",counts[1])+metric("In Progress",counts[2])+metric("Finished",counts[3])+'</div>'+
  views+calendar;
  }
  const s=summary(j),cashDetail=paymentBreakdown(j),closed=j.stage==="closed";
