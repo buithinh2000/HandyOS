@@ -1,6 +1,6 @@
 // AWS Lambda entrypoint for a private Owner-only API Gateway HTTP API.
 // Package @aws-sdk/client-s3 at build time, with no API keys in browser/source.
-import {S3Client,GetObjectCommand,PutObjectCommand} from "@aws-sdk/client-s3";
+import {S3Client,ListObjectsV2Command,GetObjectCommand,PutObjectCommand} from "@aws-sdk/client-s3";
 import {createOwnerLedgerApi} from "./owner-api.mjs";
 
 const env=process.env;
@@ -15,7 +15,12 @@ function objectKey(sub){
 const storage={
  async read(sub){
   try{
-   const res=await client.send(new GetObjectCommand({Bucket:bucket,Key:objectKey(sub)}));
+   const key=objectKey(sub);
+   // Exact-key existence probe: avoids S3 GetObject returning ambiguous 403 on first use.
+   // ListBucket is restricted by IAM to this one exact prefix.
+   const listing=await client.send(new ListObjectsV2Command({Bucket:bucket,Prefix:key,MaxKeys:1}));
+   if(!(listing.Contents||[]).some(x=>x.Key===key))return null;
+   const res=await client.send(new GetObjectCommand({Bucket:bucket,Key:key}));
    return {data:await res.Body.transformToString("utf-8"),etag:res.ETag};
   }catch(e){if(e?.name==="NoSuchKey"||e?.$metadata?.httpStatusCode===404)return null;throw e}
  },

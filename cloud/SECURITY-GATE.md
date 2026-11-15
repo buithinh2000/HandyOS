@@ -38,7 +38,7 @@ The Lambda has no user-facing publicly callable Function URL. Never put a client
 ## Storage and backup guards
 
 1. Create a **dedicated** private HandyOS-only S3 bucket, with Block Public Access ON, bucket ownership enforced, bucket versioning ON, SSE-KMS with a dedicated key, and TLS-only bucket policy.
-2. Use a minimal Lambda execution role: \`s3:GetObject\` and \`s3:PutObject\` only for \`owners/<owner-sub>/ledger.json\`, plus \`kms:Decrypt\`, \`kms:GenerateDataKey\` for this key with S3 encryption context restrictions. No S3 DeleteObject / ListBucket / PutBucketPolicy, and no production admin privileges.
+2. Use a minimal Lambda execution role: \`s3:GetObject\` and \`s3:PutObject\` only for \`owners/<owner-sub>/ledger.json\`, plus \`kms:Decrypt\`, \`kms:GenerateDataKey\` for this key with S3 encryption context restrictions. No S3 DeleteObject / PutBucketPolicy, and no production admin privileges. Only s3:ListBucket conditioned on the exact Owner ledger key is permitted to support first-use existence checking.
 3. Test first create, single save, stale-write 409, malformed backup, unauthorized access, and restoration of a previous S3 version **before** using real records.
 4. Keep a separate Owner-authorized JSON export outside the browser for disaster recovery; S3 Versioning protects history but is **not** a full backup strategy. Document restore permissions and perform a restore test.
 5. Set CloudWatch logging to metadata only: **never** log request body, response state, Authorization header, access token, payroll amounts, or client names.
@@ -105,3 +105,14 @@ The template does **not** create Cognito users, a login UI, the API artifact ZIP
 ### Cost and retention notes
 
 The template can incur charges for a KMS key, Lambda/API requests, CloudWatch logs, S3 object versions and storage. The exact total is **not determined** until an actual region, traffic, retention and account are reviewed. Retain policies intentionally avoid deleting the bucket and key on stack removal; cleanup requires a separate approved process. Public owner demo must not be described as secured by the new template.
+
+
+## First-use ledger read fix and artifact build (source review only)
+
+**Why:** AWS S3 may return 403 AccessDenied for a missing key when the caller lacks ListBucket. The first cloud GET could fail when the Owner has not saved any data. Lambda now sends a ListObjectsV2 request with an exact-key Prefix `owners/<verified Owner sub>/ledger.json` and MaxKeys=1, and only treats an exact matching key as existing. IAM grants ListBucket conditioned on that exact prefix. This behavior still requires real AWS staging verification.
+
+**Review-only Lambda ZIP:** `.github/workflows/owner-lambda-artifact.yml` runs for source PR changes and manual dispatch. It pins direct AWS SDK and build-tool versions, creates a dependency lock during that run, installs with npm ci, and bundles all runtime code into `cloud/lambda.js` (matching the CloudFormation handler `cloud/lambda.handler`). GitHub Actions artifact includes the review ZIP, the dependency lock, SHA256 checksums, and source commit. It never uploads to AWS.
+
+**Reproducibility limitation:** the generated npm lock is retained with the build artifact, but not yet committed. Separate runs can resolve different transitive dependencies. No claim of fully reproducible builds until a reviewed complete lock is committed and the workflow uses npm ci alone. Before AWS activation, verify bundle hash, object version, Cognito configuration, IAM preflight and Change Set, then explicitly approve deployment.
+
+**No deployments or real-data writes** have been performed in this change.

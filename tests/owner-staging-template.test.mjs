@@ -34,8 +34,12 @@ test("no public bucket; object versioning and KMS encryption are mandatory",()=>
 });
 test("Lambda role only grants one Owner object, KMS via S3 and CloudWatch stream rights",()=>{
  const allowed=statements.filter(x=>x.Effect==="Allow").flatMap(x=>x.Action);
- assert.deepEqual(allowed.sort(),["s3:GetObject","s3:PutObject","kms:Decrypt","kms:GenerateDataKey","logs:CreateLogStream","logs:PutLogEvents"].sort());
- assert.ok(!allowed.some(a=>a.includes("Delete")||a.includes("List")||a==="*"));
+ assert.deepEqual(allowed.sort(),["s3:GetObject","s3:PutObject","s3:ListBucket","kms:Decrypt","kms:GenerateDataKey","logs:CreateLogStream","logs:PutLogEvents"].sort());
+ assert.ok(!allowed.some(a=>a.includes("Delete")||a==="*"));
+ const list=statements.find(x=>x.Sid==="OwnerLedgerExactKeyListOnly");
+ assert.deepEqual(list.Action,["s3:ListBucket"]);
+ assert.match(allStrings(list.Condition),/owners\/\$\{OwnerSub\}\/ledger\.json/);
+ assert.deepEqual(list.Resource,[{"Fn::GetAtt":["LedgerBucket","Arn"]}]);
  const obj=statements.find(x=>x.Sid==="LedgerObjectReadWriteOnly");
  assert.match(allStrings(obj.Resource),/owners\/\$\{OwnerSub\}\/ledger\.json/);
  const kms=statements.find(x=>x.Sid==="LedgerKMSOnlyViaS3");

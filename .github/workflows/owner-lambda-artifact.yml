@@ -1,0 +1,58 @@
+name: HandyOS Owner Lambda build artifact (NO AWS deploy)
+on:
+  pull_request:
+    paths:
+      - "cloud/**"
+      - "owner-ledger-core.mjs"
+      - "owner-ledger-io.mjs"
+      - ".github/workflows/owner-lambda-artifact.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Resolve exact direct dependencies and save complete lock for evidence
+        working-directory: cloud/build
+        run: |
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm ci --no-audit --no-fund
+          node -e "const p=require('./package-lock.json'); if(!p.lockfileVersion || !p.packages['node_modules/@aws-sdk/client-s3'] || !p.packages['node_modules/esbuild']) process.exit(1)"
+      - name: Bundle all runtime source and AWS SDK into deploy-compatible handler
+        run: |
+          mkdir -p dist/cloud
+          NODE_PATH="$PWD/cloud/build/node_modules" ./cloud/build/node_modules/.bin/esbuild cloud/lambda.mjs \
+            --bundle --platform=node --target=node22 --format=cjs --packages=bundle \
+            --outfile=dist/cloud/lambda.js
+          cp cloud/build/package-lock.json dist/package-lock.build.json
+          node --check dist/cloud/lambda.js
+          HANDYOS_LEDGER_BUCKET=example-staging HANDYOS_KMS_KEY_ARN=arn:aws:kms:ap-southeast-1:123456789012:key/00000000-0000-0000-0000-000000000000 \
+            HANDYOS_OWNER_SUB=owner-1234567890 HANDYOS_OWNER_ORIGIN=https://handyos.buitai.com \
+            HANDYOS_API_GATEWAY_ID=example123 HANDYOS_JWT_ISSUER=https://cognito-idp.ap-southeast-1.amazonaws.com/example \
+            HANDYOS_JWT_CLIENT_ID=example-client \
+            node -e "const m=require('./dist/cloud/lambda.js');if(typeof m.handler!=='function')process.exit(1)"
+      - name: Record immutable review checksums (no AWS credentials)
+        run: |
+          cd dist
+          sha256sum cloud/lambda.js package-lock.build.json > SHA256SUMS.txt
+          zip -q -r owner-lambda-review.zip cloud/lambda.js
+          sha256sum owner-lambda-review.zip >> SHA256SUMS.txt
+          printf 'source_commit=%s\n' "$GITHUB_SHA" > SOURCE-COMMIT.txt
+          printf 'deployment_status=NOT_UPLOADED_TO_AWS\n' >> SOURCE-COMMIT.txt
+      - name: Upload review-only Lambda zip, dependency lock and hashes
+        uses: actions/upload-artifact@v4
+        with:
+          name: handyos-owner-lambda-review-${{ github.sha }}
+          path: |
+            dist/owner-lambda-review.zip
+            dist/package-lock.build.json
+            dist/SHA256SUMS.txt
+            dist/SOURCE-COMMIT.txt
+          if-no-files-found: error
+          retention-days: 14
