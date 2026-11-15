@@ -370,5 +370,43 @@ await legacyStagePage.locator("#saveJob").click();
 assert.equal(await legacyStagePage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0].stage),"active","Explicit stage change remains supported");
 await legacyStagePage.close();
 
+// Payroll closeouts are audit snapshots, not mutable one-slot records.
+const settlePage=await browser.newPage();
+const settlementMessages=[];
+settlePage.on("dialog",d=>{settlementMessages.push(d.message());return d.accept()});
+await settlePage.goto(address);
+const settleFixture={jobs:[{id:"payroll-job",name:"Test payroll",stage:"active",contract:1100,
+ timesheets:[{id:"hour-1",worker:"Alex",date:"2026-11-16",hours:8,rate:40}],workerPayments:[],
+ expenses:[],payments:[],tasks:[],categories:[],materials:[]}],staff:[{id:"alex",name:"Alex",role:"Carpenter",rate:40}],payrollSettlements:[]};
+await settlePage.evaluate(raw=>localStorage.setItem("handyos-workspace-v07",raw),JSON.stringify(settleFixture));
+await settlePage.reload();
+await settlePage.locator('[data-page="employees"]').click();
+await settlePage.locator('[data-open="worker"]').first().click();
+await settlePage.locator('[data-settle]').first().click();
+let savedCloses=await settlePage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).payrollSettlements);
+assert.equal(savedCloses.length,1);
+assert.equal(savedCloses[0].earned,320);
+await settlePage.locator('[data-settle]').first().click();
+assert.match(settlementMessages.at(-1),/already has an up-to-date wage settlement/);
+assert.equal(await settlePage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).payrollSettlements.length),1,"Unchanged period must not create duplicate");
+await settlePage.evaluate(()=>{
+ const data=JSON.parse(localStorage.getItem("handyos-workspace-v07"));
+ data.jobs[0].timesheets[0].hours=9;
+ localStorage.setItem("handyos-workspace-v07",JSON.stringify(data));
+});
+await settlePage.reload();
+await settlePage.locator('[data-page="employees"]').click();
+await settlePage.locator('[data-open="worker"]').first().click();
+assert.match(await settlePage.locator("#screen").innerText(),/Changed since close/);
+await settlePage.locator('[data-settle]').first().click();
+assert.match(settlementMessages.at(-1),/new version/);
+savedCloses=await settlePage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).payrollSettlements);
+assert.equal(savedCloses.length,2,"Earlier closeout must be preserved");
+assert.equal(savedCloses[0].earned,320);
+assert.equal(savedCloses[1].earned,360);
+assert.notEqual(savedCloses[0].id,savedCloses[1].id);
+assert.equal(await settlePage.locator("#screen").getByText("Saved payroll settlements").count(),1);
+await settlePage.close();
+
 console.log("OWNER_BROWSER_QA_PASS");
 }finally{if(browser)await browser.close();await new Promise(ok=>server.close(ok))}
