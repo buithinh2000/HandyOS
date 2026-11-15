@@ -44,3 +44,6 @@ The Owner V1 Add Hours and Add Wage Payment controls still accepted date-shaped 
 
 ## Annual payroll date consistency — source-only, 2026-11-15
 `wageYearSummary` had used a simple year-prefix comparison even for impossible dates in legacy labour/payment rows. This branch applies the existing `isISODate` check when a year is selected, matching PR46's strict weekly/monthly/yearly period bucketing. The unfiltered/all-time ledger and raw rows remain untouched so no financial record disappears or gets rewritten. Regression tests cover filtered annual figures and preserved all-time balances. **Pending exact-head CI and merge verification.** No AWS/production changes.
+
+## Owner V1 expense-date input validation (source-only, 2026-11-15)
+Expense entry previously accepted any nonempty date string, although monthly/year expense filters depend on the date. This branch applies existing strict `isISODate` before adding expense rows. Added real-browser regression: blank/invalid date blocks adding an expense; valid date saves normally. No changes to stored records, amounts, GST/profit arithmetic, payroll, AWS, or live data. **Verify latest HEAD CI and merge before treating this as live main.**
