@@ -1,5 +1,15 @@
 # HandyOS cross-chat handoff — 2026-11-15 Australia/Melbourne
 
+> **Verified current status (GitHub source, 2026-11-15; check again next session):**
+> Repository `buithinh2000/HandyOS`; observed `main` HEAD `896053bffc23889bc27fa78d51391002e9163015` (merged PR #56).
+> Merged and verified GitHub PRs: #52 `596fc32` (finished/open counts), #53 `f48900e` (simplified Owner dashboard), #54 `9301c45` (root opens Owner V1, original page saved as `legacy-dashboard.html`), #55 `ebb04e5` (Overview is the default tab), #56 `896053b` (date-valid year/month filter choices).
+> **Canonical UX:** `index.html` redirects to `owner-v1.html`; initial Owner tab is **Overview**; older prototypes are tucked into a collapsed footer, with legacy records untouched. Owner V1 is a browser-local synthetic-data demonstration, with **NO confirmed public Pages rollout**, **NO secure backend**, **NO real payroll/customer data**.
+> **Authority boundary:** source-only corrections and CI can be self-reviewed; no new features without the Owner's feedback, no AWS/SQL/IAM/DNS, financial formula, cloud deployment, or paid-service activation by inference.
+> **Verification limit:** public `github.io` URLs could not be fetched from current execution environment. Static GitHub source and CI are evidence of repository state, NOT of the user-visible deployed page.
+> **Next action:** first check actual owner screenshot and source `index.html`/`owner-v1.html` plus public deployment evidence; if user reports a specific defect, fix that exact issue with regression and CI. Do not resurrect quote-first or multiple-demos homepage.
+
+---
+
 ## Restart order
 1. Read `PROJECT-BRAIN.md` (when merged), `docs/DECISION-LEDGER.md`, this handoff, `ARCHITECTURE.md`, `cloud/SECURITY-GATE.md`.
 2. Verify current main SHA, open and recently merged PRs, statuses/CI. Never reuse the SHAs below as timeless.
@@ -7,7 +17,7 @@
 4. Check deployment identity and permissions independently; absent confirmed live evidence means NO-GO.
 5. Apply Owner's latest explicit scope: lean Owner V1, no AI / quote wizard / multi-user as current entry.
 
-## Verified in this handoff
+## Historical verification as originally recorded
 - GitHub repo: `buithinh2000/HandyOS`; main last observed at `6c4b2f1d11697ebb8b47a772158f3a57b212c5a1` (merged PR41). Evidence: GitHub search_commits + PR41.
 - PR24: merged lean Owner V1; PR23: closed UNMERGED (expanded quote QA deferred).
 - PR28: merged combined Tax & Reserve Fund based on adjusted **incl-GST contract**, not on profit.
@@ -18,7 +28,7 @@
 ## Staging blockers / gates
 Owner/Cognito sub and OAuth PKCE, approved account/region/budget, proper artifact + exact version and digest, private S3/KMS IAM review, CloudFormation Change Set, negative authorization tests, restore rehearsal, browser conflict tests, E2E, owner written approval for infrastructure changes. Read-only preflight script exists but output from real AWS has not been verified here.
 
-## Exact next action
+## Historical next action (superseded by verified current status above)
 This branch reconciles `PRODUCT_DESIGN_STANDARD.md` with Owner PR24: lean business manager first, prior quote-first workspace preserved as deferred. Run the continuity gate and Workspace CI on the final branch HEAD, perform VIN diff review, then source-only merge if eligible. After merge, re-verify main SHA and record result. Cloud remains NO-GO until separate authorized read-only staging preflight and all security/cost gates pass. The Project Brain CI verifies selected invariants; it does not retrieve every past chat or prove deployed runtime readiness.
 
 ## Safety boundaries
