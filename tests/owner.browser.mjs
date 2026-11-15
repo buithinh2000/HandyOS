@@ -686,7 +686,11 @@ assert.equal(localBills[0].status,"reimbursed");
 assert.equal(localBills.length,1);
 assert.match(await receiptPage.locator("#screen").innerText(),/Waiting \$0\.00/);
 await receiptPage.locator('[data-page="jobs"]').click();
-await receiptPage.locator('[data-open="job"]').first().click();
+const receiptJobId=await receiptPage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0].id);
+const receiptRow=receiptPage.locator('[data-open="job"][data-id="'+receiptJobId+'"]').first();
+const receiptGroup=receiptRow.locator("xpath=ancestor::details");
+if(await receiptGroup.count()&&!await receiptGroup.evaluate(el=>el.open))await receiptGroup.locator("summary").click();
+await receiptRow.click();
 assert.equal(await receiptPage.locator("#billPanel [data-edit-bill='"+billId+"']").count(),1);
 await receiptPage.close();
 
