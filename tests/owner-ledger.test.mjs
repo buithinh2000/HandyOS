@@ -458,3 +458,21 @@ test("company open-job count agrees with Jobs status groups including legacy fin
  }
  assert.equal(companySummary(jobs.slice(0,2)).open,2);
 });
+
+test("overview paid-expense amount covers paid entries of every category, not just Other",()=>{
+ const a=j("paid-mix","Bathroom");
+ a.expenses.push(
+  {id:"m",amount:110,gstBasis:"inc",kind:"material",paidStatus:"paid"},
+  {id:"o",amount:55,gstBasis:"no_gst",kind:"other",paidStatus:"paid"},
+  {id:"u",amount:330,gstBasis:"inc",kind:"equipment",paidStatus:"unpaid"}
+ );
+ const totals=companySummary([a]);
+ assert.equal(totals.expensesPaid,165);
+ assert.equal(totals.expensesEx,455);
+ assert.equal(summary(a).otherExpensesEx,55);
+});
+test("Owner Overview labels total marked-paid expenses without confusing them with Other category",()=>{
+ const html=readFileSync(new URL("../owner-v1.html",import.meta.url),"utf8");
+ assert.match(html,/Expenses marked paid \(entered\)/);
+ assert.doesNotMatch(html,/metric\("Other expenses paid"/);
+});
