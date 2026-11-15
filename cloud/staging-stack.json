@@ -1,0 +1,462 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "HandyOS Owner V1 isolated staging ledger. SOURCE TEMPLATE ONLY. Explicit approval, review and preflight required before deployment.",
+  "Parameters": {
+    "OwnerSub": {
+      "Type": "String",
+      "MinLength": 10,
+      "MaxLength": 128,
+      "AllowedPattern": "[A-Za-z0-9_-]+",
+      "Description": "EXISTING verified Cognito Owner subject; never use a guessed value"
+    },
+    "OwnerOrigin": {
+      "Type": "String",
+      "AllowedPattern": "https://[A-Za-z0-9.-]+",
+      "Description": "Exact approved HTTPS origin with no trailing slash"
+    },
+    "CognitoIssuer": {
+      "Type": "String",
+      "AllowedPattern": "https://cognito-idp[.][a-z0-9-]+[.]amazonaws[.]com[.a-z]*/[A-Za-z0-9_-]+",
+      "Description": "Issuer of an existing verified Cognito user pool"
+    },
+    "CognitoClientId": {
+      "Type": "String",
+      "MinLength": 5,
+      "MaxLength": 128,
+      "AllowedPattern": "[A-Za-z0-9_-]+",
+      "Description": "Existing verified Cognito PKCE public client ID"
+    },
+    "ArtifactBucket": {
+      "Type": "String",
+      "MinLength": 3,
+      "Description": "Approved, separately protected Lambda artifact bucket in same region"
+    },
+    "ArtifactKey": {
+      "Type": "String",
+      "MinLength": 1,
+      "Description": "SHA/version-pinned built Lambda ZIP (not repository files)"
+    },
+    "ArtifactVersion": {
+      "Type": "String",
+      "MinLength": 1,
+      "Description": "Immutable S3 object version ID for reviewed ZIP"
+    },
+    "StagingSuffix": {
+      "Type": "String",
+      "MinLength": 4,
+      "MaxLength": 24,
+      "AllowedPattern": "[a-z0-9-]+",
+      "Description": "Unique stage identifier, no real customer data"
+    }
+  },
+  "Resources": {
+    "LedgerKey": {
+      "Type": "AWS::KMS::Key",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "Description": "Dedicated HandyOS staging ledger encryption key; no other venture access",
+        "EnableKeyRotation": true,
+        "PendingWindowInDays": 30,
+        "KeyPolicy": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "EnableAccountIAMAdministration",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Sub": "arn:${AWS::Partition}:iam::${AWS::AccountId}:root"
+                }
+              },
+              "Action": "kms:*",
+              "Resource": "*"
+            }
+          ]
+        }
+      }
+    },
+    "LedgerBucket": {
+      "Type": "AWS::S3::Bucket",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "BucketName": {
+          "Fn::Sub": "handyos-owner-staging-${AWS::AccountId}-${AWS::Region}-${StagingSuffix}"
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "BucketOwnerEnforced"
+            }
+          ]
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "aws:kms",
+                "KMSMasterKeyID": {
+                  "Fn::GetAtt": [
+                    "LedgerKey",
+                    "Arn"
+                  ]
+                }
+              },
+              "BucketKeyEnabled": false
+            }
+          ]
+        }
+      }
+    },
+    "LedgerBucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "LedgerBucket"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "DenyNonTLS",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:*",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "LedgerBucket",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Sub": "${LedgerBucket.Arn}/*"
+                }
+              ],
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "OwnerLambdaRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "OwnerLedgerOnly",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "LedgerObjectReadWriteOnly",
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "${LedgerBucket.Arn}/owners/${OwnerSub}/ledger.json"
+                    }
+                  ]
+                },
+                {
+                  "Sid": "LedgerKMSOnlyViaS3",
+                  "Effect": "Allow",
+                  "Action": [
+                    "kms:Decrypt",
+                    "kms:GenerateDataKey"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": [
+                        "LedgerKey",
+                        "Arn"
+                      ]
+                    }
+                  ],
+                  "Condition": {
+                    "StringEquals": {
+                      "kms:ViaService": {
+                        "Fn::Sub": "s3.${AWS::Region}.amazonaws.com"
+                      }
+                    },
+                    "StringLike": {
+                      "kms:EncryptionContext:aws:s3:arn": {
+                        "Fn::Sub": "${LedgerBucket.Arn}/owners/${OwnerSub}/ledger.json"
+                      }
+                    }
+                  }
+                },
+                {
+                  "Sid": "DedicatedLogStreamOnly",
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "${OwnerLogGroup.Arn}:*"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "OwnerLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/lambda/handyos-owner-staging-${StagingSuffix}"
+        },
+        "RetentionInDays": 7
+      }
+    },
+    "LedgerFunction": {
+      "Type": "AWS::Lambda::Function",
+      "DependsOn": [
+        "OwnerLogGroup"
+      ],
+      "Properties": {
+        "FunctionName": {
+          "Fn::Sub": "handyos-owner-staging-${StagingSuffix}"
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "OwnerLambdaRole",
+            "Arn"
+          ]
+        },
+        "Runtime": "nodejs22.x",
+        "Handler": "cloud/lambda.handler",
+        "MemorySize": 128,
+        "Timeout": 10,
+        "Code": {
+          "S3Bucket": {
+            "Ref": "ArtifactBucket"
+          },
+          "S3Key": {
+            "Ref": "ArtifactKey"
+          },
+          "S3ObjectVersion": {
+            "Ref": "ArtifactVersion"
+          }
+        },
+        "Environment": {
+          "Variables": {
+            "HANDYOS_LEDGER_BUCKET": {
+              "Ref": "LedgerBucket"
+            },
+            "HANDYOS_KMS_KEY_ARN": {
+              "Fn::GetAtt": [
+                "LedgerKey",
+                "Arn"
+              ]
+            },
+            "HANDYOS_OWNER_SUB": {
+              "Ref": "OwnerSub"
+            },
+            "HANDYOS_OWNER_ORIGIN": {
+              "Ref": "OwnerOrigin"
+            },
+            "HANDYOS_API_GATEWAY_ID": {
+              "Ref": "OwnerApi"
+            },
+            "HANDYOS_JWT_ISSUER": {
+              "Ref": "CognitoIssuer"
+            }
+          }
+        }
+      }
+    },
+    "OwnerApi": {
+      "Type": "AWS::ApiGatewayV2::Api",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "handyos-owner-staging-${StagingSuffix}"
+        },
+        "ProtocolType": "HTTP",
+        "DisableExecuteApiEndpoint": false,
+        "CorsConfiguration": {
+          "AllowOrigins": [
+            {
+              "Ref": "OwnerOrigin"
+            }
+          ],
+          "AllowMethods": [
+            "GET",
+            "PUT",
+            "OPTIONS"
+          ],
+          "AllowHeaders": [
+            "authorization",
+            "content-type",
+            "if-match",
+            "if-none-match"
+          ],
+          "MaxAge": 300
+        }
+      }
+    },
+    "OwnerAuthorizer": {
+      "Type": "AWS::ApiGatewayV2::Authorizer",
+      "Properties": {
+        "ApiId": {
+          "Ref": "OwnerApi"
+        },
+        "Name": "OwnerCognitoJwt",
+        "AuthorizerType": "JWT",
+        "IdentitySource": [
+          "$request.header.Authorization"
+        ],
+        "JwtConfiguration": {
+          "Issuer": {
+            "Ref": "CognitoIssuer"
+          },
+          "Audience": [
+            {
+              "Ref": "CognitoClientId"
+            }
+          ]
+        }
+      }
+    },
+    "OwnerIntegration": {
+      "Type": "AWS::ApiGatewayV2::Integration",
+      "Properties": {
+        "ApiId": {
+          "Ref": "OwnerApi"
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationUri": {
+          "Fn::GetAtt": [
+            "LedgerFunction",
+            "Arn"
+          ]
+        },
+        "PayloadFormatVersion": "2.0",
+        "IntegrationMethod": "POST"
+      }
+    },
+    "GetLedger": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "OwnerApi"
+        },
+        "RouteKey": "GET /owner-ledger",
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "OwnerAuthorizer"
+        },
+        "AuthorizationScopes": [
+          "openid"
+        ],
+        "Target": {
+          "Fn::Sub": "integrations/${OwnerIntegration}"
+        }
+      }
+    },
+    "PutLedger": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "OwnerApi"
+        },
+        "RouteKey": "PUT /owner-ledger",
+        "AuthorizationType": "JWT",
+        "AuthorizerId": {
+          "Ref": "OwnerAuthorizer"
+        },
+        "AuthorizationScopes": [
+          "openid"
+        ],
+        "Target": {
+          "Fn::Sub": "integrations/${OwnerIntegration}"
+        }
+      }
+    },
+    "DefaultStage": {
+      "Type": "AWS::ApiGatewayV2::Stage",
+      "Properties": {
+        "ApiId": {
+          "Ref": "OwnerApi"
+        },
+        "StageName": "$default",
+        "AutoDeploy": true
+      }
+    },
+    "InvokePermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "LedgerFunction",
+            "Arn"
+          ]
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Sub": "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${OwnerApi}/*/*/owner-ledger"
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "ApiEndpoint": {
+      "Value": {
+        "Fn::Sub": "https://${OwnerApi}.execute-api.${AWS::Region}.amazonaws.com/owner-ledger"
+      }
+    },
+    "BucketName": {
+      "Value": {
+        "Ref": "LedgerBucket"
+      }
+    },
+    "KmsKeyArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "LedgerKey",
+          "Arn"
+        ]
+      }
+    },
+    "State": {
+      "Value": "NOT SAFE FOR REAL DATA UNTIL OWNER GATES PASS"
+    }
+  }
+}
