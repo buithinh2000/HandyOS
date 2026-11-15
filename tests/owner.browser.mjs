@@ -575,5 +575,49 @@ assert.equal(await managerPage.locator("#screen").getByText("Daily Alex",{exact:
 assert.equal(await managerPage.locator("#screen").getByText("Attendance calendar").count(),1);
 await managerPage.close();
 
+// Unsaved attendance shift notes must survive canceled day/month/tab navigation and browser-exit warning.
+const draftAttendancePage=await browser.newPage();
+let discardAttendance=false;
+const attendanceWarnings=[];
+draftAttendancePage.on("dialog",dialog=>{
+ attendanceWarnings.push(dialog.message());
+ if(dialog.type()==="prompt")return dialog.accept("Attendance guard sample");
+ return discardAttendance?dialog.accept():dialog.dismiss();
+});
+await draftAttendancePage.goto(address);
+await draftAttendancePage.locator('[data-page="employees"]').click();
+await draftAttendancePage.locator("#toggleStaffForm").click();
+await draftAttendancePage.locator("#staffName").fill("Guard Worker");
+await draftAttendancePage.locator("#staffRate").fill("45");
+await draftAttendancePage.locator("#addStaff").click();
+await draftAttendancePage.locator('[data-page="jobs"]').click();
+await draftAttendancePage.locator("#newJob").click();
+await draftAttendancePage.locator("#contract").fill("11000");
+await draftAttendancePage.locator("#saveJob").click();
+await draftAttendancePage.locator('[data-page="employees"]').click();
+await draftAttendancePage.locator('[data-open="worker"]').first().click();
+await draftAttendancePage.locator("#attendanceMonth").fill("2026-11");
+await draftAttendancePage.locator('[data-attendance-day="2026-11-12"]').click();
+await draftAttendancePage.locator("#attendanceJob").selectOption({index:1});
+await draftAttendancePage.locator("#attendanceNotes").fill("Uncommitted shift notes");
+await draftAttendancePage.locator("#attendanceEnd").fill("16:30");
+await draftAttendancePage.locator('[data-attendance-day="2026-11-13"]').click();
+assert.match(attendanceWarnings.at(-1),/Unsaved attendance/);
+assert.equal(await draftAttendancePage.locator("#attendanceNotes").inputValue(),"Uncommitted shift notes");
+assert.equal(await draftAttendancePage.locator("#attendanceEnd").inputValue(),"16:30");
+await draftAttendancePage.locator("#attendanceMonth").fill("2026-12");
+assert.match(attendanceWarnings.at(-1),/Unsaved attendance/);
+assert.equal(await draftAttendancePage.locator("#attendanceMonth").inputValue(),"2026-11");
+await draftAttendancePage.locator('[data-page="company"]').click();
+assert.match(attendanceWarnings.at(-1),/Unsaved attendance/);
+assert.equal(await draftAttendancePage.locator("#attendanceNotes").inputValue(),"Uncommitted shift notes");
+assert.equal(await draftAttendancePage.evaluate(()=>{const e=new Event("beforeunload",{cancelable:true});window.dispatchEvent(e);return e.defaultPrevented}),true);
+assert.equal(await draftAttendancePage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0].timesheets.length),0);
+discardAttendance=true;
+await draftAttendancePage.locator('[data-page="company"]').click();
+assert.equal(await draftAttendancePage.locator("#screen").getByText("Company overview").count(),1);
+assert.equal(await draftAttendancePage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0].timesheets.length),0,"Discarded attendance form must not write hours");
+await draftAttendancePage.close();
+
 console.log("OWNER_BROWSER_QA_PASS");
 }finally{if(browser)await browser.close();await new Promise(ok=>server.close(ok))}
