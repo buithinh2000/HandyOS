@@ -22,7 +22,7 @@
 @media(max-width:700px){.dashboard-primary{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-report td:first-child{max-width:150px}.job-group{padding:12px 14px}}
  </style></head><body>
 <header><strong>HandyOS / Owner V1</strong><div class="header-tools"><button id="exportCsv">Export CSV</button><button id="backup">Backup JSON</button><button id="restore">Restore backup</button></div></header><main><h1>Business Manager</h1><p class="muted">Jobs, employees, expenses, progress payments and estimated profit.</p><p class="notice"><b>Browser-only demo.</b> No secure login or cloud sync. Do not enter real employee, customer or payroll information. Personal employee links are deferred.</p>
-<nav id="nav" class="nav"><button data-page="jobs">Jobs</button><button data-page="employees">Employees</button><button data-page="expenses">Expenses</button><button data-page="company">Overview</button></nav><section id="screen"></section><footer class="muted" style="font-size:12px;margin-top:36px"><details><summary style="cursor:pointer">Older prototypes (separate demo data)</summary><p>These older tools are not the current Owner V1 and do not share all records with it.</p><p><a href="legacy-dashboard.html">Legacy dashboard</a> · <a href="workspace.html">Workspace</a> · <a href="renovation.html">Job Planner</a> · <a href="operations.html">Operations</a> · <a href="quotes.html">Quote Studio</a></p></details></footer></main>
+<nav id="nav" class="nav" aria-label="Owner sections"><button data-page="company">Overview</button><button data-page="jobs">Jobs</button><button data-page="employees">Employees</button><button data-page="expenses">Expenses</button></nav><section id="screen"></section><footer class="muted" style="font-size:12px;margin-top:36px"><details><summary style="cursor:pointer">Older prototypes (separate demo data)</summary><p>These older tools are not the current Owner V1 and do not share all records with it.</p><p><a href="legacy-dashboard.html">Legacy dashboard</a> · <a href="workspace.html">Workspace</a> · <a href="renovation.html">Job Planner</a> · <a href="operations.html">Operations</a> · <a href="quotes.html">Quote Studio</a></p></details></footer></main>
 <script type="module">
 import {STORE_KEY,normalize,money,dollars,summary,jobGroup,paymentProgress,scheduleDays,scheduleEntry,isISODate,canClose,snapshot,workerNames,workerTotals,workerByPeriod,employeesSummary,customerPayment,paymentBreakdown,wageYearSummary,periodSettlement,isSettlementCurrent,companySummary,expenseSummary} from "./owner-ledger-core.mjs";
 import {parseOwnerBackup,ownerExports} from "./owner-ledger-io.mjs";
@@ -39,7 +39,7 @@ try{
   state=parseOwnerBackup(raw);damagedRaw=null;
  }
 }catch(err){storageBlocked=true;storageError=String(err?.message||err);state=normalize({})}
-let page="jobs",jobId="",person="",period="week",year="",expenseKind="",expenseJob="",expenseMonth="",wageYear="";
+let page="company",jobId="",person="",period="week",year="",expenseKind="",expenseJob="",expenseMonth="",wageYear="";
 const jNow=()=>state.jobs.find(j=>j.id===jobId),cash=dollars;
 const field=(label,id,value="",type="text")=>'<div><label for="'+esc(id)+'">'+esc(label)+'</label><input type="'+type+'" id="'+esc(id)+'" value="'+esc(value)+'"></div>';
 const opt=(key,value,selected)=>'<option value="'+esc(key)+'" '+(key===selected?"selected":"")+'>'+esc(value)+'</option>';
