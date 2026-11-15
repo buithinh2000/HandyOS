@@ -146,7 +146,7 @@ $("screen").onclick=event=>{
  const b=event.target.closest("button,[data-open]");if(!b)return;
  if(b.id==="downloadCorrupt"&&storageBlocked&&damagedRaw!==null){download("HandyOS-unreadable-recovery-"+today()+".txt",damagedRaw,"text/plain;charset=utf-8");return}
  if(storageBlocked)return;
- if(b.dataset.open==="job"){jobId=b.dataset.id;render();return}
+ if(b.dataset.open==="job"){page="jobs";jobId=b.dataset.id;render();return}
  if(b.dataset.open==="worker"){person=b.dataset.name;period="week";render();return}
  if(b.dataset.back==="jobs"){jobId="";render();return}
  if(b.dataset.back==="employees"){person="";render();return}
