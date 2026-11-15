@@ -35,3 +35,16 @@ Keep the existing canonical stack in [ARCHITECTURE.md](../ARCHITECTURE.md): a ne
 - The GitHub Pages Owner demo is public browser-local storage and **not suitable for actual staff payroll or private receipt photos**.
 - The existing backend and infrastructure are source-only; no current real AWS database, role, API, S3 bucket, public domain deployment, or iPhone-to-desktop sync has been verified here.
 - This schema PR is only preparation, not a claim of production activation.
+
+## Read-only AWS account inventory (no deployment)
+Before creating or attaching any RDS, Cognito, API or S3 resource, use `cloud/handyos-aws-inventory-readonly.mjs` in an already authenticated, trusted AWS CloudShell. This does **not** use Supabase, Render or any other provider. Do **not** copy access keys into chat or GitHub.
+
+```bash
+export HANDYOS_EXPECTED_ACCOUNT='<approved-12-digit-account>'
+export HANDYOS_EXPECTED_REGION='ap-southeast-1'
+node cloud/handyos-aws-inventory-readonly.mjs
+```
+
+This script runs five allowed read-only AWS CLI operations: STS caller identity, EC2 VPC listing, RDS instance metadata, Cognito pool name metadata, S3 bucket name metadata. It prints only statuses/counts for resources with `handyos` in their names, not full identifiers or secrets. A wrong account **blocks before any inventory work**. Lack of read permissions returns **BLOCKED**, never bypasses permissions.
+
+A `PASS` means only that the preflight's metadata could be read in the expected account. It does **not** confirm dedicated isolation, backup, encryption, S3 image uploads, Cognito login, cost approval or production readiness. Next step must still be a separate reviewed change set and explicit budget/owner authorization for AWS resource creation.
