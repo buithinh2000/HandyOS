@@ -113,6 +113,30 @@ function jobs(){
  '<div class="card"><h3>Labour hours</h3>'+(closed?"":hoursForm())+table(["Employee","Date","Basis","Hours / days","Rate","Wages earned",""],j.timesheets.map(x=>'<tr><td>'+esc(x.worker)+'</td><td>'+esc(x.date)+'</td><td>'+(x.payBasis==="day"?"Daily":"Hourly")+'</td><td>'+esc(x.payBasis==="day"?x.days:x.hours)+'</td><td>'+cash(x.rate)+'</td><td>'+cash(Number(x.payBasis==="day"?x.days:x.hours)*Number(x.rate))+'</td><td>'+(closed?"":'<button data-delete="timesheets" data-id="'+esc(x.id)+'">Delete</button>')+'</td></tr>'))+'</div>'+
  (s.risks.length?'<div class="card"><h3>Checks</h3>'+s.risks.map(x=>'<p class="warn">• '+esc(x)+'</p>').join("")+'</div>':"");
 }
+function employeeAttendance(){
+ if(!person)return "";
+ const year=Number(attendanceMonth.slice(0,4)),month=Number(attendanceMonth.slice(5,7)),last=new Date(year,month,0).getDate();
+ const offset=(new Date(year,month-1,1).getDay()+6)%7;
+ const records=state.jobs.flatMap(j=>(j.timesheets||[]).filter(t=>workerKey(t.worker)===workerKey(person)).map(t=>({...t,jobId:j.id,jobName:j.name})));
+ const row=records.filter(t=>t.date===attendanceDate);
+ const selected=editingAttendanceId?row.find(t=>t.id===editingAttendanceId):row.length===1?row[0]:null;
+ const member=state.staff.find(x=>workerKey(x.name)===workerKey(person)),basis=selected?.payBasis||member?.payBasis||"hour";
+ const daily=selected?.payBasis==="day",rate=selected?.rate??member?.rate??"";
+ const days=Array.from({length:offset},()=>'<span></span>').concat(Array.from({length:last},(_,i)=>{const d=attendanceMonth+"-"+String(i+1).padStart(2,"0"),count=records.filter(x=>x.date===d).length;return '<button type="button" data-attendance-day="'+esc(d)+'" style="min-height:46px;'+(d===attendanceDate?"border:2px solid #2177b6;":"")+'">'+(i+1)+(count?" ✓":"")+'</button>'})).join("");
+ return '<div class="card"><h3>Attendance calendar</h3><p class="muted">Select a day to record or correct work. Start/finish minus unpaid break determines worked hours. Daily wages use 1 or 0.5 paid day; a daily rate is never added to an hourly rate.</p>'+
+ '<div class="fields">'+field("Month","attendanceMonth",attendanceMonth,"month")+'</div><div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;text-align:center">'+["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d=>'<b>'+d+'</b>').join("")+days+'</div>'+
+ '<h3 style="margin-top:20px">'+esc(attendanceDate)+'</h3>'+
+ (row.length?table(["Job","Work","Wage","Notes",""],row.map(t=>'<tr><td>'+esc(t.jobName)+'</td><td>'+esc(t.startTime||"Manual")+(t.endTime?"–"+esc(t.endTime):"")+'</td><td>'+cash((t.payBasis==="day"?Number(t.days):Number(t.hours))*Number(t.rate))+'</td><td>'+esc(t.notes||"")+'</td><td><button data-edit-attendance="'+esc(t.id)+'" data-attendance-job="'+esc(t.jobId)+'">Edit</button></td></tr>')):'<p class="muted">No work recorded for this day.</p>')+
+ '<div class="fields"><div><label>Job</label><select id="attendanceJob">'+opt("","Select job",selected?.jobId||"")+state.jobs.filter(j=>jobGroup(j)!=="finished"||j.id===selected?.jobId).map(j=>opt(j.id,j.name,selected?.jobId||"")).join("")+'</select></div>'+
+ field("Start time","attendanceStart",selected?.startTime||"07:00","time")+field("Finish time","attendanceEnd",selected?.endTime||"15:30","time")+field("Unpaid break (minutes)","attendanceBreak",selected?.breakMinutes??30,"number")+
+ '<div><label>Wage method</label><select id="attendanceBasis">'+["hour","day"].map(v=>opt(v,v==="day"?"Hourly"===v?"Hourly":"Daily":"Hourly",basis)).join("")+'</select></div>'+
+ field("Rate AUD / hour or day","attendanceRate",rate,"number")+
+ '<div><label>Paid day portion (daily only)</label><select id="attendanceDays">'+[1,0.5].map(v=>opt(String(v),v===1?"Full day (1)":"Half day (0.5)",String(daily?selected.days||1:1))).join("")+'</select></div>'+
+ '<div style="grid-column:1/-1">'+field("Notes for this day","attendanceNotes",selected?.notes||"")+'</div></div>'+
+ '<button id="saveAttendance" class="primary">'+(selected?"Save attendance changes":"+ Save attendance")+'</button> '+
+ (editingAttendanceId?'<button id="cancelAttendanceEdit">Cancel edit</button>':"")+
+ '<p class="muted">Changing recorded attendance updates wages accrued and marks earlier payroll closeouts for review. Existing records cannot be changed on a Finished job without reopening it.</p></div>';
+}
 function employees(){
  if(!person){const all=employeesSummary(state.jobs,state.staff),annual=wageYearSummary(state.jobs,wageYear,state.staff);
 const years=[...new Set(state.jobs.flatMap(j=>[...j.timesheets.map(t=>t.date),...(j.workerPayments||[]).map(p=>p.paidOn)]).filter(isISODate).map(d=>d.slice(0,4)))].sort().reverse();
@@ -121,6 +145,7 @@ return '<div class="row"><h2>Employees</h2><button id="toggleStaffForm" class="p
  table(["Employee","Hours","Days","Earned","Paid","Earned − paid",""],annual.rows.map(x=>'<tr data-open="worker" data-name="'+esc(x.name)+'"><td><b>'+esc(x.name)+'</b></td><td>'+x.hours+'</td><td>'+(x.days||0)+'</td><td>'+cash(x.earned)+'</td><td>'+cash(x.paid)+'</td><td>'+cash(x.difference)+'</td><td><button data-open="worker" data-name="'+esc(x.name)+'">Details</button></td></tr>'))}
  const member=state.staff.find(x=>x.name.trim().toLowerCase()===person.trim().toLowerCase()),w=workerTotals(state.jobs,person),rows=workerByPeriod(state.jobs,person,period),settlements=state.payrollSettlements.filter(x=>x.worker.trim().toLowerCase()===person.trim().toLowerCase()),seenClosePeriods=new Set();
  return '<button class="back" data-back="employees">← All employees</button><h2>'+esc(person)+'</h2><div class="metrics">'+metric("Hours",w.hours)+metric("Days",w.days)+metric("Earned",cash(w.due))+metric("Paid",cash(w.paid))+metric("Outstanding",cash(w.outstanding))+'</div>'+
+ employeeAttendance()+
  '<div class="card"><h3>Staff information</h3><div class="fields">'+field("Name","staffDetailName",member?.name||person)+field("Role / trade","staffDetailRole",member?.role||"")+'<div><label>Default wage basis</label><select id="staffDetailBasis">'+["hour","day"].map(x=>opt(x,x==="day"?"Daily":"Hourly",member?.payBasis||"hour")).join("")+'</select></div>'+field("Default rate AUD/hour or AUD/day","staffDetailRate",member?.rate??"","number")+'</div><button id="saveStaff">Save staff details</button><p class="muted">Changing a name already used in job timesheets is not supported. Name edits need a controlled migration.</p></div><div class="card"><h3>Weekly / monthly / yearly wages</h3><div class="filters">'+["week","month","year"].map(x=>'<button data-period="'+x+'" class="'+(period===x?"active":"")+'">'+esc(x)+'</button>').join("")+'</div>'+
  table(["Period","Hours","Days","Earned","Paid","Balance",""],rows.map(x=>'<tr><td>'+esc(x.period)+'</td><td>'+x.hours+'</td><td>'+(x.days||0)+'</td><td>'+cash(x.earned)+'</td><td>'+cash(x.paid)+'</td><td>'+cash(x.outstanding)+'</td><td>'+(period==="year"?"—":'<button data-settle="'+esc(x.period)+'">Close period</button>')+'</td></tr>'))+
  '<p class="muted">Payments grouped by payment date, not allocated automatically to specific workdays. Closing a period records a snapshot only, not a payment.</p></div><div class="card"><h3>Saved payroll settlements</h3>'+table(["Period","Type","Saved on","Earned","Paid","Balance","Review"],settlements.slice().reverse().map(x=>{const key=x.period+"|"+x.key,older=seenClosePeriods.has(key);seenClosePeriods.add(key);return '<tr><td>'+esc(x.key)+'</td><td>'+esc(x.period)+'</td><td>'+esc(x.savedOn||"Historical")+'</td><td>'+cash(x.earned)+'</td><td>'+cash(x.paid)+'</td><td>'+cash(x.balance)+'</td><td>'+(older?"Earlier version":isSettlementCurrent(state.jobs,x)?"Up to date":"Changed since close")+'</td></tr>'}))+'</div>'+
@@ -193,19 +218,40 @@ window.addEventListener("beforeunload",event=>{
 });
 const positive=id=>{const n=money($(id)?.value);return Number.isFinite(n)&&n>0?n:null};
 $("nav").onclick=event=>{const b=event.target.closest("[data-page]");if(!b||!canLeaveJobDetails())return;page=b.dataset.page;jobId="";editingPaymentId="";person="";render()};
-$("screen").onchange=event=>{const id=event.target.id,value=event.target.value;if(id==="workerName"){const member=state.staff.find(x=>x.name.trim().toLowerCase()===String(value).trim().toLowerCase());if(member){$("workBasis").value=member.payBasis||"hour";if(Number.isFinite(Number(member.rate)))$("workRate").value=member.rate}return}if(id==="yearFilter"){year=value;expenseMonth="";render()}else if(id==="monthFilter"){expenseMonth=value;render()}else if(id==="kindFilter"){expenseKind=value;render()}else if(id==="jobFilter"){expenseJob=value;render()}else if(id==="wageYearFilter"){wageYear=value;render()}else if(id==="dashboardPeriod"){dashboardPeriod=value;render()}};
+$("screen").onchange=event=>{const id=event.target.id,value=event.target.value;if(id==="workerName"){const member=state.staff.find(x=>x.name.trim().toLowerCase()===String(value).trim().toLowerCase());if(member){$("workBasis").value=member.payBasis||"hour";if(Number.isFinite(Number(member.rate)))$("workRate").value=member.rate}return}if(id==="yearFilter"){year=value;expenseMonth="";render()}else if(id==="monthFilter"){expenseMonth=value;render()}else if(id==="kindFilter"){expenseKind=value;render()}else if(id==="jobFilter"){expenseJob=value;render()}else if(id==="wageYearFilter"){wageYear=value;render()}else if(id==="dashboardPeriod"){dashboardPeriod=value;render()}else if(id==="attendanceMonth"){attendanceMonth=value;attendanceDate=value+"-01";editingAttendanceId="";render()}};
 $("screen").onclick=event=>{
  const b=event.target.closest("button,[data-open]");if(!b)return;
  if(b.id==="downloadCorrupt"&&storageBlocked&&damagedRaw!==null){download("HandyOS-unreadable-recovery-"+today()+".txt",damagedRaw,"text/plain;charset=utf-8");return}
  if(storageBlocked)return;
  if(b.dataset.open==="job"){page="jobs";jobId=b.dataset.id;editingPaymentId="";render();return}
- if(b.dataset.open==="worker"){person=b.dataset.name;period="week";render();return}
+ if(b.dataset.open==="worker"){person=b.dataset.name;period="week";attendanceMonth=today().slice(0,7);attendanceDate=today();editingAttendanceId="";render();return}
  if(b.dataset.back==="jobs"){if(!canLeaveJobDetails())return;jobId="";editingPaymentId="";render();return}
  if(b.dataset.back==="employees"){person="";render();return}
  if(b.dataset.period){period=b.dataset.period;render();return}
  if(b.dataset.settle){try{const receipt=periodSettlement(state.jobs,person,period,b.dataset.settle);const previous=state.payrollSettlements.filter(x=>workerKey(x.worker)===workerKey(person)&&x.period===period&&x.key===b.dataset.settle).at(-1);if(previous&&isSettlementCurrent(state.jobs,previous))return alert("This period already has an up-to-date wage settlement. No duplicate snapshot was saved.");if(!confirm("Save "+person+" / "+b.dataset.settle+" wage settlement snapshot"+(previous?" as a new version (the earlier close remains in history)":"")+"? This does NOT pay wages or lock timesheets."))return;state.payrollSettlements.push({...receipt,id:uid(),savedOn:today()});persist();}catch(err){alert(err.message)}return}
  if(b.id==="addTaxPayment"){const amount=positive("taxAmount"),date=$("taxDate").value,kind=$("taxKind").value,notes=$("taxNotes").value.trim().slice(0,500);if(!amount||!isISODate(date)||!["GST / BAS","PAYG","Income tax","Other tax / fee"].includes(kind))return alert("Enter a valid tax payment date and positive amount.");if(!confirm("Record an actual tax or fee payment of "+cash(amount)+"? Avoid duplicating this in job expenses."))return;state.taxPayments.push({id:uid(),date,kind,amount,notes});persist();return}
  if(b.dataset.deleteTax){const entry=state.taxPayments.find(x=>x.id===b.dataset.deleteTax);if(!entry||!confirm("Delete actual tax payment "+cash(entry.amount)+"?"))return;state.taxPayments=state.taxPayments.filter(x=>x.id!==entry.id);persist();return}
+ if(b.dataset.attendanceDay){attendanceDate=b.dataset.attendanceDay;editingAttendanceId="";render();return}
+ if(b.dataset.editAttendance){const target=state.jobs.find(j=>j.id===b.dataset.attendanceJob),t=target?.timesheets.find(x=>x.id===b.dataset.editAttendance);if(!t)return;attendanceDate=t.date;attendanceMonth=t.date.slice(0,7);editingAttendanceId=t.id;render();return}
+ if(b.id==="cancelAttendanceEdit"){editingAttendanceId="";render();return}
+ if(b.id==="saveAttendance"){
+  const job=state.jobs.find(j=>j.id===$("attendanceJob").value),date=attendanceDate,
+   basis=$("attendanceBasis").value,start=$("attendanceStart").value,end=$("attendanceEnd").value,
+   breaks=Number($("attendanceBreak").value),rate=money($("attendanceRate").value),
+   days=Number($("attendanceDays").value),notes=$("attendanceNotes").value.trim().slice(0,500);
+  const minutes=x=>{const m=/^([01]\\d|2[0-3]):([0-5]\\d)$/.exec(x);return m?Number(m[1])*60+Number(m[2]):NaN};
+  const worked=(minutes(end)-minutes(start)-breaks)/60;
+  if(!job||jobGroup(job)==="finished"||!isISODate(date)||!["hour","day"].includes(basis)||!Number.isInteger(breaks)||breaks<0||!Number.isFinite(worked)||worked<=0||worked>24||!Number.isFinite(rate)||rate<0||(basis==="day"&&![0.5,1].includes(days)))return alert("Check Job, start/finish, unpaid break, wage method and rate. Finish must be later than start on the same day.");
+  const matches=state.jobs.flatMap(j=>j.timesheets.filter(t=>workerKey(t.worker)===workerKey(person)&&t.date===date&&t.id!==editingAttendanceId).map(t=>({j,t})));
+  if(matches.length)return alert("Attendance already exists for this employee and date. Edit the existing record instead of recording duplicate wages.");
+  const old=editingAttendanceId?state.jobs.flatMap(j=>j.timesheets.filter(t=>t.id===editingAttendanceId).map(t=>({j,t})))[0]:null;
+  if(old&&jobGroup(old.j)==="finished")return alert("Reopen the original finished job before changing its attendance.");
+  if(old&&old.j.id!==job.id){if(!confirm("Move this attendance entry to a different Job? Job-level wage totals will change."))return;old.j.timesheets=old.j.timesheets.filter(t=>t.id!==old.t.id)}
+  const entry={id:old?.t.id||uid(),worker:person,date,payBasis:basis,startTime:start,endTime:end,breakMinutes:breaks,notes,
+   workedHours:Math.round(worked*100)/100,hours:basis==="hour"?Math.round(worked*100)/100:0,days:basis==="day"?days:0,rate};
+  if(old&&old.j.id===job.id){const index=job.timesheets.findIndex(t=>t.id===old.t.id);job.timesheets[index]=entry}else job.timesheets.push(entry);
+  editingAttendanceId="";persist();return
+ }
  if(b.id==="toggleStaffForm"){const form=$("staffForm");form.hidden=!form.hidden;return}
  if(b.id==="addStaff"){const name=$("staffName")?.value.trim().slice(0,120),role=$("staffRole")?.value.trim().slice(0,100),rate=money($("staffRate")?.value);if(!name||!Number.isFinite(rate))return alert("Enter a staff name and valid non-negative hourly cost.");if(workerNames(state.jobs,state.staff).some(n=>n.toLowerCase()===name.toLowerCase()))return alert("Employee already exists. Open their detail instead.");state.staff.push({id:uid(),name,role,rate,payBasis:$("staffBasis").value,active:true});persist();return}
  if(b.id==="saveStaff"){const member=state.staff.find(x=>x.name.trim().toLowerCase()===person.trim().toLowerCase());if(!member)return alert("This employee came from historical timesheets. Add a staff record for them first.");const name=$("staffDetailName").value.trim(),rate=money($("staffDetailRate").value),role=$("staffDetailRole").value.trim();if(name!==member.name)return alert("To protect timesheet links, staff name cannot be changed here.");if(!Number.isFinite(rate))return alert("Enter a valid hourly cost.");member.rate=rate;member.role=role;member.payBasis=$("staffDetailBasis").value;persist();return}
