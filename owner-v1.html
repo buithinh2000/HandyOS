@@ -135,7 +135,7 @@ function company(){
  '<div class="metrics dashboard-primary">'+metric("Open jobs",x.open)+metric("Customer cash received",cash(x.received))+metric("Expenses ex GST",cash(x.expensesEx))+metric("Wages outstanding",cash(x.wagesOutstanding))+'</div>'+
  '<div class="card dashboard-report dashboard-section"><h3>Profit by job</h3><p class="muted">Estimated profit after reserve. Select a job to review its records.</p>'+(rows.length?simple:'<p class="muted">No jobs yet. Add a job from Jobs to see estimates here.</p>')+'</div>'+
  '<details class="card dashboard-more" id="financialDetails"><summary>More business figures and full financial breakdown</summary>'+
- '<div class="metrics">'+metric("All jobs",x.jobs)+metric("Wages earned",cash(x.labourDue))+metric("Wages paid",cash(x.wagesPaid))+metric("Other expenses paid",cash(x.expensesPaid))+'</div>'+
+ '<div class="metrics">'+metric("All jobs",x.jobs)+metric("Wages earned",cash(x.labourDue))+metric("Wages paid",cash(x.wagesPaid))+metric("Expenses marked paid (entered)",cash(x.expensesPaid))+'</div>'+
  '<h3>Detailed profit by job</h3>'+full+
  '<p class="muted">Final estimated profit = adjusted contract ex GST (base contract plus approved variations) − recorded expenses ex GST − earned wages − Remaining Costs ex GST − unbooked overhead ex GST − one combined Tax & Reserve Fund (% of adjusted contract incl GST). Other expenses are included in recorded expenses. Paying wages does not reduce profit twice. Reserve is an Owner planning allocation, not a tax assessment or BAS calculation.</p></details>';
 }
