@@ -3,7 +3,7 @@ import {createServer} from "node:http";
 import {readFileSync,mkdirSync} from "node:fs";
 import {resolve} from "node:path";
 import assert from "node:assert/strict";
-const pages={"/owner-v1.html":{body:readFileSync(resolve("owner-v1.html")),type:"text/html"},"/owner-ledger-core.mjs":{body:readFileSync(resolve("owner-ledger-core.mjs")),type:"text/javascript"},"/owner-ledger-io.mjs":{body:readFileSync(resolve("owner-ledger-io.mjs")),type:"text/javascript"}};
+const pages={"/":{body:readFileSync(resolve("index.html")),type:"text/html"},"/index.html":{body:readFileSync(resolve("index.html")),type:"text/html"},"/legacy-dashboard.html":{body:readFileSync(resolve("legacy-dashboard.html")),type:"text/html"},"/owner-v1.html":{body:readFileSync(resolve("owner-v1.html")),type:"text/html"},"/owner-ledger-core.mjs":{body:readFileSync(resolve("owner-ledger-core.mjs")),type:"text/javascript"},"/owner-ledger-io.mjs":{body:readFileSync(resolve("owner-ledger-io.mjs")),type:"text/javascript"}};
 const server=createServer((req,res)=>{const p=pages[(req.url||"").split("?")[0]];if(!p){res.writeHead(404);res.end();return}res.writeHead(200,{"content-type":p.type+"; charset=utf-8"});res.end(p.body)});
 await new Promise(ok=>server.listen(0,"127.0.0.1",ok));
 const address="http://127.0.0.1:"+server.address().port+"/owner-v1.html";
@@ -11,6 +11,13 @@ mkdirSync("artifacts/owner-v1-browser",{recursive:true});
 let browser;
 try{
 browser=await chromium.launch({headless:true});
+// Landing page must lead to approved Owner V1, not launch the legacy mixed-dashboard.
+const rootPage=await browser.newPage();
+await rootPage.goto("http://127.0.0.1:"+server.address().port+"/");
+await rootPage.waitForURL(/\/owner-v1\.html$/);
+assert.equal(await rootPage.locator('[data-page="jobs"]').count(),1);
+assert.equal(await rootPage.locator("footer a[href='legacy-dashboard.html']").count(),1);
+await rootPage.close();
 for(const width of [390,1280]){
 const page=await browser.newPage({viewport:{width,height:850},deviceScaleFactor:1});
 const errors=[];
