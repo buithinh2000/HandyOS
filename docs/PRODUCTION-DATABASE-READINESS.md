@@ -2,7 +2,7 @@
 Status: **SOURCE-ONLY. NOT CONNECTED. NOT PRODUCTION-READY.** Checked against main source as of 2026-11-15.
 
 ## Decision
-Keep the existing canonical stack in [ARCHITECTURE.md](../ARCHITECTURE.md): a new HandyOS-only AWS PostgreSQL database, Cognito Owner login, scoped API, and private encrypted S3 receipt photos. **Do not reuse** BuiTai Core database, IAM, production secrets, or other ventures' infrastructure. The only connected Supabase project was a separate inactive BuiTai project; it is not a HandyOS datastore.
+**Owner-approved account strategy (2026-11-16): use the same AWS account as BuiTai, but create and operate dedicated, isolated HandyOS resources.** Sharing the AWS account/region or a suitable existing VPC networking boundary is allowed only after verified security review; sharing BuiTai Core database/schema/tables, application runtime, IAM roles, Cognito pool, secrets, S3 buckets/object prefixes, KMS data keys, logging roles, CI deployment identity, or backups is **not** allowed. HandyOS must have its own PostgreSQL instance or database cluster with independent credentials, own Cognito pool/app client, API service/role, private versioned S3 receipt bucket, encryption key/policy and named resource tags. No changes to BuiTai Core or other ventures. This is an architecture decision, **not** approval of paid provisioning or production data migration. Keep the stack in [ARCHITECTURE.md](../ARCHITECTURE.md). The connected Supabase project is excluded from HandyOS entirely.
 
 ## Data domains and ownership
 - `jobs`: canonical job identity and company partition.

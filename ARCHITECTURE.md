@@ -2,6 +2,11 @@
 
 STATUS: source-only AWS foundation, NOT deployed. Existing GitHub Pages pages are public browser-local demos.
 
+## AWS account boundary — Owner decision 2026-11-16
+HandyOS shares the **same AWS account** as BuiTai to avoid unnecessary account overhead, while retaining **fully independent application and data resources**. Deploying HandyOS must never alter, adopt, reconfigure, or consume BuiTai Core or any other venture's PostgreSQL data, Cognito user pool, S3 data bucket, IAM execution roles, production secrets, KMS permissions, CI deployment role, ECS task definitions, backups or domain routes. A shared AWS account is **not** permission to share a database, a privileged runtime role or secrets.
+
+Before provision, the HandyOS-specific account inventory must show the exact account/region. Use distinct `handyos-` resource names, least-privilege IAM scoped to those resources, resource tags (Project=HandyOS, Environment=staging/prod), separate CloudWatch groups and budgets/alarms. Existing VPC networking may be considered only with a reviewed non-overlapping network/security boundary and without modifying another project's routes/security groups. Production creation, resource mutation and paid services still require a separate review and explicit spending approval. Keep all existing workloads untouched.
+
 ## Locked stack
 - Cloudflare: DNS/WAF/HTTPS and frontend hosting on Cloudflare Pages. Public login assets do not contain customer data.
 - AWS Cognito: verified access tokens; email sign-in, and Google federation after OAuth provider setup.
