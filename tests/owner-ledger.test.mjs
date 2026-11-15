@@ -383,3 +383,23 @@ test("tentative planning/quoted dates do not occupy confirmed bookings calendar"
  assert.equal(jobGroup(quoted),"planning");
  assert.equal(scheduleEntry(quoted).scheduled,true,"tentative dates remain preserved on job");
 });
+
+test("invalid calendar dates never leak into weekly monthly or yearly wage periods",()=>{
+ const job=j("bad-date","Synthetic invalid legacy dates");
+ job.timesheets.push(worker("Alex","2026-02-30",8,40));
+ job.workerPayments.push({worker:"Alex",paidOn:"2026-02-30",amount:100});
+ assert.equal(isISODate("2026-02-30"),false);
+ assert.equal(weeklyStart("2026-02-30"),"");
+ for(const period of ["week","month","year"]){
+  assert.deepEqual(workerByPeriod([job],"Alex",period),[]);
+ }
+ // Source records remain intact: the fix does not silently delete or rewrite old ledger entries.
+ assert.equal(job.timesheets.length,1);
+ assert.equal(job.workerPayments.length,1);
+ job.timesheets[0].date="2026-02-28";
+ job.workerPayments[0].paidOn="2026-02-28";
+ assert.equal(weeklyStart("2026-02-28"),"2026-02-23");
+ assert.equal(workerByPeriod([job],"Alex","week")[0].period,"2026-02-23");
+ assert.equal(workerByPeriod([job],"Alex","month")[0].period,"2026-02");
+ assert.equal(workerByPeriod([job],"Alex","year")[0].period,"2026");
+});
