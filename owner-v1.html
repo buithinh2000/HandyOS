@@ -230,7 +230,7 @@ function billCapturePanel(jobFilter=""){
  '<div><label>Status</label><select id="billStatus">'+["draft","sent","reimbursed"].map(v=>opt(v,v==="draft"?"Not sent":v==="sent"?"Sent to customer":"Reimbursed",editing?.status||"draft")).join("")+'</select></div></div>'+
  '<label for="billPhoto">iPhone photo or existing photo</label><input id="billPhoto" type="file" accept="image/*" capture="environment">'+
  '<p class="muted">Choose Camera or Photo Library on iPhone. Demo images are compressed and kept only in this browser. No cross-device sync or customer delivery.</p>'+
- (photo?'<div class="bill-photo-preview"><img alt="Receipt image" src="'+esc(photo)+'" loading="lazy"></div>':'')+
+ '<div class="bill-photo-preview" id="billPhotoPreview">'+(photo?'<img alt="Receipt image" src="'+esc(photo)+'" loading="lazy">':'')+'</div>'+
  field("Notes","billNotes",editing?.notes||"")+
  '<div class="row"><button id="saveBill" class="primary">'+(editing?"Save changes":"Save bill")+'</button><button id="cancelBill">Cancel</button></div></div>':'')+
  (bills.length?table(["Date","Job","Reference","Amount","Status","Photo",""],bills.map(x=>{const job=state.jobs.find(j=>j.id===x.jobId);return '<tr><td>'+esc(x.date)+'</td><td>'+esc(job?.name||"Unknown job")+'</td><td>'+esc(x.reference||"Receipt")+'</td><td>'+cash(x.amount)+'</td><td>'+esc(x.status==="reimbursed"?"Reimbursed":x.status==="sent"?"Sent":"Not sent")+'</td><td>'+(x.image?'<button data-view-bill="'+esc(x.id)+'">View</button>':"—")+'</td><td><button data-edit-bill="'+esc(x.id)+'">Edit</button></td></tr>'})):
@@ -318,6 +318,22 @@ $("screen").onclick=event=>{
  if(b.dataset.back==="employees"){if(!canLeaveAttendance())return;person="";render();return}
  if(b.dataset.period){if(!canLeaveAttendance())return;period=b.dataset.period;render();return}
  if(b.dataset.settle){if(!canLeaveAttendance())return;try{const receipt=periodSettlement(state.jobs,person,period,b.dataset.settle);const previous=state.payrollSettlements.filter(x=>workerKey(x.worker)===workerKey(person)&&x.period===period&&x.key===b.dataset.settle).at(-1);if(previous&&isSettlementCurrent(state.jobs,previous))return alert("This period already has an up-to-date wage settlement. No duplicate snapshot was saved.");if(!confirm("Save "+person+" / "+b.dataset.settle+" wage settlement snapshot"+(previous?" as a new version (the earlier close remains in history)":"")+"? This does NOT pay wages or lock timesheets."))return;state.payrollSettlements.push({...receipt,id:uid(),savedOn:today()});persist();}catch(err){alert(err.message)}return}
+ if(b.id==="toggleBillEditor"){billEditorOpen=!billEditorOpen;if(!billEditorOpen){editingBillId="";billImageDraft=null}render();return}
+ if(b.id==="cancelBill"){billEditorOpen=false;editingBillId="";billImageDraft=null;render();return}
+ if(b.dataset.editBill||b.dataset.viewBill){const id=b.dataset.editBill||b.dataset.viewBill;const bill=(state.materialBills||[]).find(x=>x.id===id);if(!bill)return;editingBillId=id;billImageDraft=null;billEditorOpen=true;render();return}
+ if(b.id==="saveBill"){
+  const job=state.jobs.find(j=>j.id===$("billJob").value),date=$("billDate").value,
+    reference=$("billReference").value.trim().slice(0,160),amount=money($("billAmount").value),
+    status=$("billStatus").value,notes=$("billNotes").value.trim().slice(0,500),
+    original=(state.materialBills||[]).find(x=>x.id===editingBillId),image=billImageDraft||original?.image;
+  if(!job||!isISODate(date)||!reference||!Number.isFinite(amount)||amount<=0||!["draft","sent","reimbursed"].includes(status)||!image)return alert("Choose a Job, date, store/reference, positive amount and receipt photo.");
+  if(!/^data:image\\/(?:jpeg|png|webp);base64,/.test(image)||image.length>260000)return alert("Invalid or oversized receipt image.");
+  if(original&&original.status==="reimbursed"&&!confirm("Update an already reimbursed bill? This changes reimbursement history."))return;
+  const entry={id:original?.id||uid(),jobId:job.id,date,reference,amount,status,notes,image};
+  if(original)state.materialBills=state.materialBills.map(x=>x.id===original.id?entry:x);
+  else state.materialBills.push(entry);
+  editingBillId="";billEditorOpen=false;billImageDraft=null;persist();return
+ }
  if(b.id==="addTaxPayment"){const amount=positive("taxAmount"),date=$("taxDate").value,kind=$("taxKind").value,notes=$("taxNotes").value.trim().slice(0,500);if(!amount||!isISODate(date)||!["GST / BAS","PAYG","Income tax","Other tax / fee"].includes(kind))return alert("Enter a valid tax payment date and positive amount.");if(!confirm("Record an actual tax or fee payment of "+cash(amount)+"? Avoid duplicating this in job expenses."))return;state.taxPayments.push({id:uid(),date,kind,amount,notes});persist();return}
  if(b.dataset.deleteTax){const entry=state.taxPayments.find(x=>x.id===b.dataset.deleteTax);if(!entry||!confirm("Delete actual tax payment "+cash(entry.amount)+"?"))return;state.taxPayments=state.taxPayments.filter(x=>x.id!==entry.id);persist();return}
  if(b.dataset.attendanceDay){if(!canLeaveAttendance())return;attendanceDate=b.dataset.attendanceDay;editingAttendanceId="";render();return}
@@ -371,6 +387,29 @@ $("screen").onclick=event=>{
  if(b.dataset.delete&&j){if(!confirm("Delete entry?"))return;j[b.dataset.delete]=j[b.dataset.delete].filter(x=>x.id!==b.dataset.id);persist();return}
  if(b.dataset.removeWage){if(!confirm("Delete wage payment?"))return;const target=state.jobs.find(j=>j.id===b.dataset.job);target.workerPayments=target.workerPayments.filter(x=>x.id!==b.dataset.removeWage);persist()}
 };
+async function compressBillPhoto(file){
+ if(!file?.type?.startsWith("image/")||file.size>12*1024*1024)throw new Error("Choose an image smaller than 12 MB.");
+ const url=URL.createObjectURL(file),img=new Image();
+ try{
+  await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(new Error("This photo format cannot be read in your browser."));img.src=url});
+  const ratio=Math.min(1,960/Math.max(img.naturalWidth,img.naturalHeight));
+  const canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(img.naturalWidth*ratio));canvas.height=Math.max(1,Math.round(img.naturalHeight*ratio));
+  canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);
+  let output=canvas.toDataURL("image/jpeg",0.58);
+  if(output.length>260000){const factor=Math.sqrt(240000/output.length);canvas.width=Math.max(1,Math.round(canvas.width*factor));canvas.height=Math.max(1,Math.round(canvas.height*factor));canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);output=canvas.toDataURL("image/jpeg",0.49)}
+  if(output.length>260000)throw new Error("Image is still too large for this browser demo. Try a smaller crop.");
+  return output;
+ }finally{URL.revokeObjectURL(url)}
+}
+$("screen").addEventListener("change",async event=>{
+ if(event.target.id!=="billPhoto")return;
+ const input=event.target,file=input.files?.[0];if(!file)return;
+ try{
+  const image=await compressBillPhoto(file);billImageDraft=image;
+  const preview=$("billPhotoPreview");
+  if(preview){const img=document.createElement("img");img.src=image;img.alt="Receipt preview";preview.replaceChildren(img)}
+ }catch(error){billImageDraft=null;alert(error.message)}finally{input.value=""}
+});
 function download(name,data,type){const blob=new Blob([data],{type}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)}
 $("backup").onclick=()=>download("HandyOS-Owner-"+today()+".json",JSON.stringify(state,null,2),"application/json");
 $("exportCsv").onclick=()=>{const reports=ownerExports(state);for(const [label,data] of Object.entries(reports))download("HandyOS-"+label+"-"+today()+".csv",data,"text/csv;charset=utf-8")};
