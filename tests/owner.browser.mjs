@@ -124,5 +124,33 @@ assert.deepEqual(errors,[]);
 await page.screenshot({path:"artifacts/owner-v1-browser/dashboard-"+width+".png",fullPage:true});
 await page.close();
 }
-console.log("OWNER_BROWSER_QA_PASS");
+
+// Recovery regression: unreadable browser data must not become an editable empty workspace.
+const recovery=await browser.newPage({acceptDownloads:true});
+const recoveryErrors=[];
+recovery.on("pageerror",e=>recoveryErrors.push(e.message));
+recovery.on("dialog",dialog=>dialog.accept());
+await recovery.goto(address);
+const corrupt='{"jobs":[';
+await recovery.evaluate(raw=>localStorage.setItem("handyos-workspace-v07",raw),corrupt);
+await recovery.reload();
+assert.match(await recovery.locator("#screen").innerText(),/Saved data recovery required/);
+assert.equal(await recovery.locator("#newJob").count(),0);
+assert.equal(await recovery.locator('[data-page="jobs"]').isDisabled(),true);
+assert.equal(await recovery.locator("#backup").isDisabled(),true);
+assert.equal(await recovery.evaluate(()=>localStorage.getItem("handyos-workspace-v07")),corrupt);
+const downloaded=recovery.waitForEvent("download");
+await recovery.locator("#downloadCorrupt").click();
+assert.match((await downloaded).suggestedFilename(),/HandyOS-unreadable-recovery/);
+assert.equal(await recovery.evaluate(()=>localStorage.getItem("handyos-workspace-v07")),corrupt);
+const chooser=recovery.waitForEvent("filechooser");
+await recovery.locator("#restore").click();
+const fileChooser=await chooser;
+await fileChooser.setFiles({name:"handyos-safe-backup.json",mimeType:"application/json",buffer:Buffer.from(JSON.stringify({jobs:[],staff:[],payrollSettlements:[]}))});
+await recovery.locator("#newJob").waitFor();
+assert.equal(await recovery.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs.length),0);
+assert.equal(await recovery.locator('[data-page="jobs"]').isEnabled(),true);
+assert.deepEqual(recoveryErrors,[]);
+await recovery.close();
+\nconsole.log("OWNER_BROWSER_QA_PASS");
 }finally{if(browser)await browser.close();await new Promise(ok=>server.close(ok))}
