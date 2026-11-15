@@ -21,7 +21,8 @@
 .job-group .empty-state{color:#6c8091;font-size:13px}
 @media(max-width:700px){.dashboard-primary{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-report td:first-child{max-width:150px}.job-group{padding:12px 14px}}
 
-/* Owner command centre: clear information priority, quiet surfaces, mobile cards. */\n.bill-photo-preview{max-width:360px;max-height:420px;margin:12px 0;overflow:auto;border:1px solid #dce5ee;border-radius:12px}.bill-photo-preview img{display:block;max-width:100%;height:auto}
+/* Owner command centre: clear information priority, quiet surfaces, mobile cards. */
+.roster-crew{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:8px;margin:12px 0}.roster-person{display:flex;align-items:center;gap:8px;border:1px solid #dfe8f1;border-radius:9px;padding:9px!important;background:#f8fafc}.roster-person small{margin-left:auto;color:#6b7989;font-size:10px}.roster-person input{width:auto!important}\n.bill-photo-preview{max-width:360px;max-height:420px;margin:12px 0;overflow:auto;border:1px solid #dce5ee;border-radius:12px}.bill-photo-preview img{display:block;max-width:100%;height:auto}
 :root{background:#f3f6fa;color:#183047}
 body{background:linear-gradient(180deg,#edf3f9 0,#f5f7fa 270px)}
 header{background:#132e43;border-bottom:1px solid rgba(255,255,255,.1);gap:18px}
@@ -89,7 +90,7 @@ try{
   state=parseOwnerBackup(raw);damagedRaw=null;
  }
 }catch(err){storageBlocked=true;storageError=String(err?.message||err);state=normalize({})}
-let page="company",jobId="",person="",period="week",year="",expenseKind="",expenseJob="",expenseMonth="",wageYear="",editingPaymentId="",attendanceMonth=today().slice(0,7),attendanceDate=today(),editingAttendanceId="",dashboardPeriod="month",attendanceBaseline=null,editingBillId="",billEditorOpen=false,billImageDraft=null;
+let page="company",jobId="",person="",period="week",year="",expenseKind="",expenseJob="",expenseMonth="",wageYear="",editingPaymentId="",attendanceMonth=today().slice(0,7),attendanceDate=today(),editingAttendanceId="",dashboardPeriod="month",attendanceBaseline=null,editingBillId="",billEditorOpen=false,billImageDraft=null,rosterJobId="",rosterDate=today(),rosterCrewSelected=null,editingAdjustmentId="";
 const jNow=()=>state.jobs.find(j=>j.id===jobId),cash=dollars;
 const field=(label,id,value="",type="text")=>'<div><label for="'+esc(id)+'">'+esc(label)+'</label><input type="'+type+'" id="'+esc(id)+'" value="'+esc(value)+'"></div>';
 const opt=(key,value,selected)=>'<option value="'+esc(key)+'" '+(key===selected?"selected":"")+'>'+esc(value)+'</option>';
@@ -238,6 +239,20 @@ function billCapturePanel(jobFilter=""){
  '<p class="dashboard-empty">No material bills yet.</p>')+
  '<p class="muted">Pass-through reimbursements do not automatically alter contract income, Profit or Job Expenses. Record materials included in the agreed contract using Job Expenses instead.</p></div>';
 }
+function rosterPanel(){
+ const jobs=state.jobs.filter(j=>jobGroup(j)!=="finished"),staff=state.staff.filter(p=>p.active!==false&&p.name?.trim());
+ const session=state.crewSessions.find(x=>x.jobId===rosterJobId&&x.date===rosterDate);
+ const chosen=rosterCrewSelected===null?staff.map(p=>p.name):rosterCrewSelected;
+ return '<div class="card command-card" id="rosterPanel"><div class="card-top"><div><h3>Daily crew · Check in / Check out</h3><p class="muted">Choose Job and remove absent staff. Check out creates the daily wage entries.</p></div><span class="pill">'+(session?session.status==="checked_in"?"Checked in":"Completed":"Not started")+'</span></div>'+
+ '<div class="fields"><div><label>Job</label><select id="rosterJob">'+opt("","Select job",rosterJobId)+jobs.map(j=>opt(j.id,j.name,rosterJobId)).join("")+'</select></div>'+field("Work date","rosterDate",rosterDate,"date")+'</div>'+
+ '<p class="muted">Crew today: '+chosen.length+' / '+staff.length+' selected. Untick anyone absent.</p>'+
+ '<div class="roster-crew">'+staff.map(p=>'<label class="roster-person"><input type="checkbox" data-roster-worker="'+esc(p.name)+'" '+(chosen.some(n=>workerKey(n)===workerKey(p.name))?"checked":"")+' '+(session?"disabled":"")+'><span>'+esc(p.name)+'</span><small>'+cash(p.rate||0)+'/'+(p.payBasis==="day"?"day":"hour")+'</small></label>').join("")+'</div>'+
+ (session?'<p><b>Checked in:</b> '+esc(session.names.join(", "))+' · '+esc(session.startTime)+'</p>'+
+ (session.status==="checked_in"?'<div class="fields">'+field("Finish time","rosterFinish","15:30","time")+field("Unpaid break (minutes)","rosterBreak","30","number")+field("Daily notes","rosterNotes","")+'</div><button id="rosterCheckout" class="primary">Check out & record wages</button>':
+ '<p class="muted">Checked out at '+esc(session.finishTime)+'. Edit any error from the employee Attendance calendar.</p>'):
+ '<div class="fields">'+field("Start time","rosterStart","07:00","time")+'</div><button id="rosterCheckin" class="primary">Check in selected crew</button>')+
+ '<p class="muted">Manual Owner action. Check in alone does not create wages. Demo data is stored only in this browser.</p></div>';
+}
 function company(){
  const x=companySummary(state.jobs),window=dashboardWindow(dashboardPeriod),p=financialPeriodSummary(state,window);
  const all=financialPeriodSummary(state);
@@ -257,6 +272,7 @@ function company(){
  '<div class="command-grid">'+
  '<div class="card command-card"><div class="card-top"><div><h3>Jobs in progress</h3><p class="muted">'+x.open+' open jobs · Showing up to 5</p></div><button data-page-shortcut="jobs">All jobs</button></div>'+overviewJobs+'</div>'+
  '<div class="card command-card"><div class="card-top"><div><h3>Employee wage overview</h3><p class="muted">Individual wages · '+staff.length+' employees</p></div><button data-page-shortcut="employees">All employees</button></div>'+overviewStaff+'</div></div>'+
+ rosterPanel()+
  billCapturePanel()+
  '<details class="card dashboard-panel" id="periodFinancial"><summary>Period financial details <span class="muted">Earned wages, expenses and cash reconciliation</span></summary>'+
  '<div class="metrics">'+metric("Wages earned",cash(p.earned))+metric("Expenses accrued ex GST",cash(p.expensesEx))+metric("Tax payments entered",cash(p.taxesPaid))+metric("Unknown GST lines",p.unknownGst)+'</div>'+
