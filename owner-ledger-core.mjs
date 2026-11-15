@@ -237,7 +237,8 @@ export function summary(job) {
  if(remainingCostValid&&remainingCostEx>0)risks.push("Remaining Costs are owner estimates, NOT incurred costs. Update them as actual expenses and labour are recorded to avoid double counting.");
  if(job.stage==="closed"&&remainingCostEx>0)risks.push("Closed job still has estimated remaining costs: reconcile to actual costs.");
  if((job.expenses||[]).some(e=>e.kind==="labour")&&(job.timesheets||[]).length)risks.push("Labour expense lines and timesheets both exist: verify no duplicated wages.");
- if(hasContract&&received>agreedInc)risks.push("Recorded cash received exceeds the agreed contract amount.");
+ if(adjustedContractValid&&received>totalContractInc)risks.push("Recorded customer cash exceeds the adjusted contract (including approved variations). Check overpayments, variations and duplicate receipts.");
+ if(adjustedContractValid&&job.stage==="closed"&&received<totalContractInc)risks.push("Job is closed but customer cash remains outstanding against the adjusted contract.");
  return {approvedVariationInc,totalContractInc,totalContractEx,overheadAllocationEx,remainingCostEx,otherExpensesEx,taxReservePct,taxReserveAmount,profitBeforeReserve,paymentReceivedNet:payment.receivedNet,paymentReceivedGst:payment.receivedGst,wagesPaid,wagesOutstanding:round2(labour-wagesPaid),hasContract,agreedInc:hasContract?agreedInc:null,agreedEx,expensesEx,expensesEntered,unclassified,labour,costEx,received,requested,remaining,profit,risks};
 }
 export function canClose(job) {
