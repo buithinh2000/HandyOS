@@ -19,6 +19,7 @@ export function normalize(db) {
  if(!Array.isArray(state.staff))state.staff=[];
  if(!Array.isArray(state.payrollSettlements))state.payrollSettlements=[];
  if(!Array.isArray(state.taxPayments))state.taxPayments=[];
+ if(!Array.isArray(state.materialBills))state.materialBills=[];
  for(const job of state.jobs) {
   for(const field of ["tasks","categories","materials","timesheets","expenses","payments"])if(!Array.isArray(job[field]))job[field]=[];
   if(!Array.isArray(job.workerPayments))job.workerPayments=[];
@@ -142,6 +143,15 @@ export function financialPeriodSummary(state,{from="",to=""}={}){
  // Cash-flow estimate is NOT accounting profit. Tax payments are separate from GST reserve forecasts.
  const netCash=round2(receipts-wagePaid-expensesPaid-taxesPaid);
  return{receipts,earned,wagePaid,expensesPaid,expensesEx,unknownGst,taxesPaid,netCash};
+}
+// Customer-paid materials are tracked as pass-through reimbursement cash, separately from contract revenue and job profit.
+export function materialBillSummary(bills=[],jobId=""){
+ const items=bills.filter(b=>(!jobId||b.jobId===jobId)&&Number.isFinite(Number(b.amount))&&Number(b.amount)>0);
+ const subtotal=list=>Math.round(list.reduce((n,b)=>n+Number(b.amount),0)*100)/100;
+ const reimbursed=items.filter(b=>b.status==="reimbursed");
+ const pending=items.filter(b=>b.status!=="reimbursed");
+ return {count:items.length,spent:subtotal(items),reimbursed:subtotal(reimbursed),outstanding:subtotal(pending),
+  draft:subtotal(pending.filter(b=>b.status==="draft")),sent:subtotal(pending.filter(b=>b.status==="sent"))};
 }
 export function companySummary(jobs){
  const expense=expenseSummary(jobs);const employees=employeesSummary(jobs);
