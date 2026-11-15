@@ -141,7 +141,8 @@ export function paymentBreakdown(job){
  });
  const received=entries.filter(p=>p.status==="received");
  const requested=entries.filter(p=>p.status==="requested");
- return {entries,cash:round2(received.reduce((a,p)=>a+(Number.isFinite(p.gross)?p.gross:0),0)),
+ const draft=entries.filter(p=>p.status==="draft");
+ return {entries,draft:round2(draft.reduce((a,p)=>a+(Number.isFinite(p.gross)?p.gross:0),0)),cash:round2(received.reduce((a,p)=>a+(Number.isFinite(p.gross)?p.gross:0),0)),
  requested:round2(requested.reduce((a,p)=>a+(Number.isFinite(p.gross)?p.gross:0),0)),
  receivedNet:round2(received.reduce((a,p)=>a+(Number.isFinite(p.net)?p.net:0),0)),
  receivedGst:round2(received.reduce((a,p)=>a+(Number.isFinite(p.gst)?p.gst:0),0))};
