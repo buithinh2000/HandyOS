@@ -27,7 +27,7 @@ export function normalize(db) {
  return state;
 }
 export function labourRows(job) {
- return (job.timesheets||[]).map(t=>{const daily=t.payBasis==="day";const units=daily?Number(t.days)||0:Number(t.hours)||0;const rate=Number(t.rate)||0;return {...t,payBasis:daily?"day":"hour",hours:daily?0:units,days:daily?units:0,rate,total:round2(units*rate)};});
+ return (job.timesheets||[]).map(t=>{const daily=t.payBasis==="day";const units=daily?Number(t.days)||0:Number(t.hours)||0;const rate=Number(t.rate)||0;return {...t,payBasis:daily?"day":"hour",hours:daily?(Number(t.workedHours)||0):units,days:daily?units:0,rate,total:round2(units*rate)};});
 }
 // Clock entries are local same-day shifts. No overnight, automatic overtime or award rules.
 export function workedHours(start,end,breakMinutes=0){
