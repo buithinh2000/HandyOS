@@ -793,5 +793,38 @@ await billsMobile.locator("#billInboxStatus").selectOption("reimbursed");
 assert.equal(await billsMobile.locator(".bill-item").count(),1);
 await billsMobile.close();
 
+// Mobile attendance correction toggles unpaid Day off and restores original work.
+const offPage=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+offPage.on("dialog",d=>d.type()==="prompt"?d.accept("Day off sample"):d.accept());
+await offPage.goto(address);
+await offPage.locator('[data-page="employees"]').click();
+await offPage.locator("#toggleStaffForm").click();
+await offPage.locator("#staffName").fill("Day Off Alex");
+await offPage.locator("#staffRate").fill("250");
+await offPage.locator("#staffBasis").selectOption("day");
+await offPage.locator("#addStaff").click();
+await offPage.locator('[data-page="jobs"]').click();
+await offPage.locator("#newJob").click();
+await offPage.locator("#contract").fill("11000");
+await offPage.locator("#saveJob").click();
+await offPage.locator('[data-page="employees"]').click();
+await offPage.locator('[data-open="worker"][data-name="Day Off Alex"]').first().click();
+await offPage.locator("#attendanceMonth").fill("2026-11");
+await offPage.locator('[data-attendance-day="2026-11-16"]').click();
+await offPage.locator("#attendanceJob").selectOption({index:1});
+await offPage.locator("#saveAttendance").click();
+let offState=await offPage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")));
+assert.equal(offState.jobs[0].timesheets.length,1);
+await offPage.locator("[data-toggle-day-off]").click();
+offState=await offPage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")));
+assert.equal(offState.jobs[0].timesheets[0].dayOff,true);
+assert.equal(await offPage.locator("#screen").getByText("Day off · Unpaid").count(),1);
+await offPage.locator('[data-day-off="false"]').click();
+offState=await offPage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")));
+assert.equal(offState.jobs[0].timesheets[0].dayOff,false);
+assert.equal(offState.jobs[0].timesheets.length,1);
+assert.equal(offState.jobs[0].timesheets[0].statusHistory.length,2);
+await offPage.close();
+
 console.log("OWNER_BROWSER_QA_PASS");
 }finally{if(browser)await browser.close();await new Promise(ok=>server.close(ok))}
