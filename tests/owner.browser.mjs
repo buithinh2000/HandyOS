@@ -311,5 +311,34 @@ assert.match(unpricedAlerts.at(-1),/Save contract before closing/);
 assert.equal(await unpricedPage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0].contract),0);
 await unpricedPage.close();
 
+// Unsaved job details must survive cancelled navigation; confirmed leave discards only local form edits.
+const navGuardPage=await browser.newPage();
+const seenNavDialogs=[];
+let allowLeave=false;
+navGuardPage.on("dialog",dialog=>{seenNavDialogs.push(dialog.message());if(dialog.type()==="prompt")return dialog.accept("Navigation test");return allowLeave?dialog.accept():dialog.dismiss()});
+await navGuardPage.goto(address);
+await navGuardPage.locator('[data-page="jobs"]').click();
+await navGuardPage.locator("#newJob").click();
+await navGuardPage.locator("#contract").fill("11000");
+await navGuardPage.locator("#saveJob").click();
+await navGuardPage.locator("#taxReservePct").fill("15");
+await navGuardPage.locator('[data-page="expenses"]').click();
+assert.match(seenNavDialogs.at(-1),/Leave without saving/);
+assert.equal(await navGuardPage.locator("#taxReservePct").inputValue(),"15","Cancelled navigation preserves draft input");
+assert.equal(await navGuardPage.locator("#saveJob").count(),1);
+assert.equal(await navGuardPage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0].taxReservePct),0);
+await navGuardPage.locator('[data-back="jobs"]').click();
+assert.match(seenNavDialogs.at(-1),/Leave without saving/);
+assert.equal(await navGuardPage.locator("#taxReservePct").inputValue(),"15","Cancelled back navigation preserves draft input");
+allowLeave=true;
+await navGuardPage.locator('[data-page="expenses"]').click();
+assert.equal(await navGuardPage.locator("#yearFilter").count(),1);
+assert.equal(await navGuardPage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0].taxReservePct),0,"Confirmed discard does not persist unsaved amount");
+await navGuardPage.locator('[data-page="jobs"]').click();
+await navGuardPage.locator("details.job-group").first().locator("summary").click();
+await navGuardPage.locator('[data-open="job"]').first().click();
+assert.equal(await navGuardPage.locator("#taxReservePct").inputValue(),"0");
+await navGuardPage.close();
+
 console.log("OWNER_BROWSER_QA_PASS");
 }finally{if(browser)await browser.close();await new Promise(ok=>server.close(ok))}

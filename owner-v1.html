@@ -153,8 +153,14 @@ function hasUnsavedJobDetails(j){
   ||$("endDate")?.value!==(j.endDate||"")
   ||$("stage")?.value!==j.stage;
 }
+// Leave a job detail form only after confirming intentional loss of uncommitted edits.
+function canLeaveJobDetails(){
+ const job=page==="jobs"&&jobId?jNow():null;
+ return !job||jobGroup(job)==="finished"||!hasUnsavedJobDetails(job)||
+  confirm("This job has unsaved contract, reserve, schedule or status edits. Leave without saving?");
+}
 const positive=id=>{const n=money($(id)?.value);return Number.isFinite(n)&&n>0?n:null};
-$("nav").onclick=event=>{const b=event.target.closest("[data-page]");if(!b)return;page=b.dataset.page;jobId="";person="";render()};
+$("nav").onclick=event=>{const b=event.target.closest("[data-page]");if(!b||!canLeaveJobDetails())return;page=b.dataset.page;jobId="";person="";render()};
 $("screen").onchange=event=>{const id=event.target.id,value=event.target.value;if(id==="workerName"){const member=state.staff.find(x=>x.name.trim().toLowerCase()===String(value).trim().toLowerCase());if(member&&Number.isFinite(Number(member.rate)))$("workRate").value=member.rate;return}if(id==="yearFilter"){year=value;expenseMonth="";render()}else if(id==="monthFilter"){expenseMonth=value;render()}else if(id==="kindFilter"){expenseKind=value;render()}else if(id==="jobFilter"){expenseJob=value;render()}else if(id==="wageYearFilter"){wageYear=value;render()}};
 $("screen").onclick=event=>{
  const b=event.target.closest("button,[data-open]");if(!b)return;
@@ -162,7 +168,7 @@ $("screen").onclick=event=>{
  if(storageBlocked)return;
  if(b.dataset.open==="job"){page="jobs";jobId=b.dataset.id;render();return}
  if(b.dataset.open==="worker"){person=b.dataset.name;period="week";render();return}
- if(b.dataset.back==="jobs"){jobId="";render();return}
+ if(b.dataset.back==="jobs"){if(!canLeaveJobDetails())return;jobId="";render();return}
  if(b.dataset.back==="employees"){person="";render();return}
  if(b.dataset.period){period=b.dataset.period;render();return}
  if(b.dataset.settle){try{const receipt=periodSettlement(state.jobs,person,period,b.dataset.settle);if(!confirm("Save "+person+" / "+b.dataset.settle+" wage settlement snapshot? This does NOT pay wages or lock timesheets."))return;state.payrollSettlements=state.payrollSettlements.filter(x=>!(x.worker.toLowerCase()===person.toLowerCase()&&x.period===period&&x.key===b.dataset.settle));state.payrollSettlements.push({...receipt,id:uid(),savedOn:today()});persist();}catch(err){alert(err.message)}return}

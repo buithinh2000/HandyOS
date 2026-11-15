@@ -90,3 +90,6 @@ Confirmed defect: `ownerExports` defaulted missing `gstAmount` to gross cash / 1
 
 ## Owner Dashboard paid-expense label accuracy (source-only, 2026-11-15)
 Company Overview's expanded KPI was labelled `Other expenses paid`, but the underlying `companySummary.expensesPaid` is all entries marked `paid` regardless of expense category (amount as entered, not uniformly ex GST). Renamed UI label to `Expenses marked paid (entered)` without changing any amount or accounting formulas. Added regression verifying mixed material/other/unpaid entries and the accurate label. **Pending exact-head CI and merge verification.** No cloud/real business data changes.
+
+## Owner V1 unsaved job navigation guard (source-only, 2026-11-15)
+Confirmed usability/data-loss issue: contract, combined Tax & Reserve %, cost and schedule form edits in Jobs detail were silently discarded when clicking a different navigation tab or All jobs. Reuse `hasUnsavedJobDetails` and add a leave/discard confirmation on both paths. Cancel retains the in-progress form; confirm navigates without mutating saved records; an unchanged form navigates normally. Browser regression covers tab and back navigation, canceled draft persistence, confirmed discard and reopening with saved figures. **Pending exact-head CI/merge.** No accounting formula, storage, backend or deployment changes.
