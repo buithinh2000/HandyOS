@@ -315,7 +315,7 @@ await unpricedPage.close();
 const navGuardPage=await browser.newPage();
 const seenNavDialogs=[];
 let allowLeave=false;
-navGuardPage.on("dialog",dialog=>{seenNavDialogs.push(dialog.message());return allowLeave?dialog.accept("Navigation test"):dialog.dismiss()});
+navGuardPage.on("dialog",dialog=>{seenNavDialogs.push(dialog.message());if(dialog.type()==="prompt")return dialog.accept("Navigation test");return allowLeave?dialog.accept():dialog.dismiss()});
 await navGuardPage.goto(address);
 await navGuardPage.locator('[data-page="jobs"]').click();
 await navGuardPage.locator("#newJob").click();
