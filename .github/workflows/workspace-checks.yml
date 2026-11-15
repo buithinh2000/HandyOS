@@ -4,6 +4,8 @@ on:
     paths:
       - "workspace.html"
       - "owner-v1.html"
+      - "index.html"
+      - "legacy-dashboard.html"
       - "owner-ledger-core.mjs"
       - "owner-ledger-io.mjs"
       - "cloud/**"
@@ -13,6 +15,8 @@ on:
     paths:
       - "workspace.html"
       - "owner-v1.html"
+      - "index.html"
+      - "legacy-dashboard.html"
       - "owner-ledger-core.mjs"
       - "owner-ledger-io.mjs"
       - "cloud/**"
