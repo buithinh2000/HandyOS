@@ -55,6 +55,14 @@ HandyOS is a construction/renovation business operating system. The current Owne
 7. After merge, update decision/status handoff with SHA, evidence links, remaining blockers, and exact next action. Avoid repeated owner approvals for mundane source-only work within granted policy, but do not auto-merge without established authority.
 8. If context is missing, stop that specific mutation and inspect code/docs instead of guessing. No fabricated statuses, completion, or deployment URLs.
 
+## HandyOS delegated source-only review and merge authority — Owner update, 2026-11-15
+Owner explicitly directs VIN to perform routine reviews automatically and not require Owner or a separate independent reviewer for this HandyOS app. This supersedes earlier PR41 statements that independent approval is universally mandatory.
+- For source-only HandyOS PRs within existing approved V1 scope: VIN may inspect the diff, run/check all applicable CI, document self-review evidence, and merge without asking the Owner again when checks PASS, head/base are current, and no unresolved blocking findings or enforced branch-protection requirements exist.
+- Do not mislabel VIN's self-review as an independent review. GitHub-required protected-branch approvals are still binding; if required and unavailable, STOP rather than bypass protection.
+- New scope, significant data migration, finance-rule revisions, user access/payroll exposure, cloud deployment, paid APIs, AWS IAM/Secrets/SQL/DNS mutations, real money, or new recurring cost are outside this routine source-only delegation unless separately approved.
+- If tests fail, evidence conflicts, or the code changes after validation, do not merge until re-reviewed and re-tested on the exact HEAD.
+- After merging, verify main commit and record accurate state in handoff. No claim that automated CI proves all chat memories or logic correctness.
+
 ## Financial acceptance tests to keep
 - Cash received (incl GST) and revenue earned (ex GST) remain separate.
 - Approved variations alter adjusted contract; unapproved ones do not.
