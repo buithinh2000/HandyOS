@@ -102,9 +102,18 @@ body>main>.muted{margin:4px 0 0}
 .crew-worker input{width:20px;height:20px;flex-shrink:0;accent-color:#176fbe}
 .crew-primary{width:100%;background:#176fbe!important;color:white!important;min-height:52px}
 @media(max-width:700px){.crew-panel{padding:14px}.crew-staff{grid-template-columns:1fr}.crew-worker{min-height:54px}.crew-panel button{min-height:52px}}
+/* Responsive receipt list; photos never leave browser demo. */
+.bill-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:18px}
+.bill-item{display:grid;grid-template-columns:90px minmax(0,1fr);gap:12px;padding:12px;min-width:0;background:#fff;border:1px solid #dce7f0;border-radius:13px}
+.bill-item-photo{display:flex;align-items:center;justify-content:center;background:#eff4f8;border-radius:9px;min-height:90px;overflow:hidden;color:#6b7d8e;font-size:12px}
+.bill-item-photo img{width:100%;height:100%;object-fit:cover}
+.bill-item-main{min-width:0;overflow-wrap:anywhere}.bill-item-main .row{align-items:flex-start}.bill-item-main p{margin:5px 0}
+.bill-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.bill-actions button{min-height:44px;font-size:13px}
+@media(max-width:850px){.bill-list{grid-template-columns:1fr}}
+@media(max-width:430px){.bill-item{grid-template-columns:72px minmax(0,1fr);gap:9px}.bill-item-photo{min-height:78px}.bill-actions button{flex:1}}
 </style></head><body>
 <header><strong>HandyOS / Owner V1</strong><div class="header-tools"><button id="exportCsv">Export CSV</button><button id="backup">Backup JSON</button><button id="restore">Restore backup</button></div></header><main><h1>Business Manager</h1><p class="muted">Jobs, employees, expenses, progress payments and estimated profit.</p><p class="notice"><b>Browser-only demo.</b> No secure login or cloud sync. Do not enter real employee, customer or payroll information. Personal employee links are deferred.</p>
-<nav id="nav" class="nav" aria-label="Owner sections"><button data-page="company">Today</button><button data-page="jobs">Jobs</button><button data-page="employees">People</button><button data-page="expenses">Money</button></nav><section id="screen"></section><footer class="muted" style="font-size:12px;margin-top:36px"><details><summary style="cursor:pointer">Older prototypes (separate demo data)</summary><p>These older tools are not the current Owner V1 and do not share all records with it.</p><p><a href="legacy-dashboard.html">Legacy dashboard</a> · <a href="workspace.html">Workspace</a> · <a href="renovation.html">Job Planner</a> · <a href="operations.html">Operations</a> · <a href="quotes.html">Quote Studio</a></p></details></footer></main>
+<nav id="nav" class="nav" aria-label="Owner sections"><button data-page="company">Today</button><button data-page="jobs">Jobs</button><button data-page="employees">People</button><button data-page="expenses">Money</button><button data-page="receipts">Bills</button></nav><section id="screen"></section><footer class="muted" style="font-size:12px;margin-top:36px"><details><summary style="cursor:pointer">Older prototypes (separate demo data)</summary><p>These older tools are not the current Owner V1 and do not share all records with it.</p><p><a href="legacy-dashboard.html">Legacy dashboard</a> · <a href="workspace.html">Workspace</a> · <a href="renovation.html">Job Planner</a> · <a href="operations.html">Operations</a> · <a href="quotes.html">Quote Studio</a></p></details></footer></main>
 <script type="module">
 import {STORE_KEY,normalize,money,dollars,summary,jobGroup,paymentProgress,scheduleDays,scheduleEntry,isISODate,canClose,snapshot,workerKey,workerNames,workerTotals,workerByPeriod,employeesSummary,customerPayment,paymentBreakdown,wageYearSummary,periodSettlement,isSettlementCurrent,companySummary,expenseSummary,financialPeriodSummary,materialBillSummary,startCrewSession,finishCrewSession,recordWeeklyBonus,weeklyStart} from "./owner-ledger-core.mjs";
 import {parseOwnerBackup,ownerExports} from "./owner-ledger-io.mjs";
@@ -121,7 +130,7 @@ try{
   state=parseOwnerBackup(raw);damagedRaw=null;
  }
 }catch(err){storageBlocked=true;storageError=String(err?.message||err);state=normalize({})}
-let page="company",jobId="",person="",period="week",year="",expenseKind="",expenseJob="",expenseMonth="",wageYear="",editingPaymentId="",attendanceMonth=today().slice(0,7),attendanceDate=today(),editingAttendanceId="",dashboardPeriod="month",attendanceBaseline=null,editingBillId="",billEditorOpen=false,billImageDraft=null;
+let page="company",jobId="",person="",period="week",year="",expenseKind="",expenseJob="",expenseMonth="",wageYear="",editingPaymentId="",attendanceMonth=today().slice(0,7),attendanceDate=today(),editingAttendanceId="",dashboardPeriod="month",attendanceBaseline=null,editingBillId="",billEditorOpen=false,billImageDraft=null,billStatusFilter="all",billJobFilter="";
 const jNow=()=>state.jobs.find(j=>j.id===jobId),cash=dollars;
 const localClock=()=>{const d=new Date();return today()+"T"+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")};
 
@@ -148,7 +157,7 @@ function render(){
  if(storageBlocked){
   $("screen").innerHTML='<div class="card" role="alert"><h2>Saved data recovery required</h2><p class="warn">Existing browser data could not be loaded. To avoid overwriting it, editing and saving are disabled. Restore a known-good JSON backup using the button above.</p><p class="muted">'+esc(storageError)+'</p>'+(damagedRaw!==null?'<button id="downloadCorrupt">Download original unreadable data</button><p class="muted">Keep this recovery copy; it may contain private information. Downloading it does not repair it.</p>':'<p class="muted">Browser storage is unavailable. No recovery copy can be read.</p>')+'</div>';return;
  }
- $("screen").innerHTML=page==="jobs"?jobs():page==="employees"?employees():page==="expenses"?expenses():company();
+ $("screen").innerHTML=page==="jobs"?jobs():page==="employees"?employees():page==="expenses"?expenses():page==="receipts"?receiptsPage():company();
  attendanceBaseline=attendanceFormSnapshot();
 }
 function expenseForm(){return '<div class="fields">'+field("Date","expenseDate",today(),"date")+field("Description","expenseTitle")+field("Amount AUD","expenseAmount","","number")+'<div><label>Category</label><select id="expenseKind">'+["material","subcontractor","equipment","labour","other"].map(x=>opt(x,x,"material")).join("")+'</select></div><div><label>Tax basis</label><select id="expenseBasis"><option value="inc">Incl 10% GST</option><option value="ex">Ex GST</option><option value="no_gst">No GST</option></select></div><div><label>Payment</label><select id="expensePaid"><option value="unpaid">Unpaid</option><option value="paid">Paid</option></select></div></div><button id="addExpense">+ Add expense</button>'}
@@ -263,9 +272,28 @@ function dashboardWindow(period){
  const from=[monday.getFullYear(),String(monday.getMonth()+1).padStart(2,"0"),String(monday.getDate()).padStart(2,"0")].join("-");
  return{from,to:end,label:"Week to date"};
 }
-function billCapturePanel(jobFilter=""){
+function receiptCards(bills){
+ if(!bills.length)return '<p class="dashboard-empty">No receipts match this filter.</p>';
+ return '<div class="bill-list">'+bills.map(x=>{
+  const job=state.jobs.find(j=>j.id===x.jobId);
+  const label=x.status==="reimbursed"?"Reimbursed":x.status==="sent"?"Marked as sent":"Not sent";
+  const next=x.status==="draft"?'<button data-advance-bill="'+esc(x.id)+'" data-bill-target="sent">Mark sent</button>':x.status==="sent"?'<button data-advance-bill="'+esc(x.id)+'" data-bill-target="reimbursed">Mark reimbursed</button>':'';
+  return '<article class="bill-item"><div class="bill-item-photo">'+(x.image?'<img alt="Receipt photo" loading="lazy" src="'+esc(x.image)+'">':'No image')+'</div>'+
+   '<div class="bill-item-main"><div class="row"><b>'+esc(x.reference||"Receipt")+'</b><span class="pill">'+esc(label)+'</span></div>'+
+   '<p class="muted">'+esc(job?.name||"Unknown Job")+' · '+esc(x.date)+'</p><strong>'+cash(x.amount)+'</strong>'+
+   '<div class="bill-actions"><button data-edit-bill="'+esc(x.id)+'">View / Edit</button>'+next+'</div></div></article>';
+ }).join("")+'</div>';
+}
+function receiptsPage(){
+ return '<div class="command-heading"><div><h2>Material receipts</h2><p class="muted">Track purchases made for homeowners, by job and repayment status.</p></div></div>'+
+ '<div class="card bill-filters"><div class="fields"><div><label for="billInboxJob">Job</label><select id="billInboxJob">'+opt("","All jobs",billJobFilter)+state.jobs.map(j=>opt(j.id,j.name,billJobFilter)).join("")+'</select></div>'+
+ '<div><label for="billInboxStatus">Status</label><select id="billInboxStatus">'+[["all","All receipts"],["draft","Not sent"],["sent","Marked as sent"],["reimbursed","Reimbursed"]].map(x=>opt(x[0],x[1],billStatusFilter)).join("")+'</select></div></div></div>'+
+ billCapturePanel(billJobFilter,true)+
+ '<p class="notice"><b>Browser-only demo.</b> Photos stay on this device. Marking as sent does NOT contact a homeowner or issue an invoice. Do not upload real receipts.</p>';
+}
+function billCapturePanel(jobFilter="",mobileInbox=false){
  const totals=materialBillSummary(state.materialBills||[],jobFilter);
- const bills=(state.materialBills||[]).filter(x=>!jobFilter||x.jobId===jobFilter).slice().reverse();
+ const bills=(state.materialBills||[]).filter(x=>(!jobFilter||x.jobId===jobFilter)&&(!mobileInbox||billStatusFilter==="all"||x.status===billStatusFilter)).slice().reverse();
  const editing=bills.find(x=>x.id===editingBillId);
  const photo=billImageDraft||editing?.image||"";
  return '<div class="card dashboard-panel" id="billPanel"><div class="row"><div><h3>Material bills · Customer reimbursements</h3><p class="muted">Track purchases made on behalf of customers, independently of contract payments.</p></div><span class="pill">Waiting '+cash(totals.outstanding)+'</span></div>'+
@@ -280,7 +308,7 @@ function billCapturePanel(jobFilter=""){
  '<div class="bill-photo-preview" id="billPhotoPreview">'+(photo?'<img alt="Receipt image" src="'+esc(photo)+'" loading="lazy">':'')+'</div>'+
  field("Notes","billNotes",editing?.notes||"")+
  '<div class="row"><button id="saveBill" class="primary">'+(editing?"Save changes":"Save bill")+'</button><button id="cancelBill">Cancel</button></div></div>':'')+
- (bills.length?table(["Date","Job","Reference","Amount","Status","Photo",""],bills.map(x=>{const job=state.jobs.find(j=>j.id===x.jobId);return '<tr><td>'+esc(x.date)+'</td><td>'+esc(job?.name||"Unknown job")+'</td><td>'+esc(x.reference||"Receipt")+'</td><td>'+cash(x.amount)+'</td><td>'+esc(x.status==="reimbursed"?"Reimbursed":x.status==="sent"?"Sent":"Not sent")+'</td><td>'+(x.image?'<button data-view-bill="'+esc(x.id)+'">View</button>':"—")+'</td><td><button data-edit-bill="'+esc(x.id)+'">Edit</button></td></tr>'})):
+ (mobileInbox?receiptCards(bills):bills.length?table(["Date","Job","Reference","Amount","Status","Photo",""],bills.map(x=>{const job=state.jobs.find(j=>j.id===x.jobId);return '<tr><td>'+esc(x.date)+'</td><td>'+esc(job?.name||"Unknown job")+'</td><td>'+esc(x.reference||"Receipt")+'</td><td>'+cash(x.amount)+'</td><td>'+esc(x.status==="reimbursed"?"Reimbursed":x.status==="sent"?"Sent":"Not sent")+'</td><td>'+(x.image?'<button data-view-bill="'+esc(x.id)+'">View</button>':"—")+'</td><td><button data-edit-bill="'+esc(x.id)+'">Edit</button></td></tr>'})):
  '<p class="dashboard-empty">No material bills yet.</p>')+
  '<p class="muted">Pass-through reimbursements do not automatically alter contract income, Profit or Job Expenses. Record materials included in the agreed contract using Job Expenses instead.</p></div>';
 }
@@ -375,7 +403,7 @@ window.addEventListener("beforeunload",event=>{
 });
 const positive=id=>{const n=money($(id)?.value);return Number.isFinite(n)&&n>0?n:null};
 $("nav").onclick=event=>{const b=event.target.closest("[data-page]");if(!b||!canLeaveJobDetails()||!canLeaveAttendance())return;page=b.dataset.page;jobId="";editingPaymentId="";person="";render()};
-$("screen").onchange=event=>{const id=event.target.id,value=event.target.value;if(id==="workerName"){const member=state.staff.find(x=>x.name.trim().toLowerCase()===String(value).trim().toLowerCase());if(member){$("workBasis").value=member.payBasis||"hour";if(Number.isFinite(Number(member.rate)))$("workRate").value=member.rate}return}if(id==="yearFilter"){year=value;expenseMonth="";render()}else if(id==="monthFilter"){expenseMonth=value;render()}else if(id==="kindFilter"){expenseKind=value;render()}else if(id==="jobFilter"){expenseJob=value;render()}else if(id==="wageYearFilter"){wageYear=value;render()}else if(id==="dashboardPeriod"){dashboardPeriod=value;render()}else if(id==="attendanceMonth"){if(!canLeaveAttendance()){event.target.value=attendanceMonth;return}attendanceMonth=value;attendanceDate=value+"-01";editingAttendanceId="";render()}};
+$("screen").onchange=event=>{const id=event.target.id,value=event.target.value;if(id==="billInboxJob"){billJobFilter=value;billEditorOpen=false;editingBillId="";billImageDraft=null;render();return}if(id==="billInboxStatus"){billStatusFilter=value;billEditorOpen=false;editingBillId="";billImageDraft=null;render();return}if(id==="workerName"){const member=state.staff.find(x=>x.name.trim().toLowerCase()===String(value).trim().toLowerCase());if(member){$("workBasis").value=member.payBasis||"hour";if(Number.isFinite(Number(member.rate)))$("workRate").value=member.rate}return}if(id==="yearFilter"){year=value;expenseMonth="";render()}else if(id==="monthFilter"){expenseMonth=value;render()}else if(id==="kindFilter"){expenseKind=value;render()}else if(id==="jobFilter"){expenseJob=value;render()}else if(id==="wageYearFilter"){wageYear=value;render()}else if(id==="dashboardPeriod"){dashboardPeriod=value;render()}else if(id==="attendanceMonth"){if(!canLeaveAttendance()){event.target.value=attendanceMonth;return}attendanceMonth=value;attendanceDate=value+"-01";editingAttendanceId="";render()}};
 $("screen").onclick=event=>{
  const b=event.target.closest("button,[data-open]");if(!b)return;
  if(b.id==="downloadCorrupt"&&storageBlocked&&damagedRaw!==null){download("HandyOS-unreadable-recovery-"+today()+".txt",damagedRaw,"text/plain;charset=utf-8");return}
@@ -396,13 +424,20 @@ $("screen").onclick=event=>{
   try{finishCrewSession(state,{at,breakMinutes,dayPortion,notes,ids:active.staffIds.map(()=>uid())});persist()}catch(err){alert(err.message)}
   return;
  }
- if(b.id==="quickBill"){billEditorOpen=true;editingBillId="";billImageDraft=null;render();$("billPanel")?.scrollIntoView({behavior:"smooth",block:"start"});return}
+ if(b.id==="quickBill"){page="receipts";billEditorOpen=true;editingBillId="";billImageDraft=null;render();$("billEditor")?.scrollIntoView({behavior:"smooth",block:"start"});return}
  if(b.dataset.open==="job"){page="jobs";jobId=b.dataset.id;editingPaymentId="";render();return}
  if(b.dataset.open==="worker"){if(!canLeaveAttendance())return;page="employees";person=b.dataset.name;period="week";attendanceMonth=today().slice(0,7);attendanceDate=today();editingAttendanceId="";render();return}
  if(b.dataset.back==="jobs"){if(!canLeaveJobDetails())return;jobId="";editingPaymentId="";render();return}
  if(b.dataset.back==="employees"){if(!canLeaveAttendance())return;person="";render();return}
  if(b.dataset.period){if(!canLeaveAttendance())return;period=b.dataset.period;render();return}
  if(b.dataset.settle){if(!canLeaveAttendance())return;try{const receipt=periodSettlement(state.jobs,person,period,b.dataset.settle);const previous=state.payrollSettlements.filter(x=>workerKey(x.worker)===workerKey(person)&&x.period===period&&x.key===b.dataset.settle).at(-1);if(previous&&isSettlementCurrent(state.jobs,previous))return alert("This period already has an up-to-date wage settlement. No duplicate snapshot was saved.");if(!confirm("Save "+person+" / "+b.dataset.settle+" wage settlement snapshot"+(previous?" as a new version (the earlier close remains in history)":"")+"? This does NOT pay wages or lock timesheets."))return;state.payrollSettlements.push({...receipt,id:uid(),savedOn:today()});persist();}catch(err){alert(err.message)}return}
+ if(b.dataset.advanceBill){
+  const entry=(state.materialBills||[]).find(x=>x.id===b.dataset.advanceBill),target=b.dataset.billTarget;
+  if(!entry||!((entry.status==="draft"&&target==="sent")||(entry.status==="sent"&&target==="reimbursed")))return alert("This receipt status changed. Reload and review it.");
+  const question=target==="sent"?"Mark as sent? This only updates your tracking status. Nothing is delivered to the customer.":"Mark reimbursed? Confirm customer payment was actually received.";
+  if(!confirm(question))return;
+  entry.status=target;persist();return;
+ }
  if(b.id==="toggleBillEditor"){billEditorOpen=!billEditorOpen;if(!billEditorOpen){editingBillId="";billImageDraft=null}render();return}
  if(b.id==="cancelBill"){billEditorOpen=false;editingBillId="";billImageDraft=null;render();return}
  if(b.dataset.editBill||b.dataset.viewBill){const id=b.dataset.editBill||b.dataset.viewBill;const bill=(state.materialBills||[]).find(x=>x.id===id);if(!bill)return;editingBillId=id;billImageDraft=null;billEditorOpen=true;render();return}
