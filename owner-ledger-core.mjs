@@ -28,6 +28,18 @@ export function normalize(db) {
 export function labourRows(job) {
  return (job.timesheets||[]).map(t=>{const daily=t.payBasis==="day";const units=daily?Number(t.days)||0:Number(t.hours)||0;const rate=Number(t.rate)||0;return {...t,payBasis:daily?"day":"hour",hours:daily?0:units,days:daily?units:0,rate,total:round2(units*rate)};});
 }
+// Clock entries are local same-day shifts. No overnight, automatic overtime or award rules.
+export function workedHours(start,end,breakMinutes=0){
+ const clock=x=>typeof x==="string"&&/^([01]\\d|2[0-3]):[0-5]\\d$/.test(x)?Number(x.slice(0,2))*60+Number(x.slice(3)):NaN;
+ const a=clock(start),b=clock(end),rest=Number(breakMinutes);
+ if(!Number.isFinite(a)||!Number.isFinite(b)||b<=a||!Number.isInteger(rest)||rest<0||rest>=b-a)return null;
+ return Math.round((b-a-rest)/60*100)/100;
+}
+export function employeeTaxSummary(records,name,period="",key=""){
+ const all=(records||[]).filter(x=>workerKey(x.worker)===workerKey(name)&&isISODate(x.date)&&Number.isFinite(Number(x.amount))&&Number(x.amount)>=0);
+ const filtered=all.filter(x=>!period||(period==="week"?weeklyStart(x.date)===key:period==="month"?x.date.slice(0,7)===key:x.date.slice(0,4)===key));
+ return Math.round(filtered.reduce((sum,x)=>sum+Number(x.amount),0)*100)/100;
+}
 export function weeklyStart(day) {
  if(!isISODate(day))return "";
  const d=new Date(day+"T12:00:00Z");
