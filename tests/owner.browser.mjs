@@ -562,6 +562,8 @@ await managerPage.locator('[data-page="company"]').click();
 await managerPage.locator("#dashboardPeriod").selectOption("all");
 assert.match(await managerPage.locator("#screen").innerText(),/Employee wage overview/);
 assert.match(await managerPage.locator("#screen").innerText(),/\$420\.00/);
+assert.equal(await managerPage.locator("#taxLedger").evaluate(el=>el.open),false,"Tax input starts collapsed on daily overview");
+await managerPage.locator("#taxLedger > summary").click();
 await managerPage.locator("#taxDate").fill("2026-11-14");
 await managerPage.locator("#taxAmount").fill("50");
 await managerPage.locator("#taxNotes").fill("Example BAS paid");
@@ -569,6 +571,7 @@ await managerPage.locator("#addTaxPayment").click();
 managerState=await managerPage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")));
 assert.equal(managerState.taxPayments.length,1);
 assert.equal(managerState.taxPayments[0].amount,50);
+await managerPage.locator("#companyLifetime > summary").click();
 assert.match(await managerPage.locator("#screen").innerText(),/Tax paid all time/);
 await managerPage.locator('[data-open="worker"][data-name="Daily Alex"]').first().click();
 assert.equal(await managerPage.locator("#screen").getByText("Daily Alex",{exact:true}).count()>0,true);
@@ -618,6 +621,26 @@ await draftAttendancePage.locator('[data-page="company"]').click();
 assert.equal(await draftAttendancePage.locator("#screen").getByText("Company overview").count(),1);
 assert.equal(await draftAttendancePage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0].timesheets.length),0,"Discarded attendance form must not write hours");
 await draftAttendancePage.close();
+
+// A daily command centre should show only 4 KPI cards and two actionable summaries before detail panels.
+const layoutPage=await browser.newPage({viewport:{width:1280,height:900}});
+await layoutPage.goto(address);
+assert.equal(await layoutPage.locator(".dashboard-primary .metric").count(),4);
+assert.equal(await layoutPage.locator(".command-grid > .command-card").count(),2);
+for(const id of ["periodFinancial","companyLifetime","taxLedger","financialDetails"])assert.equal(await layoutPage.locator("#"+id).evaluate(el=>el.open),false);
+assert.equal(await layoutPage.locator("#dashboardPeriod").inputValue(),"month");
+await layoutPage.locator('[data-page-shortcut="employees"]').click();
+assert.match(await layoutPage.locator("#screen").innerText(),/Employees/);
+await layoutPage.locator('[data-page="company"]').click();
+await layoutPage.locator('[data-page-shortcut="jobs"]').click();
+assert.match(await layoutPage.locator("#screen").innerText(),/Jobs Overview/);
+await layoutPage.close();
+const mobileLayoutPage=await browser.newPage({viewport:{width:390,height:844}});
+await mobileLayoutPage.goto(address);
+assert.equal(await mobileLayoutPage.locator(".command-grid > .command-card").count(),2);
+const mobileOverflow=await mobileLayoutPage.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
+assert.equal(mobileOverflow,false,"390px overview should not require horizontal page scrolling");
+await mobileLayoutPage.close();
 
 console.log("OWNER_BROWSER_QA_PASS");
 }finally{if(browser)await browser.close();await new Promise(ok=>server.close(ok))}
