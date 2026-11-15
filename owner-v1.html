@@ -21,7 +21,7 @@
 .job-group .empty-state{color:#6c8091;font-size:13px}
 @media(max-width:700px){.dashboard-primary{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-report td:first-child{max-width:150px}.job-group{padding:12px 14px}}
 
-/* Owner command centre: clear information priority, quiet surfaces, mobile cards. */
+/* Owner command centre: clear information priority, quiet surfaces, mobile cards. */\n.bill-photo-preview{max-width:360px;max-height:420px;margin:12px 0;overflow:auto;border:1px solid #dce5ee;border-radius:12px}.bill-photo-preview img{display:block;max-width:100%;height:auto}
 :root{background:#f3f6fa;color:#183047}
 body{background:linear-gradient(180deg,#edf3f9 0,#f5f7fa 270px)}
 header{background:#132e43;border-bottom:1px solid rgba(255,255,255,.1);gap:18px}
@@ -74,7 +74,7 @@ body>main>.muted{margin:4px 0 0}
 <header><strong>HandyOS / Owner V1</strong><div class="header-tools"><button id="exportCsv">Export CSV</button><button id="backup">Backup JSON</button><button id="restore">Restore backup</button></div></header><main><h1>Business Manager</h1><p class="muted">Jobs, employees, expenses, progress payments and estimated profit.</p><p class="notice"><b>Browser-only demo.</b> No secure login or cloud sync. Do not enter real employee, customer or payroll information. Personal employee links are deferred.</p>
 <nav id="nav" class="nav" aria-label="Owner sections"><button data-page="company">Overview</button><button data-page="jobs">Jobs</button><button data-page="employees">Employees</button><button data-page="expenses">Expenses</button></nav><section id="screen"></section><footer class="muted" style="font-size:12px;margin-top:36px"><details><summary style="cursor:pointer">Older prototypes (separate demo data)</summary><p>These older tools are not the current Owner V1 and do not share all records with it.</p><p><a href="legacy-dashboard.html">Legacy dashboard</a> · <a href="workspace.html">Workspace</a> · <a href="renovation.html">Job Planner</a> · <a href="operations.html">Operations</a> · <a href="quotes.html">Quote Studio</a></p></details></footer></main>
 <script type="module">
-import {STORE_KEY,normalize,money,dollars,summary,jobGroup,paymentProgress,scheduleDays,scheduleEntry,isISODate,canClose,snapshot,workerKey,workerNames,workerTotals,workerByPeriod,employeesSummary,customerPayment,paymentBreakdown,wageYearSummary,periodSettlement,isSettlementCurrent,companySummary,expenseSummary,financialPeriodSummary} from "./owner-ledger-core.mjs";
+import {STORE_KEY,normalize,money,dollars,summary,jobGroup,paymentProgress,scheduleDays,scheduleEntry,isISODate,canClose,snapshot,workerKey,workerNames,workerTotals,workerByPeriod,employeesSummary,customerPayment,paymentBreakdown,wageYearSummary,periodSettlement,isSettlementCurrent,companySummary,expenseSummary,financialPeriodSummary,materialBillSummary} from "./owner-ledger-core.mjs";
 import {parseOwnerBackup,ownerExports} from "./owner-ledger-io.mjs";
 const $=id=>document.getElementById(id),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])),today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-")},uid=()=>crypto.randomUUID();
 // Unreadable browser data is never replaced silently by an empty ledger.
@@ -89,7 +89,7 @@ try{
   state=parseOwnerBackup(raw);damagedRaw=null;
  }
 }catch(err){storageBlocked=true;storageError=String(err?.message||err);state=normalize({})}
-let page="company",jobId="",person="",period="week",year="",expenseKind="",expenseJob="",expenseMonth="",wageYear="",editingPaymentId="",attendanceMonth=today().slice(0,7),attendanceDate=today(),editingAttendanceId="",dashboardPeriod="month",attendanceBaseline=null;
+let page="company",jobId="",person="",period="week",year="",expenseKind="",expenseJob="",expenseMonth="",wageYear="",editingPaymentId="",attendanceMonth=today().slice(0,7),attendanceDate=today(),editingAttendanceId="",dashboardPeriod="month",attendanceBaseline=null,editingBillId="",billEditorOpen=false,billImageDraft=null;
 const jNow=()=>state.jobs.find(j=>j.id===jobId),cash=dollars;
 const field=(label,id,value="",type="text")=>'<div><label for="'+esc(id)+'">'+esc(label)+'</label><input type="'+type+'" id="'+esc(id)+'" value="'+esc(value)+'"></div>';
 const opt=(key,value,selected)=>'<option value="'+esc(key)+'" '+(key===selected?"selected":"")+'>'+esc(value)+'</option>';
@@ -216,6 +216,27 @@ function dashboardWindow(period){
  const from=[monday.getFullYear(),String(monday.getMonth()+1).padStart(2,"0"),String(monday.getDate()).padStart(2,"0")].join("-");
  return{from,to:end,label:"Week to date"};
 }
+function billCapturePanel(jobFilter=""){
+ const totals=materialBillSummary(state.materialBills||[],jobFilter);
+ const bills=(state.materialBills||[]).filter(x=>!jobFilter||x.jobId===jobFilter).slice().reverse();
+ const editing=bills.find(x=>x.id===editingBillId);
+ const photo=billImageDraft||editing?.image||"";
+ return '<div class="card dashboard-panel" id="billPanel"><div class="row"><div><h3>Material bills · Customer reimbursements</h3><p class="muted">Track purchases made on behalf of customers, independently of contract payments.</p></div><span class="pill">Waiting '+cash(totals.outstanding)+'</span></div>'+
+ '<div class="metrics">'+metric("Not sent",cash(totals.draft))+metric("Sent",cash(totals.sent))+metric("Reimbursed",cash(totals.reimbursed))+'</div>'+
+ '<button class="primary" id="toggleBillEditor">'+(editing?"Edit selected bill":"+ Add bill / photo")+'</button>'+
+ (billEditorOpen?'<div class="card" id="billEditor"><div class="fields"><div><label>Job</label><select id="billJob">'+opt("","Select job","")+state.jobs.map(j=>opt(j.id,j.name,editing?.jobId||jobFilter||"")).join("")+'</select></div>'+
+ field("Purchase date","billDate",editing?.date||today(),"date")+field("Store / receipt","billReference",editing?.reference||"")+
+ field("Amount paid AUD","billAmount",editing?.amount??"","number")+
+ '<div><label>Status</label><select id="billStatus">'+["draft","sent","reimbursed"].map(v=>opt(v,v==="draft"?"Not sent":v==="sent"?"Sent to customer":"Reimbursed",editing?.status||"draft")).join("")+'</select></div></div>'+
+ '<label for="billPhoto">iPhone photo or existing photo</label><input id="billPhoto" type="file" accept="image/*" capture="environment">'+
+ '<p class="muted">Choose Camera or Photo Library on iPhone. Demo images are compressed and kept only in this browser. No cross-device sync or customer delivery.</p>'+
+ (photo?'<div class="bill-photo-preview"><img alt="Receipt image" src="'+esc(photo)+'" loading="lazy"></div>':'')+
+ field("Notes","billNotes",editing?.notes||"")+
+ '<div class="row"><button id="saveBill" class="primary">'+(editing?"Save changes":"Save bill")+'</button><button id="cancelBill">Cancel</button></div></div>':'')+
+ (bills.length?table(["Date","Job","Reference","Amount","Status","Photo",""],bills.map(x=>{const job=state.jobs.find(j=>j.id===x.jobId);return '<tr><td>'+esc(x.date)+'</td><td>'+esc(job?.name||"Unknown job")+'</td><td>'+esc(x.reference||"Receipt")+'</td><td>'+cash(x.amount)+'</td><td>'+esc(x.status==="reimbursed"?"Reimbursed":x.status==="sent"?"Sent":"Not sent")+'</td><td>'+(x.image?'<button data-view-bill="'+esc(x.id)+'">View</button>':"—")+'</td><td><button data-edit-bill="'+esc(x.id)+'">Edit</button></td></tr>'})):
+ '<p class="dashboard-empty">No material bills yet.</p>')+
+ '<p class="muted">Pass-through reimbursements do not automatically alter contract income, Profit or Job Expenses. Record materials included in the agreed contract using Job Expenses instead.</p></div>';
+}
 function company(){
  const x=companySummary(state.jobs),window=dashboardWindow(dashboardPeriod),p=financialPeriodSummary(state,window);
  const all=financialPeriodSummary(state);
@@ -234,7 +255,7 @@ function company(){
  '<div class="dashboard-subline"><span>Wages outstanding <strong>'+cash(x.wagesOutstanding)+'</strong></span><span>Tax paid this period <strong>'+cash(p.taxesPaid)+'</strong></span><span>Job profit forecast <strong>'+(notReady?"Incomplete · "+notReady+" jobs":cash(profit))+'</strong></span></div>'+
  '<div class="command-grid">'+
  '<div class="card command-card"><div class="card-top"><div><h3>Jobs in progress</h3><p class="muted">'+x.open+' open jobs · Showing up to 5</p></div><button data-page-shortcut="jobs">All jobs</button></div>'+overviewJobs+'</div>'+
- '<div class="card command-card"><div class="card-top"><div><h3>Employee wage overview</h3><p class="muted">Individual wages · '+staff.length+' employees</p></div><button data-page-shortcut="employees">All employees</button></div>'+overviewStaff+'</div></div>'+
+ '<div class="card command-card"><div class="card-top"><div><h3>Employee wage overview</h3><p class="muted">Individual wages · '+staff.length+' employees</p></div><button data-page-shortcut="employees">All employees</button></div>'+overviewStaff+'</div></div>'+\n billCapturePanel()+
  '<details class="card dashboard-panel" id="periodFinancial"><summary>Period financial details <span class="muted">Earned wages, expenses and cash reconciliation</span></summary>'+
  '<div class="metrics">'+metric("Wages earned",cash(p.earned))+metric("Expenses accrued ex GST",cash(p.expensesEx))+metric("Tax payments entered",cash(p.taxesPaid))+metric("Unknown GST lines",p.unknownGst)+'</div>'+
  '<p class="muted">* Cash movement = received payments − wages paid − expenses marked paid − tax payments recorded. It is not accounting profit or available bank balance. Do not double-enter wages or taxes as job expenses.</p></details>'+
