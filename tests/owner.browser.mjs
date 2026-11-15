@@ -152,5 +152,5 @@ assert.equal(await recovery.evaluate(()=>JSON.parse(localStorage.getItem("handyo
 assert.equal(await recovery.locator('[data-page="jobs"]').isEnabled(),true);
 assert.deepEqual(recoveryErrors,[]);
 await recovery.close();
-\nconsole.log("OWNER_BROWSER_QA_PASS");
+console.log("OWNER_BROWSER_QA_PASS");
 }finally{if(browser)await browser.close();await new Promise(ok=>server.close(ok))}
