@@ -370,3 +370,16 @@ test("approved variations control overpayment warnings and closed job receivable
  const closed=summary(j);
  assert.ok(closed.risks.some(x=>x.includes("cash remains outstanding")));
 });
+
+test("tentative planning/quoted dates do not occupy confirmed bookings calendar",()=>{
+ const make=(id,stage)=>({...j(id,id),stage,startDate:"2026-11-16",endDate:"2026-11-18"});
+ const survey=make("survey","survey"),quoted=make("quoted","quoted"),estimate=make("estimate","estimate");
+ const booked=make("booked","scheduled"),inProgress=make("active","active"),handover=make("handover","handover");
+ const closed=make("closed","closed");
+ const onDay=scheduleDays([survey,quoted,estimate,booked,inProgress,handover,closed],"2026-11-17",1)[0];
+ assert.deepEqual(onDay.booked.map(x=>x.id),["booked","active","handover"]);
+ assert.equal(onDay.bookedCount,3);
+ assert.equal(scheduleDays([survey,quoted,estimate,closed],"2026-11-17",1)[0].unrecorded,true);
+ assert.equal(jobGroup(quoted),"planning");
+ assert.equal(scheduleEntry(quoted).scheduled,true,"tentative dates remain preserved on job");
+});
