@@ -7,7 +7,7 @@ import {STORE_KEY,normalize,money,dollars,summary,jobGroup,paymentProgress,sched
 import {parseOwnerBackup,ownerExports} from "./owner-ledger-io.mjs";
 const $=id=>document.getElementById(id),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])),today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-")},uid=()=>crypto.randomUUID();
 let state;try{state=normalize(JSON.parse(localStorage.getItem(STORE_KEY)||"{}"))}catch{state=normalize({})}
-let page="jobs",jobId="",person="",period="week",year="",expenseKind="",expenseJob="",expenseMonth="",wageYear="";
+let page="jobs",jobId="",person="",period="week",year="",expenseKind="",expenseJob="",expenseMonth="",wageYear="",scheduleOffset=0;
 const jNow=()=>state.jobs.find(j=>j.id===jobId),cash=dollars;
 const field=(label,id,value="",type="text")=>'<div><label for="'+esc(id)+'">'+esc(label)+'</label><input type="'+type+'" id="'+esc(id)+'" value="'+esc(value)+'"></div>';
 const opt=(key,value,selected)=>'<option value="'+esc(key)+'" '+(key===selected?"selected":"")+'>'+esc(value)+'</option>';
@@ -21,14 +21,15 @@ function jobs(){
  const j=jNow();if(!j){
  const groups=[["planning","Planning / Quoting"],["booked","Booked"],["active","In Progress"],["finished","Finished"]];
  const counts=groups.map(([key])=>state.jobs.filter(x=>jobGroup(x)===key).length);
- const dayRows=scheduleDays(state.jobs,today(),14);
+ const dateAnchor=new Date(today()+"T12:00:00Z");dateAnchor.setUTCDate(dateAnchor.getUTCDate()+scheduleOffset);
+ const scheduleStart=dateAnchor.toISOString().slice(0,10),dayRows=scheduleDays(state.jobs,scheduleStart,14);
  const views=groups.map(([key,label],i)=>'<div class="card"><div class="row"><h3>'+label+'</h3><span class="pill">'+counts[i]+' jobs</span></div>'+
  table(["Job","Payment received","Progress","Est. profit","Dates",""],state.jobs.filter(x=>jobGroup(x)===key).map(x=>{
   const m=paymentProgress(x),sum=summary(x),range=scheduleEntry(x);
   const percent=m.percent===null?"Not set":m.percent.toFixed(1)+"%";
   const bar=m.percent===null?"":'<div style="height:7px;min-width:110px;background:#e4edf3;border-radius:8px;overflow:hidden"><div style="height:100%;width:'+Math.max(0,Math.min(100,m.percent))+'%;background:#2177b6"></div></div>';
   return '<tr data-open="job" data-id="'+esc(x.id)+'"><td><b>'+esc(x.name)+'</b></td><td>'+cash(sum.received)+'</td><td>'+percent+bar+(m.overpaid?'<span class="warn">Over 100%</span>':"")+'</td><td>'+(sum.profit===null?"Not ready":cash(sum.profit))+'</td><td>'+(range.scheduled?esc(range.start+" – "+range.end):range.invalid?"Check dates":"Not scheduled")+'</td><td><button data-open="job" data-id="'+esc(x.id)+'">Open</button></td></tr>'}))+'</div>').join("");
- const calendar='<div class="card"><div class="row"><h3>Schedule · Next 14 days</h3><span class="pill">Recorded bookings only</span></div><p class="muted">Days without a recorded booking may still be unavailable due to staff, travel or other commitments. Check before confirming customers.</p><div class="schedule-grid">'+dayRows.map(x=>'<div class="schedule-day '+(x.bookedCount?"busy":"unbooked")+'"><b>'+esc(x.date.slice(5))+'</b><span>'+ (x.bookedCount?x.bookedCount+' job'+(x.bookedCount===1?"":"s"):"No job booked")+'</span><small>'+esc(x.booked.map(j=>j.name).join(", ").slice(0,80))+'</small></div>').join("")+'</div></div>';
+ const calendar='<div class="card"><div class="row"><h3>Schedule · 14 days</h3><div class="row"><button data-calendar="-14">← Previous</button><button data-calendar="today">Today</button><button data-calendar="14">Next →</button></div></div><p class="muted">From '+esc(scheduleStart)+' · Only confirmed booked or in-progress jobs occupy days.</p><p class="muted">Days without a recorded booking may still be unavailable due to staff, travel or other commitments. Check before confirming customers.</p><div class="schedule-grid">'+dayRows.map(x=>'<div class="schedule-day '+(x.bookedCount?"busy":"unbooked")+'"><b>'+esc(x.date.slice(5))+'</b><span>'+ (x.bookedCount?x.bookedCount+' job'+(x.bookedCount===1?"":"s"):"No job booked")+'</span><small>'+esc(x.booked.map(j=>j.name).join(", ").slice(0,80))+'</small></div>').join("")+'</div></div>';
  return '<div class="row"><h2>Jobs Overview</h2><button class="primary" id="newJob">+ New job</button></div>'+
  '<div class="metrics">'+metric("Planning",counts[0])+metric("Booked",counts[1])+metric("In Progress",counts[2])+metric("Finished",counts[3])+'</div>'+
  views+calendar;
@@ -86,6 +87,7 @@ $("screen").onclick=event=>{
  if(b.dataset.open==="job"){jobId=b.dataset.id;render();return}
  if(b.dataset.open==="worker"){person=b.dataset.name;period="week";render();return}
  if(b.dataset.back==="jobs"){jobId="";render();return}
+ if(b.dataset.calendar){if(b.dataset.calendar==="today")scheduleOffset=0;else scheduleOffset=Math.max(-730,Math.min(730,scheduleOffset+Number(b.dataset.calendar)));render();return}
  if(b.dataset.back==="employees"){person="";render();return}
  if(b.dataset.period){period=b.dataset.period;render();return}
  if(b.dataset.settle){try{const receipt=periodSettlement(state.jobs,person,period,b.dataset.settle);if(!confirm("Save "+person+" / "+b.dataset.settle+" wage settlement snapshot? This does NOT pay wages or lock timesheets."))return;state.payrollSettlements=state.payrollSettlements.filter(x=>!(x.worker.toLowerCase()===person.toLowerCase()&&x.period===period&&x.key===b.dataset.settle));state.payrollSettlements.push({...receipt,id:uid(),savedOn:today()});persist();}catch(err){alert(err.message)}return}
