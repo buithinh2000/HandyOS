@@ -170,5 +170,29 @@ await recovery.close();
  assert.equal(preserved[0].name,"First confirmed job");
  await multiContext.close();
 
+
+ // Parseable JSON with an invalid schema must also be read-only, never normalized into an empty ledger.
+ const schemaPage=await browser.newPage({acceptDownloads:true});
+ schemaPage.on("dialog",dialog=>dialog.accept());
+ await schemaPage.goto(address);
+ const invalidSaved='{"jobs":[],"staff":"not-a-roster"}';
+ await schemaPage.evaluate(raw=>localStorage.setItem("handyos-workspace-v07",raw),invalidSaved);
+ await schemaPage.reload();
+ assert.match(await schemaPage.locator("#screen").innerText(),/Saved data recovery required/);
+ assert.equal(await schemaPage.locator("#newJob").count(),0);
+ assert.equal(await schemaPage.locator("#backup").isDisabled(),true);
+ assert.equal(await schemaPage.evaluate(()=>localStorage.getItem("handyos-workspace-v07")),invalidSaved);
+ const invalidDownload=schemaPage.waitForEvent("download");
+ await schemaPage.locator("#downloadCorrupt").click();
+ assert.match((await invalidDownload).suggestedFilename(),/HandyOS-unreadable-recovery/);
+ assert.equal(await schemaPage.evaluate(()=>localStorage.getItem("handyos-workspace-v07")),invalidSaved);
+ // A valid existing-schema record must still open without converting or overwriting it.
+ const validSaved=JSON.stringify({jobs:[],staff:[],payrollSettlements:[]});
+ await schemaPage.evaluate(raw=>localStorage.setItem("handyos-workspace-v07",raw),validSaved);
+ await schemaPage.reload();
+ assert.equal(await schemaPage.locator("#newJob").count(),1);
+ assert.equal(await schemaPage.evaluate(()=>localStorage.getItem("handyos-workspace-v07")),validSaved);
+ await schemaPage.close();
+
 console.log("OWNER_BROWSER_QA_PASS");
 }finally{if(browser)await browser.close();await new Promise(ok=>server.close(ok))}
