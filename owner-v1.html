@@ -7,9 +7,10 @@ import {STORE_KEY,normalize,money,dollars,summary,jobGroup,paymentProgress,sched
 import {parseOwnerBackup,ownerExports} from "./owner-ledger-io.mjs";
 const $=id=>document.getElementById(id),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])),today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-")},uid=()=>crypto.randomUUID();
 // Unreadable browser data is never replaced silently by an empty ledger.
-let state,storageBlocked=false,damagedRaw=null,storageError="";
+let state,storageBlocked=false,damagedRaw=null,storageError="",lastSavedRaw=null;
 try{
  const raw=localStorage.getItem(STORE_KEY);
+ lastSavedRaw=raw;
  if(raw===null)state=normalize({});
  else{
   damagedRaw=raw;
@@ -26,8 +27,16 @@ const metric=(label,value)=>'<div class="metric">'+esc(label)+'<b>'+esc(value)+'
 const table=(heads,rows)=>'<div class="wrap"><table><thead><tr>'+heads.map(x=>'<th>'+esc(x)+'</th>').join("")+'</tr></thead><tbody>'+rows.join("")+'</tbody></table></div>';
 function persist(){
  if(storageBlocked){alert("Saved browser data is unreadable. Writes remain blocked until a valid backup is restored.");return}
- try{localStorage.setItem(STORE_KEY,JSON.stringify(state));render()}
- catch(err){alert("Unable to save to this browser. Export a backup before closing or refreshing. "+String(err?.message||err))}
+ try{
+  if(localStorage.getItem(STORE_KEY)!==lastSavedRaw){
+   alert("This workspace was changed in another tab. Your edit was NOT saved. The latest saved data will reload.");
+   location.reload();return;
+  }
+  const next=JSON.stringify(state);
+  localStorage.setItem(STORE_KEY,next);
+  lastSavedRaw=next;
+  render()
+ }catch(err){alert("Unable to save to this browser. Export a backup before closing or refreshing. "+String(err?.message||err))}
 }
 function render(){
  for(const x of $("nav").querySelectorAll("[data-page]")){x.classList.toggle("active",!storageBlocked&&x.dataset.page===page);x.disabled=storageBlocked}
@@ -137,7 +146,11 @@ $("restore").onclick=()=>{
  const restored=parseOwnerBackup(await file.text());
  const jobs=restored.jobs.length,rows=restored.jobs.reduce((sum,j)=>sum+j.expenses.length+j.timesheets.length+j.payments.length+j.workerPayments.length,0);
  if(!confirm("Replace ALL data in this browser with "+jobs+" jobs and "+rows+" financial records from backup? Export your existing backup first. This cannot be undone."))return;
- localStorage.setItem(STORE_KEY,JSON.stringify(restored));state=restored;storageBlocked=false;damagedRaw=null;storageError="";jobId="";person="";page="jobs";render();
+ if(localStorage.getItem(STORE_KEY)!==lastSavedRaw){
+  alert("This workspace changed in another tab. Restore was cancelled to protect the newer data.");location.reload();return;
+ }
+ const restoredRaw=JSON.stringify(restored);
+ localStorage.setItem(STORE_KEY,restoredRaw);lastSavedRaw=restoredRaw;state=restored;storageBlocked=false;damagedRaw=null;storageError="";jobId="";person="";page="jobs";render();
  }catch(err){alert("Restore blocked: "+err.message)}};chooser.click()
 };
 render();

@@ -152,5 +152,23 @@ assert.equal(await recovery.evaluate(()=>JSON.parse(localStorage.getItem("handyo
 assert.equal(await recovery.locator('[data-page="jobs"]').isEnabled(),true);
 assert.deepEqual(recoveryErrors,[]);
 await recovery.close();
+
+ // Multiple tabs share localStorage: stale editor must not overwrite newer work.
+ const multiContext=await browser.newContext();
+ const tabA=await multiContext.newPage(),tabB=await multiContext.newPage();
+ const notices=[];
+ tabA.on("dialog",d=>d.accept("First confirmed job"));
+ tabB.on("dialog",d=>{if(d.type()==="alert")notices.push(d.message());return d.accept("Stale second job")});
+ await tabA.goto(address);await tabB.goto(address);
+ await tabA.locator("#newJob").click();
+ assert.equal(await tabA.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs.length),1);
+ await tabB.locator("#newJob").click();
+ await tabB.waitForLoadState("load");
+ assert.ok(notices.some(s=>s.includes("another tab")),JSON.stringify(notices));
+ const preserved=await tabB.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs);
+ assert.equal(preserved.length,1);
+ assert.equal(preserved[0].name,"First confirmed job");
+ await multiContext.close();
+
 console.log("OWNER_BROWSER_QA_PASS");
 }finally{if(browser)await browser.close();await new Promise(ok=>server.close(ok))}
