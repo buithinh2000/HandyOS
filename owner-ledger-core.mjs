@@ -74,8 +74,10 @@ export function workerByPeriod(jobs,name,period="week",jobId=""){
 }
 export function wageYearSummary(jobs,year="",staff=[]){
  const results=employeesSummary(jobs,staff).map(worker=>{
-  const wages=worker.earned.filter(x=>!year||String(x.date||"").startsWith(year));
-  const payments=worker.payments.filter(x=>!year||String(x.paidOn||"").startsWith(year));
+  // Year-filtered views must use the same strict real-date rule as wage period groups.
+  // All-time totals still retain legacy records for reconciliation rather than deleting them.
+  const wages=worker.earned.filter(x=>!year||(isISODate(x.date)&&x.date.startsWith(year)));
+  const payments=worker.payments.filter(x=>!year||(isISODate(x.paidOn)&&x.paidOn.startsWith(year)));
   const earned=round2(wages.reduce((s,x)=>s+x.total,0)),paid=round2(payments.reduce((s,x)=>s+x.amount,0));
   return{name:worker.name,hours:round2(wages.reduce((s,x)=>s+x.hours,0)),earned,paid,difference:round2(earned-paid)};
  });
