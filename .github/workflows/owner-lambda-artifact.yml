@@ -28,19 +28,19 @@ jobs:
         run: |
           mkdir -p dist/cloud
           ./cloud/build/node_modules/.bin/esbuild cloud/lambda.mjs \
-            --bundle --platform=node --target=node22 --format=esm --packages=bundle \
-            --outfile=dist/cloud/lambda.mjs
+            --bundle --platform=node --target=node22 --format=cjs --packages=bundle \
+            --outfile=dist/cloud/lambda.js
           cp cloud/build/package-lock.json dist/package-lock.build.json
-          node --check dist/cloud/lambda.mjs
+          node --check dist/cloud/lambda.js
           HANDYOS_LEDGER_BUCKET=example-staging HANDYOS_KMS_KEY_ARN=arn:aws:kms:ap-southeast-1:123456789012:key/00000000-0000-0000-0000-000000000000 \
             HANDYOS_OWNER_SUB=owner-1234567890 HANDYOS_OWNER_ORIGIN=https://handyos.buitai.com \
             HANDYOS_API_GATEWAY_ID=example123 HANDYOS_JWT_ISSUER=https://cognito-idp.ap-southeast-1.amazonaws.com/example \
             HANDYOS_JWT_CLIENT_ID=example-client \
-            node --input-type=module -e "const m=await import('./dist/cloud/lambda.mjs');if(typeof m.handler!=='function')process.exit(1)"
+            node -e "const m=require('./dist/cloud/lambda.js');if(typeof m.handler!=='function')process.exit(1)"
       - name: Record immutable review checksums (no AWS credentials)
         run: |
           cd dist
-          sha256sum cloud/lambda.mjs package-lock.build.json > SHA256SUMS.txt
+          sha256sum cloud/lambda.js package-lock.build.json > SHA256SUMS.txt
           zip -q -r owner-lambda-review.zip cloud/lambda.mjs
           sha256sum owner-lambda-review.zip >> SHA256SUMS.txt
           printf 'source_commit=%s\n' "$GITHUB_SHA" > SOURCE-COMMIT.txt
