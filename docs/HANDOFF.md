@@ -26,3 +26,6 @@ Routine source-only PRs within existing approved scope: Owner has delegated VIN 
 
 ## Owner V1 confirmed-booking calendar defect — 2026-11-15
 A source review found `scheduleDays()` included planning/quoted jobs when they had tentative dates, contradicting PR32's confirmed-only scheduling rule. This branch filters to normalized job groups `booked` or `active`, retaining ongoing handover jobs and excluding planning and finished entries. Added regression test; existing job start/end dates and saved records are untouched. **Pending CI and merge verification.** After merge, update main SHA in the next handoff.
+
+## Browser-local corrupt-storage safety fix (source-only proposal, 2026-11-15)
+Previously, invalid JSON under `handyos-workspace-v07` was silently converted into an empty workspace; a subsequent save risked overwriting the unreadable original. This patch fails closed: disables editing/export of fictitious empty data, allows download of the exact unreadable bytes, and permits validated JSON restore. A storage-write failure now reports failure rather than silently presenting save success. Added a real-browser regression for corruption, raw recovery download and restore. No live data, AWS, auth, finance formula or backup schema change. **Pending exact-head CI and merge validation**. Public site remains synthetic-data demo only.
