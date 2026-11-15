@@ -349,5 +349,5 @@ test("simple schedule shows only recorded bookings, excluding finished jobs",()=
 });
 test("Owner V1 jobs overview exposes status counts, payment progress and schedule dates",()=>{
  const html=readFileSync(new URL("../owner-v1.html",import.meta.url),"utf8");
- for(const token of ["Jobs Overview","Booked / Preparing","In Progress","Finished","Schedule · Next 14 days","No job booked","startDate","endDate","paymentProgress"]){assert.ok(html.includes(token),token)}
+ for(const token of ["Jobs Overview","Planning / Quoting","In Progress","Finished","Schedule · Next 14 days","No job booked","startDate","endDate","paymentProgress"]){assert.ok(html.includes(token),token)}
 });
