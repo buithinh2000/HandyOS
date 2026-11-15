@@ -50,3 +50,6 @@ Expense entry previously accepted any nonempty date string, although monthly/yea
 
 ## Expense date-filter accuracy (source-only proposal, 2026-11-15)
 After PR #50 prevented invalid expense dates at new entry, historical malformed dates could still pass year/month string-prefix filters (e.g. `2026-02-30`). This patch applies the existing strict `isISODate` to expense rows **only when year/month filters are active**. The unfiltered Owner expense totals, Job profit math, original ledger rows and stored data remain unchanged; tests cover both views. **Pending exact-head CI and merge verification.** No AWS/SQL/cloud operations.
+
+## Company Overview legacy-finished count (source-only, 2026-11-15)
+Confirmed mismatch: Jobs V1 groups stages `closed` and legacy `finished` as finished via `jobGroup`, but company Overview `Open jobs` excluded only exact `closed`, incorrectly counting finished legacy jobs as open. Switch `companySummary.open` to the existing shared `jobGroup` classifier. Regression covers current and legacy stages and capitalization. No storage or accounting formula changes, no AWS. **Pending latest-head CI/merge.**
