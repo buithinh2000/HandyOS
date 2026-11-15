@@ -65,7 +65,7 @@ export function setAttendanceDayOff(state,{jobId,entryId,dayOff,reason="",change
  const t=(job.timesheets||[]).find(x=>x.id===entryId);
  if(!t)throw new Error("Attendance entry not found.");
  if(typeof dayOff!=="boolean"||typeof reason!=="string"||reason.length>250||
-    typeof changedAt!=="string"||!/^\\d{4}-\\d{2}-\\d{2}T(?:[01]\\d|2[0-3]):[0-5]\\d$/.test(changedAt)||!isISODate(changedAt.slice(0,10)))
+    typeof changedAt!=="string"||!/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/.test(changedAt)||!isISODate(changedAt.slice(0,10)))
   throw new Error("Invalid attendance correction.");
  if((t.dayOff===true)===dayOff)return false;
  t.dayOff=dayOff;
