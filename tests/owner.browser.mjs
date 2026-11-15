@@ -235,5 +235,31 @@ await recovery.close();
  assert.equal(await schemaPage.evaluate(()=>localStorage.getItem("handyos-workspace-v07")),validSaved);
  await schemaPage.close();
 
+// Filter options must reflect the same valid-date rules as filtered report totals.
+const filterPage=await browser.newPage();
+await filterPage.goto(address);
+const historic={
+ jobs:[{id:"hist",name:"Historic example",stage:"active",contract:1100,
+  expenses:[{id:"invalid-expense",date:"2026-02-30",title:"Legacy malformed",amount:110,gstBasis:"inc",kind:"material",paidStatus:"paid"},{id:"valid-expense",date:"2025-11-15",title:"Valid historic",amount:220,gstBasis:"inc",kind:"material",paidStatus:"paid"}],
+  timesheets:[{id:"invalid-hours",worker:"Alex",date:"2026-02-30",hours:8,rate:40},{id:"valid-hours",worker:"Alex",date:"2025-11-15",hours:2,rate:40}],
+  workerPayments:[{id:"invalid-wage",worker:"Alex",paidOn:"2026-02-30",amount:80},{id:"valid-wage",worker:"Alex",paidOn:"2025-11-15",amount:20}],
+  payments:[],tasks:[],categories:[],materials:[]}],
+ staff:[],payrollSettlements:[]
+};
+const historicRaw=JSON.stringify(historic);
+await filterPage.evaluate(raw=>localStorage.setItem("handyos-workspace-v07",raw),historicRaw);
+await filterPage.reload();
+await filterPage.locator('[data-page="expenses"]').click();
+assert.deepEqual(await filterPage.locator("#yearFilter option").evaluateAll(nodes=>nodes.map(x=>x.value)),["","2025"]);
+assert.deepEqual(await filterPage.locator("#monthFilter option").evaluateAll(nodes=>nodes.map(x=>x.value)),["","2025-11"]);
+assert.equal(await filterPage.locator("table tbody tr").count(),2,"All-time expenses remain visible");
+await filterPage.locator("#yearFilter").selectOption("2025");
+assert.equal(await filterPage.locator("table tbody tr").count(),1);
+await filterPage.locator('[data-page="employees"]').click();
+assert.deepEqual(await filterPage.locator("#wageYearFilter option").evaluateAll(nodes=>nodes.map(x=>x.value)),["","2025"]);
+assert.equal(await filterPage.locator("table tbody tr").count(),1,"Worker roster remains visible");
+assert.equal(await filterPage.evaluate(()=>localStorage.getItem("handyos-workspace-v07")),historicRaw,"No historical records are rewritten by viewing filters");
+await filterPage.close();
+
 console.log("OWNER_BROWSER_QA_PASS");
 }finally{if(browser)await browser.close();await new Promise(ok=>server.close(ok))}
