@@ -20,6 +20,56 @@
 .job-group .pill{margin-left:12px}
 .job-group .empty-state{color:#6c8091;font-size:13px}
 @media(max-width:700px){.dashboard-primary{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-report td:first-child{max-width:150px}.job-group{padding:12px 14px}}
+
+/* Owner command centre: clear information priority, quiet surfaces, mobile cards. */
+:root{background:#f3f6fa;color:#183047}
+body{background:linear-gradient(180deg,#edf3f9 0,#f5f7fa 270px)}
+header{background:#132e43;border-bottom:1px solid rgba(255,255,255,.1);gap:18px}
+main{max-width:1220px}
+body>main>h1{font-size:clamp(24px,2.6vw,32px);letter-spacing:-.035em;margin-top:5px}
+body>main>.muted{margin:4px 0 0}
+.notice{border:1px solid #eadfbd;background:#fbf7ed;padding:9px 12px;border-radius:9px;margin:14px 0}
+.nav{padding:6px;background:#e7eef5;border:1px solid #d9e5ef;border-radius:12px;gap:4px;width:max-content;max-width:100%;margin:19px 0 22px}
+.nav button{background:transparent;border:0;border-radius:8px;padding:9px 17px;color:#4b647a;font-size:13px}
+.nav .active{background:#fff;color:#113d61;border:0;box-shadow:0 1px 5px #162b4020}
+.nav button:hover{background:#d4e6f4}
+.nav .active:hover{background:#fff}
+.command-heading{display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:13px}
+.command-heading h2{font-size:22px;margin:0;letter-spacing:-.03em}
+.command-heading .muted{margin:3px 0 0}
+.command-heading .period-control{display:flex;align-items:center;gap:9px}
+.command-heading .period-control label{white-space:nowrap;margin:0}
+.command-heading .period-control select{min-width:155px;padding:9px 12px;border-radius:9px}
+.dashboard-primary{gap:13px;margin:14px 0 10px}
+.dashboard-primary .metric{padding:19px 17px;background:white;box-shadow:0 5px 22px #1b35450a;border:1px solid #e2e9f0;border-radius:13px;min-height:108px;display:flex;flex-direction:column;justify-content:space-between}
+.dashboard-primary .metric:first-child{border-left:1px solid #e2e9f0}
+.dashboard-primary .metric b{font-weight:750;letter-spacing:-.04em;font-size:clamp(21px,2.4vw,29px);margin-top:10px}
+.dashboard-subline{display:flex;gap:8px 22px;flex-wrap:wrap;align-items:center;margin:8px 0 19px;padding:9px 4px;color:#5b7185;font-size:12px}
+.dashboard-subline strong{color:#27445e}
+.command-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px;align-items:start}
+.command-card{margin:0;min-width:0;box-shadow:0 4px 20px #20364c08}
+.command-card h3{margin:0;font-size:16px}
+.command-card .card-top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+.command-card .card-top .muted{margin:0}
+.command-card .wrap{overflow-x:auto}
+.command-card th{font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.command-card td{font-size:12px}
+.command-card td button{font-size:12px;padding:5px 8px}
+.command-card .muted,.dashboard-panel .muted{line-height:1.55}
+.dashboard-panel{margin:14px 0}
+.dashboard-panel summary{display:flex;align-items:center;justify-content:space-between;cursor:pointer;list-style:none;font-weight:680;color:#23435d;gap:12px}
+.dashboard-panel summary::-webkit-details-marker{display:none}
+.dashboard-panel summary::after{content:"+";font-size:20px;color:#74879b}
+.dashboard-panel[open] summary::after{content:"−"}
+.dashboard-panel[open] summary{margin-bottom:18px}
+.dashboard-panel .metrics{margin:10px 0}
+.dashboard-panel .metric{background:#f5f8fb}
+.dashboard-more{margin-top:14px}
+.dashboard-more summary{font-size:14px}
+.dashboard-empty{color:#7a8a98;font-size:13px;padding:18px;text-align:center;background:#f7f9fc;border-radius:9px}
+@media(max-width:900px){.command-grid{grid-template-columns:1fr}}
+@media(max-width:700px){header{align-items:flex-start;flex-direction:column}.header-tools{width:100%}.header-tools button{font-size:11px}.nav{width:100%;overflow-x:auto;flex-wrap:nowrap}.nav button{padding:9px 12px;flex:1}.dashboard-primary{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-primary .metric{padding:13px;min-height:94px}.dashboard-primary .metric b{font-size:21px}.command-heading{align-items:flex-start}.command-heading .period-control{width:100%}.command-heading .period-control select{flex:1}.card{padding:15px}}
+@media(max-width:390px){.nav button{font-size:12px;padding:8px 7px}.dashboard-primary .metric b{font-size:19px}}
  </style></head><body>
 <header><strong>HandyOS / Owner V1</strong><div class="header-tools"><button id="exportCsv">Export CSV</button><button id="backup">Backup JSON</button><button id="restore">Restore backup</button></div></header><main><h1>Business Manager</h1><p class="muted">Jobs, employees, expenses, progress payments and estimated profit.</p><p class="notice"><b>Browser-only demo.</b> No secure login or cloud sync. Do not enter real employee, customer or payroll information. Personal employee links are deferred.</p>
 <nav id="nav" class="nav" aria-label="Owner sections"><button data-page="company">Overview</button><button data-page="jobs">Jobs</button><button data-page="employees">Employees</button><button data-page="expenses">Expenses</button></nav><section id="screen"></section><footer class="muted" style="font-size:12px;margin-top:36px"><details><summary style="cursor:pointer">Older prototypes (separate demo data)</summary><p>These older tools are not the current Owner V1 and do not share all records with it.</p><p><a href="legacy-dashboard.html">Legacy dashboard</a> · <a href="workspace.html">Workspace</a> · <a href="renovation.html">Job Planner</a> · <a href="operations.html">Operations</a> · <a href="quotes.html">Quote Studio</a></p></details></footer></main>
@@ -172,25 +222,32 @@ function company(){
  const rows=state.jobs.map(j=>({job:j,figures:summary(j)}));
  const validProfit=rows.filter(x=>x.figures.profit!==null),notReady=rows.length-validProfit.length;
  const profit=validProfit.reduce((n,x)=>n+x.figures.profit,0);
+ const staff=employeesSummary(state.jobs,state.staff);
+ const focusJobs=rows.filter(x=>jobGroup(x.job)!=="finished").slice(0,5);
+ const focusStaff=staff.slice(0,5);
  const simple=table(["Job","Contract inc GST","Recorded cost ex GST","Estimated profit"],rows.map(({job,figures:s})=>'<tr data-open="job" data-id="'+esc(job.id)+'"><td><b>'+esc(job.name)+'</b></td><td>'+(s.totalContractInc===null?"Not ready":cash(s.totalContractInc))+'</td><td>'+cash(s.costEx)+'</td><td><b>'+(s.profit===null?"Not ready":cash(s.profit))+'</b></td></tr>'));
  const full=table(["Job","Adjusted contract inc GST","Recorded cost ex GST","Remaining costs ex GST","Overhead ex GST","Tax & Reserve Fund","Estimated profit"],rows.map(({job,figures:s})=>'<tr><td>'+esc(job.name)+'</td><td>'+(s.totalContractInc===null?"Not ready":cash(s.totalContractInc))+'</td><td>'+cash(s.costEx)+'</td><td>'+(s.remainingCostEx===null?"Invalid":cash(s.remainingCostEx))+'</td><td>'+(s.overheadAllocationEx===null?"Invalid":cash(s.overheadAllocationEx))+'</td><td>'+(s.taxReserveAmount===null?"Not ready":cash(s.taxReserveAmount))+'</td><td>'+(s.profit===null?"Not ready":cash(s.profit))+'</td></tr>'));
- return '<div class="dashboard-heading"><div><h2>Company overview</h2><p class="muted">Daily snapshot of payments, staff costs, taxes and job forecasts. Demo data is stored only in this browser.</p></div></div>'+
- '<div class="fields"><div><label>Report period</label><select id="dashboardPeriod">'+["week","month","year","all"].map((v,i)=>opt(v,["This week","This month","This year","All time"][i],dashboardPeriod)).join("")+'</select></div></div>'+
- '<p class="muted">'+esc(window.label)+(window.from?" · "+esc(window.from)+" to "+esc(window.to):"")+' · Figures reflect transactions dated within this period, not invoiced revenue.</p>'+
- '<div class="metrics dashboard-primary">'+metric("Customer cash received",cash(p.receipts))+metric("Wages paid",cash(p.wagePaid))+metric("Expenses marked paid",cash(p.expensesPaid))+metric("Tax payments entered",cash(p.taxesPaid))+'</div>'+
- '<div class="card dashboard-section"><h3>Period money & wages</h3>'+
- '<div class="metrics">'+metric("Wages earned",cash(p.earned))+metric("Expenses accrued ex GST",cash(p.expensesEx))+metric("Net cash movement*",cash(p.netCash))+metric("Unknown GST expense lines",p.unknownGst)+'</div>'+
- '<p class="muted">* Net cash movement = received customer cash − recorded wages paid − expenses marked paid − tax payments entered. It is NOT accounting profit or available bank balance. Avoid entering wages or tax payments again as job expenses; those would double count this cash view. GST bases may differ.</p></div>'+
- '<div class="card dashboard-section"><h3>Company to date</h3><div class="metrics">'+metric("Open jobs",x.open)+metric("Received all time",cash(all.receipts))+metric("Wages paid all time",cash(all.wagePaid))+metric("Wages outstanding",cash(x.wagesOutstanding))+'</div>'+
+ const overviewJobs=focusJobs.length?table(["Job","Received","Profit forecast",""],focusJobs.map(({job,figures:s})=>'<tr data-open="job" data-id="'+esc(job.id)+'"><td><b>'+esc(job.name)+'</b></td><td>'+cash(s.received)+'</td><td>'+(s.profit===null?"Not ready":cash(s.profit))+'</td><td><button data-open="job" data-id="'+esc(job.id)+'">View</button></td></tr>')):'<div class="dashboard-empty">No active jobs yet. Create a job in Jobs.</div>';
+ const overviewStaff=focusStaff.length?table(["Employee","Earned","Paid",""],focusStaff.map(w=>{const earned=w.earned.filter(t=>!window.from||isISODate(t.date)&&t.date>=window.from&&t.date<=window.to).reduce((n,t)=>n+t.total,0);const paid=w.payments.filter(t=>!window.from||isISODate(t.paidOn)&&t.paidOn>=window.from&&t.paidOn<=window.to).reduce((n,t)=>n+t.amount,0);return '<tr data-open="worker" data-name="'+esc(w.name)+'"><td><b>'+esc(w.name)+'</b></td><td>'+cash(earned)+'</td><td>'+cash(paid)+'</td><td><button data-open="worker" data-name="'+esc(w.name)+'">View</button></td></tr>'})):'<div class="dashboard-empty">No employees yet. Add staff in Employees.</div>';
+ return '<div class="command-heading"><div><h2>Company overview</h2><p class="muted">Your daily business snapshot · '+esc(window.label)+'</p></div><div class="period-control"><label for="dashboardPeriod">Period</label><select id="dashboardPeriod">'+["week","month","year","all"].map((v,i)=>opt(v,["This week","This month","This year","All time"][i],dashboardPeriod)).join("")+'</select></div></div>'+
+ '<div class="metrics dashboard-primary">'+metric("Customer cash received",cash(p.receipts))+metric("Wages paid",cash(p.wagePaid))+metric("Expenses marked paid",cash(p.expensesPaid))+metric("Net cash movement*",cash(p.netCash))+'</div>'+
+ '<div class="dashboard-subline"><span>Wages outstanding <strong>'+cash(x.wagesOutstanding)+'</strong></span><span>Tax paid this period <strong>'+cash(p.taxesPaid)+'</strong></span><span>Job profit forecast <strong>'+(notReady?"Incomplete · "+notReady+" jobs":cash(profit))+'</strong></span></div>'+
+ '<div class="command-grid">'+
+ '<div class="card command-card"><div class="card-top"><div><h3>Jobs in progress</h3><p class="muted">'+x.open+' open jobs · Showing up to 5</p></div><button data-page-shortcut="jobs">All jobs</button></div>'+overviewJobs+'</div>'+
+ '<div class="card command-card"><div class="card-top"><div><h3>Employee wage overview</h3><p class="muted">Individual wages · '+staff.length+' employees</p></div><button data-page-shortcut="employees">All employees</button></div>'+overviewStaff+'</div></div>'+
+ '<details class="card dashboard-panel" id="periodFinancial"><summary>Period financial details <span class="muted">Earned wages, expenses and cash reconciliation</span></summary>'+
+ '<div class="metrics">'+metric("Wages earned",cash(p.earned))+metric("Expenses accrued ex GST",cash(p.expensesEx))+metric("Tax payments entered",cash(p.taxesPaid))+metric("Unknown GST lines",p.unknownGst)+'</div>'+
+ '<p class="muted">* Cash movement = received payments − wages paid − expenses marked paid − tax payments recorded. It is not accounting profit or available bank balance. Do not double-enter wages or taxes as job expenses.</p></details>'+
+ '<details class="card dashboard-panel" id="companyLifetime"><summary>Company to date <span class="muted">Cumulative totals</span></summary>'+
+ '<div class="metrics">'+metric("Open jobs",x.open)+metric("Received all time",cash(all.receipts))+metric("Wages paid all time",cash(all.wagePaid))+metric("Wages outstanding",cash(x.wagesOutstanding))+'</div>'+
  '<div class="metrics">'+metric("Tax paid all time",cash(all.taxesPaid))+metric("Other costs ex GST",cash(state.jobs.reduce((n,j)=>n+summary(j).otherExpensesEx,0)))+metric("Job forecast profit",notReady?"Incomplete ("+notReady+" jobs)":cash(profit))+metric("Jobs",x.jobs)+'</div>'+
- '<p class="muted">Job profit is a forecast based on total contract ex GST minus accrued labour, costs, future estimates, overhead and Owner Tax & Reserve allocation. It is not cash profit. Actual taxes paid below are separate and must not be deducted twice. '+(notReady?notReady+" job(s) need valid cost/contract details.":"All job forecasts are ready.")+'</p></div>'+
- '<div class="card dashboard-section"><h3>Actual tax payments</h3><p class="muted">Record taxes only when actually paid (GST/BAS, PAYG, income tax or other). Do not enter the same payment here and as a job expense. Owner Tax & Reserve % is a forecast, not tax paid.</p>'+
+ '<p class="muted">Forecast profit uses signed contract ex GST, accrued labour, costs, future cost estimates, overhead, and the Owner Tax & Reserve Fund. It is not bank cash or a tax assessment.</p></details>'+
+ '<details class="card dashboard-panel" id="taxLedger"><summary>Actual tax payments <span class="muted">'+cash(all.taxesPaid)+' entered to date · Open to record a payment</span></summary>'+
+ '<p class="muted">Enter tax or fees only when actually paid. Owner Tax & Reserve Fund is a forecast, not actual tax paid. Avoid entering the same tax payment in Job Expenses.</p>'+
  '<div class="fields">'+field("Paid on","taxDate",today(),"date")+'<div><label>Tax / fee type</label><select id="taxKind">'+["GST / BAS","PAYG","Income tax","Other tax / fee"].map(x=>opt(x,x,"GST / BAS")).join("")+'</select></div>'+field("Amount actually paid AUD","taxAmount","","number")+field("Notes / reference","taxNotes")+'</div><button id="addTaxPayment">+ Record tax paid</button>'+
- table(["Paid date","Type","Amount","Notes",""],(state.taxPayments||[]).slice().reverse().map(t=>'<tr><td>'+esc(t.date)+'</td><td>'+esc(t.kind)+'</td><td>'+cash(t.amount)+'</td><td>'+esc(t.notes||"")+'</td><td><button data-delete-tax="'+esc(t.id)+'">Delete</button></td></tr>'))+'</div>'+
- '<div class="card dashboard-section"><h3>Employee wage overview</h3><p class="muted">Select an employee to open attendance, hourly/daily wages and individual settlement history. Period earned and paid are separate; outstanding is all-time.</p>'+
- table(["Employee","Earned this period","Paid this period","Outstanding all time",""],employeesSummary(state.jobs,state.staff).map(w=>{const earned=w.earned.filter(t=>isISODate(t.date)&&(!window.from||t.date>=window.from)&&(!window.to||t.date<=window.to)).reduce((n,t)=>n+t.total,0);const paid=w.payments.filter(t=>isISODate(t.paidOn)&&(!window.from||t.paidOn>=window.from)&&(!window.to||t.paidOn<=window.to)).reduce((n,t)=>n+t.amount,0);return '<tr data-open="worker" data-name="'+esc(w.name)+'"><td><b>'+esc(w.name)+'</b></td><td>'+cash(earned)+'</td><td>'+cash(paid)+'</td><td>'+cash(w.outstanding)+'</td><td><button data-open="worker" data-name="'+esc(w.name)+'">Details</button></td></tr>'}))+'</div>'+
- '<div class="card dashboard-report dashboard-section"><h3>Profit by job</h3><p class="muted">Estimated profit after reserve. Click a job to review expenses, cash, wages and forecasts.</p>'+(rows.length?simple:'<p class="muted">No jobs yet.</p>')+'</div>'+
- '<details class="card dashboard-more" id="financialDetails"><summary>Full financial breakdown</summary><div class="metrics">'+metric("Wages earned all time",cash(x.labourDue))+metric("Wages paid all time",cash(x.wagesPaid))+metric("Expenses ex GST all time",cash(x.expensesEx))+metric("Expenses marked paid (entered)",cash(x.expensesPaid))+'</div>'+full+'</details>';
+ table(["Paid date","Type","Amount","Notes",""],(state.taxPayments||[]).slice().reverse().map(t=>'<tr><td>'+esc(t.date)+'</td><td>'+esc(t.kind)+'</td><td>'+cash(t.amount)+'</td><td>'+esc(t.notes||"")+'</td><td><button data-delete-tax="'+esc(t.id)+'">Delete</button></td></tr>'))+'</details>'+
+ '<details class="card dashboard-more" id="financialDetails"><summary>Full financial breakdown</summary><div class="metrics">'+metric("Wages earned all time",cash(x.labourDue))+metric("Wages paid all time",cash(x.wagesPaid))+metric("Expenses ex GST all time",cash(x.expensesEx))+metric("Expenses marked paid (entered)",cash(x.expensesPaid))+'</div>'+
+ '<h3>Profit by job</h3>'+simple+'<h3>Detailed profit by job</h3>'+full+'</details>';
 }
 // A close snapshot must never silently use stale values while the Owner is editing this form.
 function hasUnsavedJobDetails(j){
@@ -233,6 +290,7 @@ $("screen").onclick=event=>{
  const b=event.target.closest("button,[data-open]");if(!b)return;
  if(b.id==="downloadCorrupt"&&storageBlocked&&damagedRaw!==null){download("HandyOS-unreadable-recovery-"+today()+".txt",damagedRaw,"text/plain;charset=utf-8");return}
  if(storageBlocked)return;
+ if(b.dataset.pageShortcut){if(!canLeaveJobDetails()||!canLeaveAttendance())return;page=b.dataset.pageShortcut;jobId="";person="";render();return}
  if(b.dataset.open==="job"){page="jobs";jobId=b.dataset.id;editingPaymentId="";render();return}
  if(b.dataset.open==="worker"){if(!canLeaveAttendance())return;page="employees";person=b.dataset.name;period="week";attendanceMonth=today().slice(0,7);attendanceDate=today();editingAttendanceId="";render();return}
  if(b.dataset.back==="jobs"){if(!canLeaveJobDetails())return;jobId="";editingPaymentId="";render();return}
