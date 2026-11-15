@@ -18,6 +18,7 @@ export function normalize(db) {
  if(!Array.isArray(state.jobs))state.jobs=[];
  if(!Array.isArray(state.staff))state.staff=[];
  if(!Array.isArray(state.payrollSettlements))state.payrollSettlements=[];
+ if(!Array.isArray(state.taxPayments))state.taxPayments=[];
  for(const job of state.jobs) {
   for(const field of ["tasks","categories","materials","timesheets","expenses","payments"])if(!Array.isArray(job[field]))job[field]=[];
   if(!Array.isArray(job.workerPayments))job.workerPayments=[];
@@ -126,6 +127,21 @@ export function expenseSummary(jobs,{jobId="",kind="",year="",month=""}={}){
  net:round2(entries.reduce((a,e)=>a+(Number.isFinite(e.net)?e.net:0),0)),
  paid:round2(entries.filter(e=>e.paidStatus==="paid").reduce((a,e)=>a+(money(e.amount)||0),0)),
  unclassified:entries.filter(e=>!Number.isFinite(e.net)).length};
+}
+// Date-scoped management view. Cash movements and accrued wages are distinct.
+export function financialPeriodSummary(state,{from="",to=""}={}){
+ const inside=d=>isISODate(d)&&(!from||d>=from)&&(!to||d<=to);
+ const jobs=state.jobs||[];
+ const earned=round2(jobs.reduce((n,j)=>n+labourRows(j).filter(t=>inside(t.date)).reduce((a,t)=>a+t.total,0),0));
+ const wagePaid=round2(jobs.reduce((n,j)=>n+(j.workerPayments||[]).filter(p=>inside(p.paidOn)).reduce((a,p)=>a+(money(p.amount)||0),0),0));
+ const receipts=round2(jobs.reduce((n,j)=>n+(j.payments||[]).filter(p=>p.status==="received"&&inside(p.date)).reduce((a,p)=>a+(money(p.amount)||0),0),0));
+ const expensesPaid=round2(jobs.reduce((n,j)=>n+(j.expenses||[]).filter(e=>e.paidStatus==="paid"&&inside(e.date)).reduce((a,e)=>a+(money(e.amount)||0),0),0));
+ const expensesEx=round2(jobs.reduce((n,j)=>n+(j.expenses||[]).filter(e=>inside(e.date)).reduce((a,e)=>a+(Number.isFinite(expenseEx(e))?expenseEx(e):0),0),0));
+ const unknownGst=jobs.reduce((n,j)=>n+(j.expenses||[]).filter(e=>inside(e.date)&&!Number.isFinite(expenseEx(e))).length,0);
+ const taxesPaid=round2((state.taxPayments||[]).filter(p=>inside(p.date)).reduce((a,p)=>a+(money(p.amount)||0),0));
+ // Cash-flow estimate is NOT accounting profit. Tax payments are separate from GST reserve forecasts.
+ const netCash=round2(receipts-wagePaid-expensesPaid-taxesPaid);
+ return{receipts,earned,wagePaid,expensesPaid,expensesEx,unknownGst,taxesPaid,netCash};
 }
 export function companySummary(jobs){
  const expense=expenseSummary(jobs);const employees=employeesSummary(jobs);
