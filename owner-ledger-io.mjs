@@ -1,4 +1,4 @@
-import {normalize,summary,expenseEx,paymentBreakdown,isISODate,labourRows} from "./owner-ledger-core.mjs";
+import {normalize,summary,expenseEx,paymentBreakdown,isISODate,labourRows,weeklyStart,validMoney} from "./owner-ledger-core.mjs";
 
 function record(x){return !!x&&typeof x==="object"&&!Array.isArray(x)}
 function arr(x){return Array.isArray(x)&&x.every(record)}
@@ -18,6 +18,19 @@ export function parseOwnerBackup(json){
   for(const name of ["tasks","expenses","payments","timesheets","materials","workerPayments"]){
    if(j[name]!==undefined&&!arr(j[name]))throw new Error("Invalid "+name+" entries for job "+j.name+".");
    count+=(j[name]||[]).length;
+  }
+  if(j.wageAdjustments!==undefined){
+   if(!arr(j.wageAdjustments))throw new Error("Invalid wage bonuses.");
+   const bonusIds=new Set();
+   for(const a of j.wageAdjustments){
+    if(typeof a.id!=="string"||!a.id||bonusIds.has(a.id)||a.kind!=="bonus"||
+       typeof a.worker!=="string"||!a.worker.trim()||!isISODate(a.date)||
+       typeof a.weekStart!=="string"||a.weekStart!==weeklyStart(a.date)||
+       !validMoney(a.amount)||Number(a.amount)<=0||
+       (a.notes!==undefined&&typeof a.notes!=="string"))throw new Error("Invalid weekly wage bonus.");
+    bonusIds.add(a.id);
+   }
+   count+=j.wageAdjustments.length;
   }
   if(j.categories!==undefined&&!Array.isArray(j.categories))throw new Error("Invalid categories.");
   if(count>MAX_LINES)throw new Error("Backup has too many entries.");
@@ -56,6 +69,7 @@ export function ownerExports(state){
  const jobs=state.jobs||[];
  const jobRows=jobs.map(j=>{const s=summary(j);return[j.name,j.code||"",j.stage||"",s.agreedInc??"",s.approvedVariationInc??"",s.totalContractInc??"",s.totalContractEx??"",s.received,s.expensesEx,s.otherExpensesEx,s.labour,s.remainingCostEx??"",s.overheadAllocationEx??"",s.profitBeforeReserve??"",s.taxReservePct??"",s.taxReserveAmount??"",s.profit??"",s.wagesPaid,s.wagesOutstanding]});
  const hours=jobs.flatMap(j=>labourRows(j).map(x=>[j.name,x.worker||"",x.date||"",x.hours??"",x.days??"",x.payBasis||"hour",x.startTime||"",x.endTime||"",x.breakMinutes??"",x.notes||"",x.rate??"",x.total]));
+ const bonuses=jobs.flatMap(j=>(j.wageAdjustments||[]).map(a=>[j.name,a.worker,a.weekStart,a.date,a.amount,a.notes||""]));
  const wagePayments=jobs.flatMap(j=>(j.workerPayments||[]).map(x=>[j.name,x.worker||"",x.paidOn||"",x.amount??""]));
  const expenses=jobs.flatMap(j=>(j.expenses||[]).map(x=>[j.name,x.date||"",x.kind||"",x.title||"",x.amount??"",x.gstBasis||"",Number.isFinite(expenseEx(x))?expenseEx(x):"Unknown",x.paidStatus||""]));
  // Older payments may lack saved GST breakdowns: compute from actual cash and declared basis, never assume No GST contains GST.
@@ -64,6 +78,7 @@ export function ownerExports(state){
  return{
   "jobs":csv(["Job","Code","Stage","Base contract incl GST","Approved variations incl GST","Adjusted contract incl GST","Adjusted contract ex GST","Cash received","Expenses ex GST","Other expenses (within total) ex GST","Labour earned","Remaining Costs ex GST (estimated)","Unbooked overhead allocation ex GST","Profit before reserve ex GST","Tax & Reserve Fund %","Tax & Reserve Fund AUD","Final estimated profit after reserve","Wages paid","Wages outstanding"],jobRows),
   "labour-hours":csv(["Job","Employee","Work date","Hours","Days","Wage basis","Start","Finish","Break minutes","Notes","Rate AUD per unit","Wages earned AUD"],hours),
+  "weekly-bonuses":csv(["Job","Employee","Week beginning","Bonus date","Bonus AUD","Reason"],bonuses),
   "wage-payments":csv(["Job","Employee","Paid date","Amount AUD"],wagePayments),
   "expenses":csv(["Job","Date","Category","Description","Entered amount AUD","GST basis","Cost ex GST AUD","Paid status"],expenses),
   "client-payments":csv(["Job","Date","Reference","Status","GST basis","Amount entered AUD","GST portion AUD","Net of GST AUD","Actual cash AUD"],clientPayments),
