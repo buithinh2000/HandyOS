@@ -406,6 +406,16 @@ assert.equal(savedCloses[0].earned,320);
 assert.equal(savedCloses[1].earned,360);
 assert.notEqual(savedCloses[0].id,savedCloses[1].id);
 assert.equal(await settlePage.locator("#screen").getByText("Saved payroll settlements").count(),1);
+assert.equal(await settlePage.locator("#screen").getByText("Earlier version").count(),1);
+assert.equal(await settlePage.locator("#screen").getByText("Up to date").count(),1);
+// Even if totals later revert to an old closeout, that historical version remains superseded.
+await settlePage.evaluate(()=>{const state=JSON.parse(localStorage.getItem("handyos-workspace-v07"));state.jobs[0].timesheets[0].hours=8;localStorage.setItem("handyos-workspace-v07",JSON.stringify(state))});
+await settlePage.reload();
+await settlePage.locator('[data-page="employees"]').click();
+await settlePage.locator('[data-open="worker"]').first().click();
+assert.equal(await settlePage.locator("#screen").getByText("Earlier version").count(),1);
+assert.equal(await settlePage.locator("#screen").getByText("Up to date").count(),0);
+assert.equal(await settlePage.locator("#screen").getByText("Changed since close").count(),1);
 await settlePage.close();
 
 console.log("OWNER_BROWSER_QA_PASS");
