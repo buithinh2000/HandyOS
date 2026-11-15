@@ -6,15 +6,37 @@
 import {STORE_KEY,normalize,money,dollars,summary,jobGroup,paymentProgress,scheduleDays,scheduleEntry,isISODate,canClose,snapshot,workerNames,workerTotals,workerByPeriod,employeesSummary,customerPayment,paymentBreakdown,wageYearSummary,periodSettlement,isSettlementCurrent,companySummary,expenseSummary} from "./owner-ledger-core.mjs";
 import {parseOwnerBackup,ownerExports} from "./owner-ledger-io.mjs";
 const $=id=>document.getElementById(id),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])),today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-")},uid=()=>crypto.randomUUID();
-let state;try{state=normalize(JSON.parse(localStorage.getItem(STORE_KEY)||"{}"))}catch{state=normalize({})}
+// Unreadable browser data is never replaced silently by an empty ledger.
+let state,storageBlocked=false,damagedRaw=null,storageError="";
+try{
+ const raw=localStorage.getItem(STORE_KEY);
+ if(raw===null)state=normalize({});
+ else{
+  damagedRaw=raw;
+  const parsed=JSON.parse(raw);
+  if(!parsed||typeof parsed!=="object"||Array.isArray(parsed)||(parsed.jobs!==undefined&&!Array.isArray(parsed.jobs)))throw new Error("Invalid saved workspace format.");
+  state=normalize(parsed);damagedRaw=null;
+ }
+}catch(err){storageBlocked=true;storageError=String(err?.message||err);state=normalize({})}
 let page="jobs",jobId="",person="",period="week",year="",expenseKind="",expenseJob="",expenseMonth="",wageYear="";
 const jNow=()=>state.jobs.find(j=>j.id===jobId),cash=dollars;
 const field=(label,id,value="",type="text")=>'<div><label for="'+esc(id)+'">'+esc(label)+'</label><input type="'+type+'" id="'+esc(id)+'" value="'+esc(value)+'"></div>';
 const opt=(key,value,selected)=>'<option value="'+esc(key)+'" '+(key===selected?"selected":"")+'>'+esc(value)+'</option>';
 const metric=(label,value)=>'<div class="metric">'+esc(label)+'<b>'+esc(value)+'</b></div>';
 const table=(heads,rows)=>'<div class="wrap"><table><thead><tr>'+heads.map(x=>'<th>'+esc(x)+'</th>').join("")+'</tr></thead><tbody>'+rows.join("")+'</tbody></table></div>';
-function persist(){localStorage.setItem(STORE_KEY,JSON.stringify(state));render()}
-function render(){for(const x of $("nav").querySelectorAll("[data-page]"))x.classList.toggle("active",x.dataset.page===page);$("screen").innerHTML=page==="jobs"?jobs():page==="employees"?employees():page==="expenses"?expenses():company()}
+function persist(){
+ if(storageBlocked){alert("Saved browser data is unreadable. Writes remain blocked until a valid backup is restored.");return}
+ try{localStorage.setItem(STORE_KEY,JSON.stringify(state));render()}
+ catch(err){alert("Unable to save to this browser. Export a backup before closing or refreshing. "+String(err?.message||err))}
+}
+function render(){
+ for(const x of $("nav").querySelectorAll("[data-page]")){x.classList.toggle("active",!storageBlocked&&x.dataset.page===page);x.disabled=storageBlocked}
+ $("backup").disabled=storageBlocked;$("exportCsv").disabled=storageBlocked;
+ if(storageBlocked){
+  $("screen").innerHTML='<div class="card" role="alert"><h2>Saved data recovery required</h2><p class="warn">Existing browser data could not be loaded. To avoid overwriting it, editing and saving are disabled. Restore a known-good JSON backup using the button above.</p><p class="muted">'+esc(storageError)+'</p>'+(damagedRaw!==null?'<button id="downloadCorrupt">Download original unreadable data</button><p class="muted">Keep this recovery copy; it may contain private information. Downloading it does not repair it.</p>':'<p class="muted">Browser storage is unavailable. No recovery copy can be read.</p>')+'</div>';return;
+ }
+ $("screen").innerHTML=page==="jobs"?jobs():page==="employees"?employees():page==="expenses"?expenses():company()
+}
 function expenseForm(){return '<div class="fields">'+field("Date","expenseDate",today(),"date")+field("Description","expenseTitle")+field("Amount AUD","expenseAmount","","number")+'<div><label>Category</label><select id="expenseKind">'+["material","subcontractor","equipment","labour","other"].map(x=>opt(x,x,"material")).join("")+'</select></div><div><label>Tax basis</label><select id="expenseBasis"><option value="inc">Incl 10% GST</option><option value="ex">Ex GST</option><option value="no_gst">No GST</option></select></div><div><label>Payment</label><select id="expensePaid"><option value="unpaid">Unpaid</option><option value="paid">Paid</option></select></div></div><button id="addExpense">+ Add expense</button>'}
 function hoursForm(){const people=workerNames(state.jobs,state.staff);return '<div class="fields"><div><label>Employee name</label><select id="workerName"><option value="">Select employee</option>'+people.map(name=>opt(name,name,"")).join("")+'</select></div>'+field("Work date","workDate",today(),"date")+field("Hours","workHours","","number")+field("Hourly cost AUD","workRate","","number")+'</div><button id="addHours">+ Add hours</button><p class="muted">Add staff from the Employees tab first. Select their name here; the stored rate can be adjusted for this job.</p>'}
 function jobs(){
@@ -83,6 +105,8 @@ $("nav").onclick=event=>{const b=event.target.closest("[data-page]");if(!b)retur
 $("screen").onchange=event=>{const id=event.target.id,value=event.target.value;if(id==="workerName"){const member=state.staff.find(x=>x.name.trim().toLowerCase()===String(value).trim().toLowerCase());if(member&&Number.isFinite(Number(member.rate)))$("workRate").value=member.rate;return}if(id==="yearFilter"){year=value;expenseMonth="";render()}else if(id==="monthFilter"){expenseMonth=value;render()}else if(id==="kindFilter"){expenseKind=value;render()}else if(id==="jobFilter"){expenseJob=value;render()}else if(id==="wageYearFilter"){wageYear=value;render()}};
 $("screen").onclick=event=>{
  const b=event.target.closest("button,[data-open]");if(!b)return;
+ if(b.id==="downloadCorrupt"&&storageBlocked&&damagedRaw!==null){download("HandyOS-unreadable-recovery-"+today()+".txt",damagedRaw,"text/plain;charset=utf-8");return}
+ if(storageBlocked)return;
  if(b.dataset.open==="job"){jobId=b.dataset.id;render();return}
  if(b.dataset.open==="worker"){person=b.dataset.name;period="week";render();return}
  if(b.dataset.back==="jobs"){jobId="";render();return}
@@ -113,7 +137,7 @@ $("restore").onclick=()=>{
  const restored=parseOwnerBackup(await file.text());
  const jobs=restored.jobs.length,rows=restored.jobs.reduce((sum,j)=>sum+j.expenses.length+j.timesheets.length+j.payments.length+j.workerPayments.length,0);
  if(!confirm("Replace ALL data in this browser with "+jobs+" jobs and "+rows+" financial records from backup? Export your existing backup first. This cannot be undone."))return;
- localStorage.setItem(STORE_KEY,JSON.stringify(restored));state=restored;jobId="";person="";page="jobs";render();
+ localStorage.setItem(STORE_KEY,JSON.stringify(restored));state=restored;storageBlocked=false;damagedRaw=null;storageError="";jobId="";person="";page="jobs";render();
  }catch(err){alert("Restore blocked: "+err.message)}};chooser.click()
 };
 render();
