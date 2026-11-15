@@ -20,9 +20,9 @@ const validETag=s=>typeof s==="string"&&/^"[A-Za-z0-9-]{16,128}"$/.test(s);
 
 // S3 implementation is injected: read(sub) => {data: serialized JSON string, etag}, or null;
 // write(sub, data, {ifMatch?|ifNoneMatch?}) => {etag}.
-export function createOwnerLedgerApi({storage,ownerSub,origin,apiId,issuer,clock=()=>Date.now()}){
+export function createOwnerLedgerApi({storage,ownerSub,origin,apiId,issuer,clientId,clock=()=>Date.now()}){
  if(!storage||typeof storage.read!=="function"||typeof storage.write!=="function")throw new Error("Storage adapter required.");
- for(const [name,value] of Object.entries({ownerSub,origin,apiId,issuer}))
+ for(const [name,value] of Object.entries({ownerSub,origin,apiId,issuer,clientId}))
   if(typeof value!=="string"||!value.trim())throw new Error(name+" environment variable required.");
  if(!/^https:\/\//.test(origin))throw new Error("Only HTTPS owner origin is permitted.");
  return async function handler(event){
@@ -32,10 +32,10 @@ export function createOwnerLedgerApi({storage,ownerSub,origin,apiId,issuer,clock
   if(eventOrigin&&eventOrigin!==origin)return response(403,{error:"Origin not allowed"});
   // API Gateway authorizer must be configured on BOTH GET and PUT.
   // API ID + issuer + sub checks are defense in depth, not a replacement for JWT verification.
-  if(event?.version!=="2.0"||event?.requestContext?.apiId!==apiId)
+  if(event?.version!=="2.0"||event?.requestContext?.apiId!==apiId||event?.rawPath!=="/owner-ledger"||event?.routeKey!==method+" /owner-ledger")
    return response(403,{error:"Request gateway not authorized"},cors);
   const claims=event?.requestContext?.authorizer?.jwt?.claims;
-  if(!claims||claims.sub!==ownerSub||claims.iss!==issuer)return response(403,{error:"Owner authentication required"},cors);
+  if(!claims||claims.sub!==ownerSub||claims.iss!==issuer||claims.client_id!==clientId||claims.token_use!=="access"||!String(claims.scope||"").split(/\s+/).includes("openid"))return response(403,{error:"Owner access token required"},cors);
   if(method!=="GET"&&method!=="PUT")return response(405,{error:"Method not allowed"},cors,{allow:"GET, PUT"});
   if(method==="GET"){
    try{
