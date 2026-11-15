@@ -117,7 +117,7 @@ export function expenseSummary(jobs,{jobId="",kind="",year="",month=""}={}){
 }
 export function companySummary(jobs){
  const expense=expenseSummary(jobs);const employees=employeesSummary(jobs);
- return{jobs:jobs.length,open:jobs.filter(j=>j.stage!=="closed").length,received:round2(jobs.reduce((a,j)=>a+summary(j).received,0)),labourDue:round2(employees.reduce((a,e)=>a+e.due,0)),wagesPaid:round2(employees.reduce((a,e)=>a+e.paid,0)),wagesOutstanding:round2(employees.reduce((a,e)=>a+e.outstanding,0)),expensesEx:expense.net,expensesPaid:expense.paid,expenseUnclassified:expense.unclassified};
+ return{jobs:jobs.length,open:jobs.filter(j=>jobGroup(j)!=="finished").length,received:round2(jobs.reduce((a,j)=>a+summary(j).received,0)),labourDue:round2(employees.reduce((a,e)=>a+e.due,0)),wagesPaid:round2(employees.reduce((a,e)=>a+e.paid,0)),wagesOutstanding:round2(employees.reduce((a,e)=>a+e.outstanding,0)),expensesEx:expense.net,expensesPaid:expense.paid,expenseUnclassified:expense.unclassified};
 }
 // Payment input is the amount keyed by Owner. amount remains actual customer cash
 // for compatibility with older entries that stored inclusive cash in amount.
