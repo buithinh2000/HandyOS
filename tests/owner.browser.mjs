@@ -229,6 +229,8 @@ await recovery.close();
  const validSaved=JSON.stringify({jobs:[],staff:[],payrollSettlements:[]});
  await schemaPage.evaluate(raw=>localStorage.setItem("handyos-workspace-v07",raw),validSaved);
  await schemaPage.reload();
+ assert.match(await schemaPage.locator("#screen").innerText(),/Company overview/);
+ await schemaPage.locator('[data-page="jobs"]').click();
  assert.equal(await schemaPage.locator("#newJob").count(),1);
  assert.equal(await schemaPage.evaluate(()=>localStorage.getItem("handyos-workspace-v07")),validSaved);
  await schemaPage.close();
