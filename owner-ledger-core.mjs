@@ -102,8 +102,11 @@ export function expenseSummary(jobs,{jobId="",kind="",year="",month=""}={}){
   if(jobId&&job.id!==jobId)continue;
   for(const e of job.expenses||[]){
    if(kind&&e.kind!==kind)continue;
-   if(year&&!String(e.date||"").startsWith(year))continue;
-   if(month&&!String(e.date||"").startsWith(month))continue;
+   // Filtered reports must exclude impossible legacy dates, not silently assign them to a month/year.
+   // Unfiltered expense totals retain every original record for reconciliation.
+   if((year||month)&&!isISODate(e.date))continue;
+   if(year&&!e.date.startsWith(year))continue;
+   if(month&&!e.date.startsWith(month))continue;
    entries.push({...e,jobId:job.id,jobName:job.name,net:expenseEx(e)});
   }
  }
