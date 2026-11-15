@@ -439,5 +439,64 @@ await reloadGuardPage.locator("#saveJob").click();
 assert.equal(await leaveWouldBeBlocked(),false,"After saving reserve, leave warning must clear");
 await reloadGuardPage.close();
 
+
+// Editable progress payment schedule: 2 received, 1 requested, 1 draft.
+const paymentPage=await browser.newPage();
+const paymentDialogs=[];
+paymentPage.on("dialog",d=>{paymentDialogs.push(d.message());return d.type()==="prompt"?d.accept("Payment schedule sample"):d.accept()});
+await paymentPage.goto(address);
+await paymentPage.locator('[data-page="jobs"]').click();
+await paymentPage.locator("#newJob").click();
+await paymentPage.locator("#contract").fill("11000");
+await paymentPage.locator("#saveJob").click();
+const addMilestone=async(label,amount,status,date)=>{
+ await paymentPage.locator("#payRef").fill(label);
+ await paymentPage.locator("#payAmount").fill(String(amount));
+ await paymentPage.locator("#payDate").fill(date);
+ await paymentPage.locator("#payStatus").selectOption(status);
+ await paymentPage.locator("#addPayment").click();
+};
+await addMilestone("Deposit",1100,"received","2026-11-01");
+await addMilestone("Progress 1",2200,"received","2026-11-05");
+await addMilestone("Invoice sent",3300,"requested","2026-11-20");
+await addMilestone("Not sent",4400,"draft","2026-11-28");
+let scheduleState=await paymentPage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0]);
+assert.equal(scheduleState.payments.length,4);
+assert.equal(scheduleState.payments.filter(x=>x.status==="received").length,2);
+assert.equal(scheduleState.payments.filter(x=>x.status==="requested").length,1);
+assert.equal(scheduleState.payments.filter(x=>x.status==="draft").length,1);
+assert.match(await paymentPage.locator("#screen").innerText(),/Received \$3,300\.00/);
+assert.match(await paymentPage.locator("#screen").innerText(),/Draft \$4,400\.00/);
+const draftId=scheduleState.payments[3].id;
+await paymentPage.locator('[data-edit-payment="'+draftId+'"]').click();
+assert.equal(await paymentPage.locator("#payRef").inputValue(),"Not sent");
+assert.equal(await paymentPage.locator("#payDate").inputValue(),"2026-11-28");
+assert.equal(await paymentPage.locator("#payStatus").inputValue(),"draft");
+await paymentPage.locator("#payAmount").fill("5000");
+await paymentPage.locator("#payDate").fill("2026-12-01");
+await paymentPage.locator("#payStatus").selectOption("requested");
+await paymentPage.locator("#savePayment").click();
+scheduleState=await paymentPage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0]);
+assert.equal(scheduleState.payments.length,4,"Editing must not add a duplicate milestone");
+assert.equal(scheduleState.payments[3].id,draftId);
+assert.equal(scheduleState.payments[3].amount,5000);
+assert.equal(scheduleState.payments[3].date,"2026-12-01");
+assert.equal(scheduleState.payments[3].status,"requested");
+assert.match(await paymentPage.locator("#screen").innerText(),/Received \$3,300\.00/);
+await paymentPage.locator('[data-edit-payment="'+draftId+'"]').click();
+await paymentPage.locator("#payStatus").selectOption("received");
+await paymentPage.locator("#savePayment").click();
+scheduleState=await paymentPage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0]);
+assert.equal(scheduleState.payments.length,4);
+assert.equal(scheduleState.payments[3].status,"received");
+assert.match(await paymentPage.locator("#screen").innerText(),/Received \$8,300\.00/);
+const receivedId=scheduleState.payments[0].id;
+await paymentPage.locator('[data-edit-payment="'+receivedId+'"]').click();
+await paymentPage.locator("#payAmount").fill("1200");
+await paymentPage.locator("#savePayment").click();
+assert.match(paymentDialogs.at(-1),/Update a payment marked Received/);
+assert.equal(await paymentPage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0].payments[0].amount),1200);
+await paymentPage.close();
+
 console.log("OWNER_BROWSER_QA_PASS");
 }finally{if(browser)await browser.close();await new Promise(ok=>server.close(ok))}
