@@ -39,7 +39,7 @@ try{
   state=parseOwnerBackup(raw);damagedRaw=null;
  }
 }catch(err){storageBlocked=true;storageError=String(err?.message||err);state=normalize({})}
-let page="company",jobId="",person="",period="week",year="",expenseKind="",expenseJob="",expenseMonth="",wageYear="",editingPaymentId="",attendanceMonth=today().slice(0,7),attendanceDate=today(),editingAttendanceId="",dashboardPeriod="month";
+let page="company",jobId="",person="",period="week",year="",expenseKind="",expenseJob="",expenseMonth="",wageYear="",editingPaymentId="",attendanceMonth=today().slice(0,7),attendanceDate=today(),editingAttendanceId="",dashboardPeriod="month",attendanceBaseline=null;
 const jNow=()=>state.jobs.find(j=>j.id===jobId),cash=dollars;
 const field=(label,id,value="",type="text")=>'<div><label for="'+esc(id)+'">'+esc(label)+'</label><input type="'+type+'" id="'+esc(id)+'" value="'+esc(value)+'"></div>';
 const opt=(key,value,selected)=>'<option value="'+esc(key)+'" '+(key===selected?"selected":"")+'>'+esc(value)+'</option>';
@@ -64,7 +64,8 @@ function render(){
  if(storageBlocked){
   $("screen").innerHTML='<div class="card" role="alert"><h2>Saved data recovery required</h2><p class="warn">Existing browser data could not be loaded. To avoid overwriting it, editing and saving are disabled. Restore a known-good JSON backup using the button above.</p><p class="muted">'+esc(storageError)+'</p>'+(damagedRaw!==null?'<button id="downloadCorrupt">Download original unreadable data</button><p class="muted">Keep this recovery copy; it may contain private information. Downloading it does not repair it.</p>':'<p class="muted">Browser storage is unavailable. No recovery copy can be read.</p>')+'</div>';return;
  }
- $("screen").innerHTML=page==="jobs"?jobs():page==="employees"?employees():page==="expenses"?expenses():company()
+ $("screen").innerHTML=page==="jobs"?jobs():page==="employees"?employees():page==="expenses"?expenses():company();
+ attendanceBaseline=attendanceFormSnapshot();
 }
 function expenseForm(){return '<div class="fields">'+field("Date","expenseDate",today(),"date")+field("Description","expenseTitle")+field("Amount AUD","expenseAmount","","number")+'<div><label>Category</label><select id="expenseKind">'+["material","subcontractor","equipment","labour","other"].map(x=>opt(x,x,"material")).join("")+'</select></div><div><label>Tax basis</label><select id="expenseBasis"><option value="inc">Incl 10% GST</option><option value="ex">Ex GST</option><option value="no_gst">No GST</option></select></div><div><label>Payment</label><select id="expensePaid"><option value="unpaid">Unpaid</option><option value="paid">Paid</option></select></div></div><button id="addExpense">+ Add expense</button>'}
 function hoursForm(){const people=workerNames(state.jobs,state.staff);return '<div class="fields"><div><label>Employee name</label><select id="workerName"><option value="">Select employee</option>'+people.map(name=>opt(name,name,"")).join("")+'</select></div>'+field("Work date","workDate",today(),"date")+'<div><label>Wage basis</label><select id="workBasis"><option value="hour">Hourly</option><option value="day">Daily</option></select></div>'+field("Hours / days worked","workHours","","number")+field("Rate per hour / day AUD","workRate","","number")+'</div><button id="addHours">+ Add work</button><p class="muted">For start/end times, breaks and notes use Employees → employee → Attendance calendar. Existing manual entries remain supported.</p>'}
@@ -206,6 +207,13 @@ function hasUnsavedJobDetails(j){
   ||$("stage")?.value!==j.stage;
 }
 // Leave a job detail form only after confirming intentional loss of uncommitted edits.
+// Attendance is a draft until Save; changing date/month/person or closing the browser must not silently discard it.
+function attendanceFormSnapshot(){
+ if(page!=="employees"||!person||!$("attendanceJob"))return null;
+ return JSON.stringify(["attendanceJob","attendanceStart","attendanceEnd","attendanceBreak","attendanceBasis","attendanceRate","attendanceDays","attendanceNotes"].map(id=>$(id)?.value??null));
+}
+function hasUnsavedAttendance(){const current=attendanceFormSnapshot();return current!==null&&attendanceBaseline!==null&&current!==attendanceBaseline}
+function canLeaveAttendance(){return !hasUnsavedAttendance()||confirm("Unsaved attendance hours, rate or notes will be lost. Leave without saving?")}
 function canLeaveJobDetails(){
  const job=page==="jobs"&&jobId?jNow():null;
  return !job||jobGroup(job)==="finished"||!hasUnsavedJobDetails(job)||
@@ -214,28 +222,28 @@ function canLeaveJobDetails(){
 // Browser refresh/close also discards uncommitted job financial edits; use the native leave warning.
 window.addEventListener("beforeunload",event=>{
  const job=page==="jobs"&&jobId?jNow():null;
- if(!job||jobGroup(job)==="finished"||!$("contract")||!hasUnsavedJobDetails(job))return;
+ if(!hasUnsavedAttendance()&&(!job||jobGroup(job)==="finished"||!$("contract")||!hasUnsavedJobDetails(job)))return;
  event.preventDefault();
  event.returnValue="";
 });
 const positive=id=>{const n=money($(id)?.value);return Number.isFinite(n)&&n>0?n:null};
-$("nav").onclick=event=>{const b=event.target.closest("[data-page]");if(!b||!canLeaveJobDetails())return;page=b.dataset.page;jobId="";editingPaymentId="";person="";render()};
-$("screen").onchange=event=>{const id=event.target.id,value=event.target.value;if(id==="workerName"){const member=state.staff.find(x=>x.name.trim().toLowerCase()===String(value).trim().toLowerCase());if(member){$("workBasis").value=member.payBasis||"hour";if(Number.isFinite(Number(member.rate)))$("workRate").value=member.rate}return}if(id==="yearFilter"){year=value;expenseMonth="";render()}else if(id==="monthFilter"){expenseMonth=value;render()}else if(id==="kindFilter"){expenseKind=value;render()}else if(id==="jobFilter"){expenseJob=value;render()}else if(id==="wageYearFilter"){wageYear=value;render()}else if(id==="dashboardPeriod"){dashboardPeriod=value;render()}else if(id==="attendanceMonth"){attendanceMonth=value;attendanceDate=value+"-01";editingAttendanceId="";render()}};
+$("nav").onclick=event=>{const b=event.target.closest("[data-page]");if(!b||!canLeaveJobDetails()||!canLeaveAttendance())return;page=b.dataset.page;jobId="";editingPaymentId="";person="";render()};
+$("screen").onchange=event=>{const id=event.target.id,value=event.target.value;if(id==="workerName"){const member=state.staff.find(x=>x.name.trim().toLowerCase()===String(value).trim().toLowerCase());if(member){$("workBasis").value=member.payBasis||"hour";if(Number.isFinite(Number(member.rate)))$("workRate").value=member.rate}return}if(id==="yearFilter"){year=value;expenseMonth="";render()}else if(id==="monthFilter"){expenseMonth=value;render()}else if(id==="kindFilter"){expenseKind=value;render()}else if(id==="jobFilter"){expenseJob=value;render()}else if(id==="wageYearFilter"){wageYear=value;render()}else if(id==="dashboardPeriod"){dashboardPeriod=value;render()}else if(id==="attendanceMonth"){if(!canLeaveAttendance()){event.target.value=attendanceMonth;return}attendanceMonth=value;attendanceDate=value+"-01";editingAttendanceId="";render()}};
 $("screen").onclick=event=>{
  const b=event.target.closest("button,[data-open]");if(!b)return;
  if(b.id==="downloadCorrupt"&&storageBlocked&&damagedRaw!==null){download("HandyOS-unreadable-recovery-"+today()+".txt",damagedRaw,"text/plain;charset=utf-8");return}
  if(storageBlocked)return;
  if(b.dataset.open==="job"){page="jobs";jobId=b.dataset.id;editingPaymentId="";render();return}
- if(b.dataset.open==="worker"){page="employees";person=b.dataset.name;period="week";attendanceMonth=today().slice(0,7);attendanceDate=today();editingAttendanceId="";render();return}
+ if(b.dataset.open==="worker"){if(!canLeaveAttendance())return;page="employees";person=b.dataset.name;period="week";attendanceMonth=today().slice(0,7);attendanceDate=today();editingAttendanceId="";render();return}
  if(b.dataset.back==="jobs"){if(!canLeaveJobDetails())return;jobId="";editingPaymentId="";render();return}
- if(b.dataset.back==="employees"){person="";render();return}
- if(b.dataset.period){period=b.dataset.period;render();return}
- if(b.dataset.settle){try{const receipt=periodSettlement(state.jobs,person,period,b.dataset.settle);const previous=state.payrollSettlements.filter(x=>workerKey(x.worker)===workerKey(person)&&x.period===period&&x.key===b.dataset.settle).at(-1);if(previous&&isSettlementCurrent(state.jobs,previous))return alert("This period already has an up-to-date wage settlement. No duplicate snapshot was saved.");if(!confirm("Save "+person+" / "+b.dataset.settle+" wage settlement snapshot"+(previous?" as a new version (the earlier close remains in history)":"")+"? This does NOT pay wages or lock timesheets."))return;state.payrollSettlements.push({...receipt,id:uid(),savedOn:today()});persist();}catch(err){alert(err.message)}return}
+ if(b.dataset.back==="employees"){if(!canLeaveAttendance())return;person="";render();return}
+ if(b.dataset.period){if(!canLeaveAttendance())return;period=b.dataset.period;render();return}
+ if(b.dataset.settle){if(!canLeaveAttendance())return;try{const receipt=periodSettlement(state.jobs,person,period,b.dataset.settle);const previous=state.payrollSettlements.filter(x=>workerKey(x.worker)===workerKey(person)&&x.period===period&&x.key===b.dataset.settle).at(-1);if(previous&&isSettlementCurrent(state.jobs,previous))return alert("This period already has an up-to-date wage settlement. No duplicate snapshot was saved.");if(!confirm("Save "+person+" / "+b.dataset.settle+" wage settlement snapshot"+(previous?" as a new version (the earlier close remains in history)":"")+"? This does NOT pay wages or lock timesheets."))return;state.payrollSettlements.push({...receipt,id:uid(),savedOn:today()});persist();}catch(err){alert(err.message)}return}
  if(b.id==="addTaxPayment"){const amount=positive("taxAmount"),date=$("taxDate").value,kind=$("taxKind").value,notes=$("taxNotes").value.trim().slice(0,500);if(!amount||!isISODate(date)||!["GST / BAS","PAYG","Income tax","Other tax / fee"].includes(kind))return alert("Enter a valid tax payment date and positive amount.");if(!confirm("Record an actual tax or fee payment of "+cash(amount)+"? Avoid duplicating this in job expenses."))return;state.taxPayments.push({id:uid(),date,kind,amount,notes});persist();return}
  if(b.dataset.deleteTax){const entry=state.taxPayments.find(x=>x.id===b.dataset.deleteTax);if(!entry||!confirm("Delete actual tax payment "+cash(entry.amount)+"?"))return;state.taxPayments=state.taxPayments.filter(x=>x.id!==entry.id);persist();return}
- if(b.dataset.attendanceDay){attendanceDate=b.dataset.attendanceDay;editingAttendanceId="";render();return}
- if(b.dataset.editAttendance){const target=state.jobs.find(j=>j.id===b.dataset.attendanceJob),t=target?.timesheets.find(x=>x.id===b.dataset.editAttendance);if(!t)return;attendanceDate=t.date;attendanceMonth=t.date.slice(0,7);editingAttendanceId=t.id;render();return}
- if(b.id==="cancelAttendanceEdit"){editingAttendanceId="";render();return}
+ if(b.dataset.attendanceDay){if(!canLeaveAttendance())return;attendanceDate=b.dataset.attendanceDay;editingAttendanceId="";render();return}
+ if(b.dataset.editAttendance){if(!canLeaveAttendance())return;const target=state.jobs.find(j=>j.id===b.dataset.attendanceJob),t=target?.timesheets.find(x=>x.id===b.dataset.editAttendance);if(!t)return;attendanceDate=t.date;attendanceMonth=t.date.slice(0,7);editingAttendanceId=t.id;render();return}
+ if(b.id==="cancelAttendanceEdit"){if(!canLeaveAttendance())return;editingAttendanceId="";render();return}
  if(b.id==="saveAttendance"){
   const job=state.jobs.find(j=>j.id===$("attendanceJob").value),date=attendanceDate,
    basis=$("attendanceBasis").value,start=$("attendanceStart").value,end=$("attendanceEnd").value,
