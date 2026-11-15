@@ -75,3 +75,33 @@ The Lambda has no user-facing publicly callable Function URL. Never put a client
 - For production login, do not use the static demo's browser-local storage as a secure source of truth; expose a separate authorized Owner app shell only after authentication and security verification.
 
 **Activation gate remains RED:** the Cognito client, API Gateway routes/authorizer, Lambda IAM, private S3/KMS bucket and real restore tests have not been deployed or verified. These modules must not be described as a working cloud login.
+
+
+## Staging CloudFormation template — prepared, NOT applied
+
+\`cloud/staging-stack.json\` is a **review-only CloudFormation source template**. It creates an isolated private S3 versioned ledger bucket with a dedicated KMS CMK (both Retain policies), a narrowly scoped Lambda execution role, dedicated CloudWatch log group, Node.js 22 Lambda, and an HTTP API with two JWT-authorized \`GET/PUT /owner-ledger\` routes. No default wildcard route is defined. The Lambda verifies exact API ID, path, route, Cognito subject, issuer, client ID, access-token type and \`openid\` scope. API Gateway also requires \`openid\` route scopes. A Cognito **ID token must NOT access financial records**.
+
+The template does **not** create Cognito users, a login UI, the API artifact ZIP, or a custom API domain. Do not create these with unverified account settings or guessed user subjects.
+
+### Preflight inputs — actual verified values required
+
+- Approved AWS account, region, staging budget, dedicated stack name, authorized deploy role
+- Verified **existing** Cognito issuer, app-client ID and Owner user's immutable \`sub\` (never an email address or assumed identifier)
+- Confirmed \`https://handyos.buitai.com\` Owner frontend origin and authenticated Cognito PKCE callback domain
+- Reviewed, checksum-pinned Lambda ZIP in an approved artifact bucket; supply its exact S3 object version ID
+- Unique \`StagingSuffix\` to avoid touching existing venture or Core infrastructure
+- Owner authorization for all resources, key retention, lifecycle and rollback scope
+
+### Safe verification, in order
+
+1. Run source tests, inspect IAM/bucket/KMS policies, and scan all template references.
+2. Review AWS CloudFormation Change Set in **read-only** preview mode; do not execute it without explicit Owner approval.
+3. If explicitly approved, create separate staging identities and artifact, execute the reviewed stack only, and verify all routes and access controls with synthetic data.
+4. Confirm IAM negative access, a second user's forbidden access, ID-token rejection, token expiry, stale-write 409, KMS encryption and object versioning.
+5. Download and independently restore an old S3 object version; prove no DELETE permission is required for normal ledger writes.
+6. Implement a real Cognito PKCE Owner login UI and a separately protected Owner app session; the current \`owner-v1.html\` **remains demo-only**.
+7. Only after all safety gates and an Owner decision on cost and real data may the existing browser backup be explicitly migrated.
+
+### Cost and retention notes
+
+The template can incur charges for a KMS key, Lambda/API requests, CloudWatch logs, S3 object versions and storage. The exact total is **not determined** until an actual region, traffic, retention and account are reviewed. Retain policies intentionally avoid deleting the bucket and key on stack removal; cleanup requires a separate approved process. Public owner demo must not be described as secured by the new template.

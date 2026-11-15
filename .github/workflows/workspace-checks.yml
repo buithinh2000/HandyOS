@@ -28,7 +28,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: node --test tests/workspace.test.mjs tests/owner-ledger.test.mjs tests/owner-ledger-io.test.mjs tests/owner-cloud-api.test.mjs tests/owner-sync-client.test.mjs
+      - run: node --test tests/workspace.test.mjs tests/owner-ledger.test.mjs tests/owner-ledger-io.test.mjs tests/owner-cloud-api.test.mjs tests/owner-sync-client.test.mjs tests/owner-staging-template.test.mjs
 
   owner-browser-qa:
     runs-on: ubuntu-24.04

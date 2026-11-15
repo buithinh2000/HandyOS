@@ -30,5 +30,5 @@ const storage={
 };
 export const handler=createOwnerLedgerApi({
  storage,ownerSub:env.HANDYOS_OWNER_SUB,origin:env.HANDYOS_OWNER_ORIGIN,
- apiId:env.HANDYOS_API_GATEWAY_ID,issuer:env.HANDYOS_JWT_ISSUER
+ apiId:env.HANDYOS_API_GATEWAY_ID,issuer:env.HANDYOS_JWT_ISSUER,clientId:env.HANDYOS_JWT_CLIENT_ID
 });

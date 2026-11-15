@@ -16,8 +16,8 @@ function fixture(){
    stored=data;revision=REV2;return {etag:revision};
   }
  };
- const api=createOwnerLedgerApi({storage,ownerSub:"owner-1234567890",origin:ORIGIN,apiId:"abc123",issuer:ISSUER,clock:()=>Date.parse("2026-11-15T01:00:00.000Z")});
- const event=(method,body,headers={})=>({version:"2.0",headers:{origin:ORIGIN,...headers},body,requestContext:{apiId:"abc123",http:{method},authorizer:{jwt:{claims:{sub:"owner-1234567890",iss:ISSUER}}}}});
+ const api=createOwnerLedgerApi({storage,ownerSub:"owner-1234567890",origin:ORIGIN,apiId:"abc123",issuer:ISSUER,clientId:"public-client-id",clock:()=>Date.parse("2026-11-15T01:00:00.000Z")});
+ const event=(method,body,headers={})=>({version:"2.0",rawPath:"/owner-ledger",routeKey:method+" /owner-ledger",headers:{origin:ORIGIN,...headers},body,requestContext:{apiId:"abc123",http:{method},authorizer:{jwt:{claims:{sub:"owner-1234567890",iss:ISSUER,token_use:"access",client_id:"public-client-id",scope:"openid email"}}}}});
  return {api,event,storage,reads:()=>reads,writes:()=>writes,getStored:()=>stored};
 }
 const payload=r=>JSON.parse(r.body);
@@ -81,7 +81,7 @@ test("do not accept mixed, absent, or untrusted revision conditions",async()=>{
 });
 test("do not leak system exceptions, only generic read/write errors",async()=>{
  const storage={read:async()=>{throw Error("SECRET DB TOKEN")},write:async()=>{throw Error("SECRET AWS ERROR")}};
- const api=createOwnerLedgerApi({storage,ownerSub:"owner-1234567890",origin:ORIGIN,apiId:"abc123",issuer:ISSUER});
+ const api=createOwnerLedgerApi({storage,ownerSub:"owner-1234567890",origin:ORIGIN,apiId:"abc123",issuer:ISSUER,clientId:"public-client-id"});
  const f=fixture();
  const read=await api(f.event("GET"));
  assert.equal(read.statusCode,503);assert.ok(!read.body.includes("SECRET"));
@@ -91,4 +91,23 @@ test("do not leak system exceptions, only generic read/write errors",async()=>{
 test("no OPTIONS/POST access to ledger routes",async()=>{
  const f=fixture();assert.equal((await f.api(f.event("POST"))).statusCode,405);
  assert.equal((await f.api(f.event("OPTIONS"))).statusCode,405);
+});
+
+test("deny ID tokens, wrong Cognito client, missing scope and wrong API route",async()=>{
+ const f=fixture(),bad=f.event("GET");
+ bad.requestContext.authorizer.jwt.claims.token_use="id";
+ assert.equal((await f.api(bad)).statusCode,403);
+ bad.requestContext.authorizer.jwt.claims.token_use="access";
+ bad.requestContext.authorizer.jwt.claims.client_id="another-client";
+ assert.equal((await f.api(bad)).statusCode,403);
+ bad.requestContext.authorizer.jwt.claims.client_id="public-client-id";
+ bad.requestContext.authorizer.jwt.claims.scope="email";
+ assert.equal((await f.api(bad)).statusCode,403);
+ bad.requestContext.authorizer.jwt.claims.scope="openid";
+ bad.rawPath="/another-route";
+ assert.equal((await f.api(bad)).statusCode,403);
+ bad.rawPath="/owner-ledger";
+ bad.routeKey="GET /other";
+ assert.equal((await f.api(bad)).statusCode,403);
+ assert.equal(f.reads(),0);assert.equal(f.writes(),0);
 });
