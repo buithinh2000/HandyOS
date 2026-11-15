@@ -756,5 +756,42 @@ assert.equal(bonusData.jobs[0].workerPayments.length,0);
 assert.match(await bonusPage.locator("#weeklyBonusPanel").innerText(),/\$100\.00/);
 await bonusPage.close();
 
+// Mobile Bills inbox: filter & status transitions, no fictitious customer delivery.
+const billsMobile=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+billsMobile.on("dialog",d=>d.type()==="prompt"?d.accept("Receipts sample job"):d.accept());
+await billsMobile.goto(address);
+await billsMobile.locator('[data-page="jobs"]').click();
+await billsMobile.locator("#newJob").click();
+await billsMobile.locator("#contract").fill("11000");
+await billsMobile.locator("#saveJob").click();
+await billsMobile.locator('[data-page="receipts"]').click();
+assert.equal(await billsMobile.locator("#billInboxStatus").count(),1);
+assert.equal(await billsMobile.locator("#billPanel").count(),1);
+await billsMobile.locator("#toggleBillEditor").click();
+await billsMobile.locator("#billJob").selectOption({index:1});
+await billsMobile.locator("#billReference").fill("Bunnings sample");
+await billsMobile.locator("#billAmount").fill("160");
+const imageBuffer=Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/7QAAAABJRU5ErkJggg==","base64");
+await billsMobile.locator("#billPhoto").setInputFiles({name:"test-receipt.png",mimeType:"image/png",buffer:imageBuffer});
+await billsMobile.locator("#billPhotoPreview img").waitFor();
+await billsMobile.locator("#saveBill").click();
+assert.equal(await billsMobile.locator(".bill-item").count(),1);
+await billsMobile.locator("#billInboxStatus").selectOption("sent");
+assert.equal(await billsMobile.locator(".bill-item").count(),0);
+await billsMobile.locator("#billInboxStatus").selectOption("draft");
+await billsMobile.locator('[data-bill-target="sent"]').click();
+let mobileBillState=await billsMobile.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")));
+assert.equal(mobileBillState.materialBills[0].status,"sent");
+assert.equal(await billsMobile.locator(".bill-item").count(),0,"filtered list updates after status change");
+await billsMobile.locator("#billInboxStatus").selectOption("sent");
+await billsMobile.locator('[data-bill-target="reimbursed"]').click();
+mobileBillState=await billsMobile.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")));
+assert.equal(mobileBillState.materialBills[0].status,"reimbursed");
+assert.equal(mobileBillState.jobs[0].expenses.length,0,"pass-through receipt is not a job expense");
+assert.equal(mobileBillState.jobs[0].payments.length,0,"reimbursed receipt is not a progress payment");
+await billsMobile.locator("#billInboxStatus").selectOption("reimbursed");
+assert.equal(await billsMobile.locator(".bill-item").count(),1);
+await billsMobile.close();
+
 console.log("OWNER_BROWSER_QA_PASS");
 }finally{if(browser)await browser.close();await new Promise(ok=>server.close(ok))}
