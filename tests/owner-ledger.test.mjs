@@ -422,3 +422,24 @@ test("year-filtered wage summary excludes impossible legacy dates without rewrit
  assert.equal(a.timesheets.length,2);
  assert.equal(a.workerPayments.length,2);
 });
+
+test("month/year expense filters reject impossible historical dates without dropping all-time costs",()=>{
+ const job=j("legacy-expense-dates","Bathroom");
+ job.expenses.push(
+  {id:"bad",date:"2026-02-30",amount:110,gstBasis:"inc",kind:"material",paidStatus:"paid"},
+  {id:"valid",date:"2026-02-28",amount:220,gstBasis:"inc",kind:"material",paidStatus:"paid"},
+  {id:"other",date:"2025-12-31",amount:55,gstBasis:"no_gst",kind:"other",paidStatus:"unpaid"}
+ );
+ const year=expenseSummary([job],{year:"2026"});
+ assert.deepEqual(year.entries.map(x=>x.id),["valid"]);
+ assert.equal(year.net,200);
+ assert.equal(year.paid,220);
+ const month=expenseSummary([job],{month:"2026-02"});
+ assert.deepEqual(month.entries.map(x=>x.id),["valid"]);
+ assert.equal(expenseSummary([job],{year:"2026",month:"2026-02"}).entries.length,1);
+ const unfiltered=expenseSummary([job]);
+ assert.equal(unfiltered.entries.length,3);
+ assert.equal(unfiltered.net,355);
+ assert.equal(unfiltered.paid,330);
+ assert.equal(job.expenses[0].date,"2026-02-30");
+});
