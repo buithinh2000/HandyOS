@@ -41,3 +41,6 @@ A parseable JSON object could contain structurally invalid records (e.g. `staff`
 
 ## Date validation at payroll entry (source-only, 2026-11-15)
 The Owner V1 Add Hours and Add Wage Payment controls still accepted date-shaped strings without real-calendar validation while PR46's downstream period grouping strictly rejected them. This branch applies existing `isISODate` at both entry points so bad dates cannot be appended and silently disappear from period views. Browser QA covers rejection and successful valid date entry. No change to financial formulas, saved schema, legacy records, calendar or cloud. **Pending exact-head CI and merge check.**
+
+## Annual payroll date consistency — source-only, 2026-11-15
+`wageYearSummary` had used a simple year-prefix comparison even for impossible dates in legacy labour/payment rows. This branch applies the existing `isISODate` check when a year is selected, matching PR46's strict weekly/monthly/yearly period bucketing. The unfiltered/all-time ledger and raw rows remain untouched so no financial record disappears or gets rewritten. Regression tests cover filtered annual figures and preserved all-time balances. **Pending exact-head CI and merge verification.** No AWS/production changes.
