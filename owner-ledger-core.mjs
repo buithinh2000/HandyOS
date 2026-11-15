@@ -141,6 +141,47 @@ export function paymentBreakdown(job){
  receivedNet:round2(received.reduce((a,p)=>a+(Number.isFinite(p.net)?p.net:0),0)),
  receivedGst:round2(received.reduce((a,p)=>a+(Number.isFinite(p.gst)?p.gst:0),0))};
 }
+export function jobGroup(job){
+ const stage=String(job.stage||"").toLowerCase();
+ if(stage==="closed"||stage==="finished")return "finished";
+ if(["active","handover","in_progress"].includes(stage))return "active";
+ if(["approved","scheduled","booked"].includes(stage))return "booked";
+ // Surveys, drafts and unapproved quotes are NOT confirmed bookings.
+ return "planning";
+}
+export function paymentProgress(job){
+ const s=summary(job);
+ // Actual RECEIVED cash / adjusted signed contract, both inc GST.
+ const percent=s.totalContractInc&&s.totalContractInc>0
+  ?Math.round((s.received/s.totalContractInc)*10000)/100:null;
+ return {percent,received:s.received,contract:s.totalContractInc,remaining:s.remaining,overpaid:percent!==null&&percent>100};
+}
+export function isISODate(value){
+ if(typeof value!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;
+ const date=new Date(value+"T12:00:00Z");
+ return Number.isFinite(date.getTime())&&date.toISOString().slice(0,10)===value;
+}
+export function scheduleEntry(job){
+ const start=job.startDate||"",end=job.endDate||"";
+ if(!start&&!end)return {scheduled:false,start:"",end:""};
+ if(!isISODate(start)||!isISODate(end)||start>end)return {scheduled:false,invalid:true,start,end};
+ return {scheduled:true,start,end};
+}
+export function scheduleDays(jobs,from,days=14){
+ if(!isISODate(from)||!Number.isInteger(days)||days<1||days>62)throw new Error("Invalid calendar range.");
+ const anchor=new Date(from+"T12:00:00Z");
+ const result=[];
+ for(let index=0;index<days;index++){
+  const d=new Date(anchor.getTime()+index*86400000),date=d.toISOString().slice(0,10);
+  const booked=jobs.filter(j=>{
+   if(jobGroup(j)==="finished")return false;
+   const e=scheduleEntry(j);
+   return e.scheduled&&e.start<=date&&date<=e.end;
+  });
+  result.push({date,booked,bookedCount:booked.length,unrecorded:booked.length===0});
+ }
+ return result;
+}
 export function summary(job) {
  const agreedInc=money(job.contract),hasContract=Number.isFinite(agreedInc)&&agreedInc>0;
  // Approved variations are net increases/decreases in signed, GST-inclusive contract value.
