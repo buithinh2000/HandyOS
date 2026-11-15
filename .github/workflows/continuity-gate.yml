@@ -1,0 +1,28 @@
+name: HandyOS Project Brain continuity gate (source-only)
+on:
+  pull_request:
+    paths:
+      - "PROJECT-BRAIN.md"
+      - "docs/DECISION-LEDGER.md"
+      - "docs/HANDOFF.md"
+      - ".github/pull_request_template.md"
+      - "owner-ledger-core.mjs"
+      - "owner-v1.html"
+      - "cloud/SECURITY-GATE.md"
+      - "ARCHITECTURE.md"
+      - "tests/continuity-gate.test.mjs"
+      - ".github/workflows/continuity-gate.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  continuity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify continuity documents and financial invariants
+        run: node --test tests/continuity-gate.test.mjs tests/owner-ledger.test.mjs
