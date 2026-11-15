@@ -24,7 +24,7 @@ export function parseOwnerBackup(json){
  }
  if(input.payrollSettlements!==undefined&&!arr(input.payrollSettlements))throw new Error("Invalid payroll settlement records.");
  if(input.taxPayments!==undefined&&(!arr(input.taxPayments)||input.taxPayments.some(x=>!isISODate(x.date)||!Number.isFinite(Number(x.amount))||Number(x.amount)<=0)))throw new Error("Invalid actual tax payment records.");
- if(input.materialBills!==undefined&&(!arr(input.materialBills)||input.materialBills.some(b=>typeof b.id!=="string"||typeof b.jobId!=="string"||!isISODate(b.date)||typeof b.reference!=="string"||!Number.isFinite(Number(b.amount))||Number(b.amount)<=0||!["draft","sent","reimbursed"].includes(b.status)||typeof b.image!=="string"||b.image.length>260000||!/^data:image\\/(?:jpeg|png|webp);base64,/.test(b.image))))throw new Error("Invalid material bill or receipt image.");
+ if(input.materialBills!==undefined&&(!arr(input.materialBills)||input.materialBills.some(b=>typeof b.id!=="string"||typeof b.jobId!=="string"||!isISODate(b.date)||typeof b.reference!=="string"||!Number.isFinite(Number(b.amount))||Number(b.amount)<=0||!["draft","sent","reimbursed"].includes(b.status)||typeof b.image!=="string"||b.image.length>260000||!/^data:image\/(?:jpeg|png|webp);base64,/.test(b.image))))throw new Error("Invalid material bill or receipt image.");
  if(input.materialBills?.some(b=>!seen.has(b.jobId)))throw new Error("Material bill references a missing Job.");
  if(input.staff!==undefined&&(!arr(input.staff)||input.staff.some(x=>typeof x.id!=="string"||typeof x.name!=="string"||!x.name.trim())))throw new Error("Invalid staff directory.");
  // Do not change input records until the entire backup is validated.
