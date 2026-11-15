@@ -23,3 +23,6 @@ This branch reconciles `PRODUCT_DESIGN_STANDARD.md` with Owner PR24: lean busine
 
 ## Safety boundaries
 Routine source-only PRs within existing approved scope: Owner has delegated VIN self-review and merge after CI PASS + exact HEAD checks (see PROJECT-BRAIN.md). No independently approved review is required unless GitHub branch protection itself requires it. No AWS write, SQL write, IAM/secrets/DNS changes, paid APIs, synthetic data presented as real data or unverified public login claims.
+
+## Owner V1 confirmed-booking calendar defect — 2026-11-15
+A source review found `scheduleDays()` included planning/quoted jobs when they had tentative dates, contradicting PR32's confirmed-only scheduling rule. This branch filters to normalized job groups `booked` or `active`, retaining ongoing handover jobs and excluding planning and finished entries. Added regression test; existing job start/end dates and saved records are untouched. **Pending CI and merge verification.** After merge, update main SHA in the next handoff.
