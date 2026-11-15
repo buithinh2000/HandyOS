@@ -476,3 +476,21 @@ test("Owner Overview labels total marked-paid expenses without confusing them wi
  assert.match(html,/Expenses marked paid \(entered\)/);
  assert.doesNotMatch(html,/metric\("Other expenses paid"/);
 });
+
+test("four scheduled payments distinguish two received, one sent, and one not sent",()=>{
+ const job=j("four-stages","Example");
+ job.payments=[
+  {id:"one",status:"received",amount:110,reference:"Deposit"},
+  {id:"two",status:"received",amount:220,reference:"Progress"},
+  {id:"three",status:"requested",amount:330,reference:"Invoice sent"},
+  {id:"four",status:"draft",amount:440,reference:"Not sent"}
+ ];
+ const breakdown=paymentBreakdown(job);
+ assert.equal(breakdown.entries.length,4);
+ assert.equal(breakdown.cash,330);
+ assert.equal(breakdown.requested,330);
+ assert.equal(breakdown.draft,440);
+ assert.equal(summary(job).received,330);
+ assert.equal(companySummary([job]).received,330);
+ assert.equal(paymentProgress(job).received,330);
+});
