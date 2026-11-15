@@ -224,7 +224,7 @@
                   ],
                   "Resource": [
                     {
-                      "Fn::Sub": "${OwnerLogGroup.Arn}:*"
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/handyos-owner-staging-${StagingSuffix}:log-stream:*"
                     }
                   ]
                 }
@@ -297,6 +297,9 @@
             },
             "HANDYOS_JWT_ISSUER": {
               "Ref": "CognitoIssuer"
+            },
+            "HANDYOS_JWT_CLIENT_ID": {
+              "Ref": "CognitoClientId"
             }
           }
         }
