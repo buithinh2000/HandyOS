@@ -62,3 +62,13 @@ test("owner-only public demo does not claim operational secure login or share pa
  assert.match(html,/No secure login/i);
  assert.doesNotMatch(html,/data-share-employee/);
 });
+
+test("current V1 design contract preserves lean Owner scope and clearly defers old quote flow",()=>{
+ const design=read("PRODUCT_DESIGN_STANDARD.md");
+ assert.match(design,/normative for current Owner V1/i);
+ assert.match(design,/Jobs, Employees, timesheets/i);
+ assert.match(design,/Not V1 default entry/i);
+ assert.match(design,/historical quote-first design/i);
+ assert.match(design,/adjusted_contract_inc \* owner_selected_pct/);
+ assert.match(design,/browser-local synthetic-data demo only/i);
+});
