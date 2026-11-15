@@ -443,3 +443,18 @@ test("month/year expense filters reject impossible historical dates without drop
  assert.equal(unfiltered.paid,330);
  assert.equal(job.expenses[0].date,"2026-02-30");
 });
+
+test("company open-job count agrees with Jobs status groups including legacy finished stage",()=>{
+ const stages=["survey","quoted","approved","scheduled","active","handover","finished","closed"];
+ const jobs=stages.map((stage,i)=>({...j("status-"+i,"Job "+i),stage}));
+ assert.equal(jobs.filter(x=>jobGroup(x)==="finished").length,2);
+ assert.equal(companySummary(jobs).jobs,8);
+ assert.equal(companySummary(jobs).open,6);
+ for(const stage of ["finished","closed","FINISHED"]){
+  const completed=j("done-"+stage,"Completed");
+  completed.stage=stage;
+  assert.equal(jobGroup(completed),"finished");
+  assert.equal(companySummary([completed]).open,0);
+ }
+ assert.equal(companySummary(jobs.slice(0,2)).open,2);
+});
