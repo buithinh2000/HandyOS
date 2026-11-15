@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {normalize,expenseEx,weeklyStart,workerTotals,workerByPeriod,employeesSummary,expenseSummary,companySummary,summary,canClose,snapshot,wageYearSummary,periodSettlement,isSettlementCurrent,workerNames,jobGroup,paymentProgress,scheduleEntry,scheduleDays,isISODate,customerPayment,paymentBreakdown,financialPeriodSummary,workedHours} from "../owner-ledger-core.mjs";
+import {normalize,expenseEx,weeklyStart,workerTotals,workerByPeriod,employeesSummary,expenseSummary,companySummary,summary,canClose,snapshot,wageYearSummary,periodSettlement,isSettlementCurrent,workerNames,jobGroup,paymentProgress,scheduleEntry,scheduleDays,isISODate,customerPayment,paymentBreakdown,financialPeriodSummary,workedHours,materialBillSummary} from "../owner-ledger-core.mjs";
 
 const j=(id,name)=>({id,name,stage:"active",contract:11000,tasks:[],categories:[],materials:[],expenses:[],timesheets:[],payments:[],workerPayments:[]});
 const worker=(name,date,hours,rate)=>({id:name+date,worker:name,date,hours,rate});
@@ -534,4 +534,21 @@ test("start/finish and break produce valid hours; reject negative, overnight and
  assert.equal(workedHours("07:00","15:30",30),8);
  assert.equal(workedHours("07:00","11:00",0),4);
  for(const [start,end,rest] of [["17:00","07:00",0],["09:00","09:00",0],["07:00","15:00",480],["bad","12:00",0],["08:00","17:00",-1]])assert.equal(workedHours(start,end,rest),null);
+});
+
+test("reimbursable material bills stay separate from contract customer cash and job profit",()=>{
+ const job=j("reimbursement-job","Bathroom");
+ job.payments=[{status:"received",amount:1100,date:"2026-11-01"}];
+ const bills=[
+  {jobId:job.id,status:"draft",amount:110,date:"2026-11-02"},
+  {jobId:job.id,status:"sent",amount:220,date:"2026-11-03"},
+  {jobId:job.id,status:"reimbursed",amount:330,date:"2026-11-04"},
+  {jobId:"other-job",status:"draft",amount:55,date:"2026-11-04"}
+ ];
+ const all=materialBillSummary(bills),mine=materialBillSummary(bills,job.id);
+ assert.deepEqual({spent:mine.spent,draft:mine.draft,sent:mine.sent,reimbursed:mine.reimbursed,outstanding:mine.outstanding},
+ {spent:660,draft:110,sent:220,reimbursed:330,outstanding:330});
+ assert.equal(all.outstanding,385);
+ assert.equal(summary(job).received,1100,"Reimbursement receipts must not inflate contract receipts");
+ assert.equal(financialPeriodSummary({jobs:[job],materialBills:bills}).receipts,1100);
 });

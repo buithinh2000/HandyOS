@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {parseOwnerBackup,csv,ownerExports} from "../owner-ledger-io.mjs";
-const fixture=()=>({jobs:[{id:"job-a",name:"Bathroom",code:"",stage:"active",contract:1100,expenses:[{id:"e1",date:"2026-11-12",kind:"material",title:"Tiles",amount:110,gstBasis:"inc",paidStatus:"paid"}],timesheets:[{id:"t1",date:"2026-11-12",worker:"Alex",hours:8,rate:40}],workerPayments:[{id:"w1",worker:"Alex",paidOn:"2026-11-13",amount:200}],payments:[{id:"p1",reference:"Progress 1",date:"2026-11-14",status:"received",amount:500}],tasks:[],categories:[],materials:[]}],payrollSettlements:[],staff:[],taxPayments:[]});
+const fixture=()=>({jobs:[{id:"job-a",name:"Bathroom",code:"",stage:"active",contract:1100,expenses:[{id:"e1",date:"2026-11-12",kind:"material",title:"Tiles",amount:110,gstBasis:"inc",paidStatus:"paid"}],timesheets:[{id:"t1",date:"2026-11-12",worker:"Alex",hours:8,rate:40}],workerPayments:[{id:"w1",worker:"Alex",paidOn:"2026-11-13",amount:200}],payments:[{id:"p1",reference:"Progress 1",date:"2026-11-14",status:"received",amount:500}],tasks:[],categories:[],materials:[]}],payrollSettlements:[],staff:[],taxPayments:[],materialBills:[]});
 test("validated backup preserves ledger IDs, expenses and settlements",()=>{
  const data=fixture();data.payrollSettlements.push({worker:"Alex",period:"week",key:"2026-11-09",earned:320,paid:200});
  const result=parseOwnerBackup(JSON.stringify(data));
@@ -18,7 +18,7 @@ test("backup rejects corrupt, wrong schema, and duplicate job IDs",()=>{
 });
 test("CSV export has separate jobs, labour, wages, expenses and payments with consistent figures",()=>{
  const exports=ownerExports(fixture());
- assert.deepEqual(Object.keys(exports),["jobs","labour-hours","wage-payments","expenses","client-payments","staff","tax-payments"]);
+ assert.deepEqual(Object.keys(exports),["jobs","labour-hours","wage-payments","expenses","client-payments","staff","material-reimbursements","tax-payments"]);
  assert.match(exports.jobs,/\$?/); // files are plain numeric values, not live business data
  assert.match(exports.jobs,/"320"/);
  assert.match(exports["wage-payments"],/"200"/);
@@ -114,4 +114,21 @@ test("attendance CSV includes clock times, notes, and single daily-rate cost",()
  const out=ownerExports(data)["labour-hours"];
  assert.match(out,/Wage basis/);
  assert.match(out,/"day","07:00","15:30","30","Kitchen framing","280","280"/);
+});
+
+test("receipt-image backup validates material reimbursements and CSV omits private photo bytes",()=>{
+ const data=fixture();
+ const image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/7QAAAABJRU5ErkJggg==";
+ data.materialBills=[{id:"bill1",jobId:data.jobs[0].id,date:"2026-11-15",reference:"Store receipt",amount:130,status:"sent",image,notes:"Paint"}];
+ const restored=parseOwnerBackup(JSON.stringify(data));
+ assert.equal(restored.materialBills.length,1);
+ assert.equal(restored.materialBills[0].image,image);
+ const report=ownerExports(restored)["material-reimbursements"];
+ assert.match(report,/Store receipt/);
+ assert.match(report,/sent/);
+ assert.doesNotMatch(report,/iVBORw/);
+ const bad={...data,materialBills:[{...data.materialBills[0],image:"https://public.example/photo.jpg"}]};
+ assert.throws(()=>parseOwnerBackup(JSON.stringify(bad)),/receipt image/);
+ const wrongJob={...data,materialBills:[{...data.materialBills[0],jobId:"nonexistent"}]};
+ assert.throws(()=>parseOwnerBackup(JSON.stringify(wrongJob)),/missing Job/);
 });

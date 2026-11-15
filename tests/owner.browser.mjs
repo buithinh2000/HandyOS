@@ -642,5 +642,57 @@ const mobileOverflow=await mobileLayoutPage.evaluate(()=>document.documentElemen
 assert.equal(mobileOverflow,false,"390px overview should not require horizontal page scrolling");
 await mobileLayoutPage.close();
 
+
+// Owner reimbursable materials: upload iPhone-compatible photo, edit same record, segregate receipts.
+const receiptPage=await browser.newPage();
+receiptPage.on("dialog",dialog=>dialog.type()==="prompt"?dialog.accept("Customer bill sample"):dialog.accept());
+await receiptPage.goto(address);
+await receiptPage.locator('[data-page="jobs"]').click();
+await receiptPage.locator("#newJob").click();
+await receiptPage.locator("#contract").fill("11000");
+await receiptPage.locator("#saveJob").click();
+await receiptPage.locator('[data-page="company"]').click();
+assert.equal(await receiptPage.locator("#billPanel").count(),1);
+await receiptPage.locator("#toggleBillEditor").click();
+await receiptPage.locator("#billJob").selectOption({index:1});
+await receiptPage.locator("#billReference").fill("Paint purchase");
+await receiptPage.locator("#billAmount").fill("132");
+await receiptPage.locator("#billStatus").selectOption("draft");
+const tinyPng=Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/7QAAAABJRU5ErkJggg==","base64");
+await receiptPage.locator("#billPhoto").setInputFiles({name:"receipt.png",mimeType:"image/png",buffer:tinyPng});
+await receiptPage.locator("#billPhotoPreview img").waitFor();
+await receiptPage.locator("#saveBill").click();
+let localBills=await receiptPage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).materialBills);
+assert.equal(localBills.length,1);
+assert.equal(localBills[0].status,"draft");
+assert.match(localBills[0].image,/^data:image\/jpeg;base64,/);
+assert.match(await receiptPage.locator("#screen").innerText(),/Waiting \$132\.00/);
+const billId=localBills[0].id;
+await receiptPage.locator('[data-edit-bill="'+billId+'"]').click();
+assert.equal(await receiptPage.locator("#billReference").inputValue(),"Paint purchase");
+await receiptPage.locator("#billStatus").selectOption("sent");
+await receiptPage.locator("#billAmount").fill("155");
+await receiptPage.locator("#saveBill").click();
+localBills=await receiptPage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).materialBills);
+assert.equal(localBills.length,1,"An edit must not duplicate a customer bill");
+assert.equal(localBills[0].id,billId);
+assert.equal(localBills[0].amount,155);
+assert.equal(localBills[0].status,"sent");
+await receiptPage.locator('[data-edit-bill="'+billId+'"]').click();
+await receiptPage.locator("#billStatus").selectOption("reimbursed");
+await receiptPage.locator("#saveBill").click();
+localBills=await receiptPage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).materialBills);
+assert.equal(localBills[0].status,"reimbursed");
+assert.equal(localBills.length,1);
+assert.match(await receiptPage.locator("#screen").innerText(),/Waiting \$0\.00/);
+await receiptPage.locator('[data-page="jobs"]').click();
+const receiptJobId=await receiptPage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0].id);
+const receiptRow=receiptPage.locator('[data-open="job"][data-id="'+receiptJobId+'"]').first();
+const receiptGroup=receiptRow.locator("xpath=ancestor::details");
+if(await receiptGroup.count()&&!await receiptGroup.evaluate(el=>el.open))await receiptGroup.locator("summary").click();
+await receiptRow.click();
+assert.equal(await receiptPage.locator("#billPanel [data-edit-bill='"+billId+"']").count(),1);
+await receiptPage.close();
+
 console.log("OWNER_BROWSER_QA_PASS");
 }finally{if(browser)await browser.close();await new Promise(ok=>server.close(ok))}
