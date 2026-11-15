@@ -128,9 +128,19 @@ assert.match(await page.locator("#screen").innerText(),/Schedule · Next 14 days
 assert.match(await page.locator("#screen").innerText(),/2026-11-16/);
 assert.match(await page.locator("#screen").innerText(),/Bathroom|Sample renovation/);
 assert.match(await page.locator("#screen").innerText(),/%/);
+// Dashboard shows the most actionable figures and one concise profit table first.
+assert.equal(await page.locator("details.job-group").count(),4);
+assert.equal(await page.locator('details.job-group[open]').count(),2);
 await page.locator('[data-page="company"]').click();
+assert.equal(await page.locator(".dashboard-primary .metric").count(),4);
+assert.equal(await page.locator(".dashboard-report table").count(),1);
+assert.equal(await page.locator(".dashboard-report th").count(),4);
+assert.equal(await page.locator("#financialDetails").evaluate(el=>el.open),false);
+await page.locator("#financialDetails > summary").click();
 assert.match(await page.locator("#screen").innerText(),/\$400\.00/);
 assert.match(await page.locator("#screen").innerText(),/\$250\.00/);
+assert.match(await page.locator("#financialDetails").innerText(),/Tax & Reserve Fund/);
+await page.locator("#financialDetails > summary").click();
 const bounds=await page.evaluate(()=>({width:innerWidth,content:document.documentElement.scrollWidth}));
 assert.ok(bounds.content<=bounds.width+2,JSON.stringify(bounds));
 assert.deepEqual(errors,[]);
