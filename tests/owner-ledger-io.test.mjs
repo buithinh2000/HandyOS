@@ -76,3 +76,25 @@ test("Job CSV exports adjusted contract and overhead separately from incurred ex
  assert.match(out,/"220"/);
  assert.match(out,/"40"/);
 });
+
+test("CSV recomputes missing legacy payment GST from declared basis instead of inventing GST for No GST",()=>{
+ const data=fixture();
+ data.jobs[0].payments=[
+  {id:"p-no",reference:"Legacy no GST",date:"2026-11-01",status:"received",gstBasis:"no_gst",amount:200},
+  {id:"p-inc",reference:"Legacy incl GST",date:"2026-11-02",status:"received",gstBasis:"inc",amount:110},
+  {id:"p-ex",reference:"Legacy ex GST",date:"2026-11-03",status:"received",gstBasis:"ex",enteredAmount:100,amount:110}
+ ];
+ const out=ownerExports(data)["client-payments"];
+ const rows=out.trim().split("\r\n").slice(1);
+ assert.equal(rows.length,3);
+ assert.equal(rows[0],'"Bathroom","2026-11-01","Legacy no GST","received","no_gst","200","0","200","200"');
+ assert.equal(rows[1],'"Bathroom","2026-11-02","Legacy incl GST","received","inc","110","10","100","110"');
+ assert.equal(rows[2],'"Bathroom","2026-11-03","Legacy ex GST","received","ex","100","10","100","110"');
+ assert.equal(data.jobs[0].payments[0].gstAmount,undefined,"Export never mutates original payment records");
+});
+
+test("CSV respects saved GST components when present",()=>{
+ const data=fixture();
+ data.jobs[0].payments=[{reference:"Saved breakdown",date:"2026-11-04",status:"received",gstBasis:"no_gst",enteredAmount:200,amount:200,gstAmount:0,netAmount:200}];
+ assert.match(ownerExports(data)["client-payments"],/"Saved breakdown","received","no_gst","200","0","200","200"/);
+});
