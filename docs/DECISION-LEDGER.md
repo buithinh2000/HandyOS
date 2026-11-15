@@ -35,8 +35,8 @@ customer_balance_inc = adjusted_contract_inc - actual_received_cash_inc
 ```
 Currency rounds to 2 decimals at defined intermediate steps. If contract, variation, reserve rate, remaining cost, overhead or expense GST basis invalid, the final estimate must be NOT READY. Paid wages are settlement against accrued labour, not an additional wage cost. 'Other Expenses' is a subtotal of total expenses, not an extra cost.
 
-## Documentation conflict requiring future clean-up
-`PRODUCT_DESIGN_STANDARD.md` still describes the earlier quote-first V1 journey. Its historical design/quality rules are useful, but the newer Owner V1 scope reset in PR24 overrides its **V1 feature priority and default entry flow**. Do not silently repurpose or delete the legacy quote UI. Make a separate reviewed design-doc reconciliation later.
+## Documentation reconciliation
+`PRODUCT_DESIGN_STANDARD.md` is being reconciled in this source-only branch so the current Owner V1 default matches PR24. Earlier quote-first standards remain explicitly preserved as historical/deferred requirements. Verify merge before describing this change as canonical on `main`.
 
 ## Unknown and not to fabricate
 Complete verbatim old chat histories, Owner's reasons for every minor PR, exact live AWS account/role resource state, full test-run matrix, CI status of this new documentation branch and any live security verification are NOT fully established here. Collect evidence when needed instead of marking PASS.

@@ -1,64 +1,63 @@
-# HandyOS Product Design Contract — Owner V1
+# HandyOS Product Design Standard — current Owner V1 and historical quote workspace
 
-Status: **normative design baseline**, 2026-11-15. This document defines acceptance gates; it does not claim that current demo is production ready.
+Status: **normative for current Owner V1** as of 2026-11-15. This is a source/design contract, not evidence of secure cloud deployment or of complete prior chat retrieval.
 
-## Product and target user
-HandyOS V1 serves one Australian renovation-business Owner who needs quick on-site scoping and reliable estimates, plus ongoing jobs, labour, costs and payments. V2 collaboration (workers, clients, partner chat, stage acceptance) is outside V1.
+## Authority and scope
+- The Owner-approved V1 scope reset was merged in [PR #24](https://github.com/buithinh2000/HandyOS/pull/24). Expanded quote browser QA [PR #23](https://github.com/buithinh2000/HandyOS/pull/23) was **closed without merge**.
+- The current V1 is a **lean Owner-only business manager**: Jobs, Employees, timesheets and wage settlements, Expenses, customer progress payments, forecast Profit, job status/calendar and Company Overview.
+- **Not V1 default entry**: AI quotes, material takeoff wizard, supplier integrations, multi-user accounts, client/worker chat, employee personal share links. Existing older quote/task pages and data remain intact for legacy/backlog purposes; do not silently delete them.
+- Follow `PROJECT-BRAIN.md`, `docs/DECISION-LEDGER.md`, `docs/HANDOFF.md`, `ARCHITECTURE.md` and `cloud/SECURITY-GATE.md` when implementing changes.
 
-## Evidence-based user stories
-- **US-01 Start a job:** As an Owner, I can create a job with only a name so I do not complete a large form at the site; reference, notes and deadline remain optional.
-- **US-02 Structure work:** As an Owner, I add one primary trade/task (e.g. Bathroom) at a time. It NEVER inserts all template steps without consent. Each main task can have zero or more visible, user-selected subtasks; legacy main tasks are retained unchanged.
-- **US-03 Cost materials:** I enter exact product description/specification, preferred supplier (default Bunnings), SKU/I/N where known, required quantity and unit, pack coverage, wastage and owner-checked provisional shelf price. The system rounds *purchase units* up, converts incl-GST shelf prices to ex-GST estimating cost under an explicit 10% assumption, and displays source/store/date uncertainty.
-- **US-04 Build estimate:** I can distinguish priced scope tasks, material takeoff, labour allowance, other allowance, contingency, markup and tax. Actual timesheets and costs are separate from estimated allowances.
-- **US-05 Review draft:** I see explainable warnings for missing exact product code, price, store, scope, and possible duplicates. A deterministic rule engine cannot claim it is a generative AI model or silently alter amounts.
-- **US-06 Operate business:** I can review multiple jobs, status, deadline, payments received and expenses. Draft quote is not booked revenue, invoices or collectible debt.
+## Current V1 default user journey
+1. **Jobs list**: show all jobs with status groups (Planning/Quoting, Booked, In Progress, Finished), actual cash received, progress against *adjusted signed contract including GST*, estimated final profit when ready, and recorded schedule. Creating a job should be simple; details live in job view.
+2. **Job detail**: enter base signed contract (incl GST), approved +/- variations, record actual expenses with explicit GST basis (including **Other Expenses**), record hours and hourly costs, customer payments (incl GST / ex GST / no GST), estimated remaining costs ex GST and unbooked overhead ex GST.
+3. **Profit & close**: choose one combined Owner-editable Tax & Reserve Fund % (0–100) **of adjusted contract incl GST**, deducted once after normal costs. Mark forecast NOT READY if required amounts or expense tax bases are invalid. On close, require estimated remaining costs reconciled into real expenses/labour. Flag receivables outstanding at closed jobs, rather than mislabelling them paid.
+4. **Employees list -> Employee detail**: create/edit roster entries, view time worked and wages earned/paid/outstanding by job and week/month/year, record actual wage payments, save non-destructive close-period snapshots. A settlement snapshot is **not another wage payment**. No public employee payroll link in V1.
+5. **Expenses view**: filter by job, year, month and category; retain payment status separately from cost. Other Expenses is already a subset of the total expense ledger.
+6. **Company Overview**: separate receivables, actual customer cash, ex-GST costs, accrued wages, paid wages and outstanding wages. Do not equate receipts with revenue or wages paid with a second expense.
 
-## Default journey and information architecture
-1. **Projects / Job switcher:** select current job or create with one field.
-2. **Tasks:** add a main task; optional suggested subtasks live immediately below that task. Editable task costs are secondary details.
-3. **Materials:** primary form is material identification, quantity, pack size, provisional GST-inclusive shelf price. Supplier provenance, wastage and units are progressively disclosed (defaults must remain visible in labels/help).
-4. **Quote:** material + scoped work + separate allowances + contingency + markup + assumed GST; show basis explicitly.
-5. **Review:** human-verifiable findings; owner decides.
-6. **Business tools:** job overview, actual costs, labour, payments, deadlines and company dashboard are secondary navigation, not simultaneously presented with quote workflow.
+The initial public `owner-v1.html` is **browser-local synthetic-data demo only**. No real client, employee, bank or payroll records belong in it until actual secured infrastructure, auth, backups and restore have passed independent technical verification.
 
-Do NOT show duplicate navigation bars for the same job stage, a 100-item checklist on job creation, or financial dashboards above the task entry form. Long forms require progressive disclosure, not hiding critical values or defaults.
+## Financial design invariants
+```text
+adjusted_contract_inc = base_contract_inc + approved_variation_inc
+adjusted_contract_ex = round(adjusted_contract_inc / 1.10)
+expense_cost_ex = sum(expenses with explicitly known GST basis)
+accrued_labor = sum(timesheet hours * hourly cost)
+profit_before_reserve = adjusted_contract_ex - expense_cost_ex - accrued_labor
+                        - remaining_cost_estimate_ex - unbooked_overhead_ex
+combined_reserve = adjusted_contract_inc * owner_selected_pct / 100
+final_forecast_profit = profit_before_reserve - combined_reserve
+customer_balance_inc = adjusted_contract_inc - actual_customer_cash_received_inc
+```
+Mirror the round-to-cents behavior of the existing `owner-ledger-core.mjs`, which is the executable implementation; do not reinterpret this text to change numbers. Customer payment input supports incl GST / ex GST / no GST; persisted `amount` is **actual cash**, never multiplied twice when reading. Approved variations change the adjusted contract; not yet approved variations are not booked. Negative/invalid remaining costs and overhead, or unknown GST basis, block forecast. Cash received is not contract profit. GST is a modelling assumption, not individual tax advice.
 
-## Visual and interaction quality
-- Use coherent font stack, type scale, spacing and contrast; clear one primary action per step.
-- Desktop and narrow-phone layouts must not overflow horizontally; tables may scroll inside their container.
-- Text inputs have visible labels, clear units, safe defaults; all destructive actions have confirmation or scoped undo.
-- Default workflow must work without knowledge of building software terms, and without template selection.
-- Do not conflate task completion with subtask completion.
-- Preserve keyboard navigation, logical focus order, semantic labels and touch targets.
-- Validate with 360px, 768px, and 1280px screenshots plus a manually run real-browser journey before claiming visual QA **PASS**. Node VM tests alone never justify this claim.
+## UI / accessibility acceptance
+- List-first, detail-on-click information architecture; avoid clutter and duplicate job navigation.
+- Keep entry forms short and reveal advanced fields only when needed; labels identify dollar units and GST basis.
+- Clear empty, edited, error, closed and legacy data states. Never silently overwrite previous employee, job or financial data.
+- Keyboard accessible, sufficient contrast and touch targets. Test 360px/768px/1280px viewport and real mobile/desktop browser journeys before claiming visual QA.
+- Calendar shows only confirmed recorded bookings. Empty days do not guarantee crew availability; tentative quoted dates are not automatically bookings.
 
-## Financial correctness & product data
-- Product identity includes manufacturer/brand, size/thickness, pack coverage, unit and supplier SKU when known. Similar names are NOT verified substitutes.
-- Prices must carry currency, tax basis, supplier, source URL where available, store/location, checked date and verification state. Never autofill a guessed quote as a verified supplier price.
-- Ex-GST calculation is a conditional tax assumption. VAT/GST differences, zero-rated items and multi-tax invoices require explicit handling before production issue.
-- The material count is ceil(required quantity * (1 + waste pct/100) / pack coverage) when units match. Unknown/invalid values must block rather than silently produce plausible totals.
-- A cost cannot be included in both task unit cost and separately listed material/labour without an explicit warning.
-- Never present draft quote less recorded deposits as confirmed receivables; commercial lifecycle needs accepted quote/contract, claims/invoices and payments linked.
+## Engineering and release quality
+- Preserve legacy localStorage data key and records until an explicitly reviewed reversible migration; no undocumented automatic conversion.
+- Add regression tests for GST, reserve, adjusted contract, wages, close rules, invalid inputs and no double-counting.
+- For normal source-only work, VIN performs self-review, checks PR-head CI, checks conflicts/branch protection, documents evidence and may merge within Owner's delegated authority. Do **not** represent this as independent reviewer approval.
+- Infrastructure, paid APIs, real data, changes to financial formulas, IAM, DNS, SQL and production go-live are **not** authorized merely by source-only delegation.
+- Production roadmap requires real Cognito PKCE, exact-Owner authorization, private encrypted storage, restore test, HTTPS, E2E and documented cost/deployment gates. Cloud adapter code does not make the public demo secure.
+- Explicitly mark Source-only / Staging / Production status and limitations; validate the published site before saying a change is live.
 
-## Technical architecture and security
-- V1 is Owner only; production login uses Cognito, backend API validates JWT and enforces tenant identity. Database row-level boundaries and transactions must be tested with real PostgreSQL.
-- Public GitHub Pages/localStorage workspace is **synthetic-data demo only**; no real client, payroll or financial data until deployed private backend, backups, HTTPS, authorization and recovery checks.
-- AWS services and secrets isolated from BuiTai Core and other ventures. No Render, Supabase, unapproved paid APIs or accidental shared IAM credentials.
-- API contract, schema migrations, validations, audit log, errors and backward-compatible import/export documented before implementation. Cloud deployment must have budget and security gates.
-- Do not scrape suppliers as if it were an authorized API; API/stock/order features deferred.
-- Quote review V1 is deterministic rules, not generative AI. Any future LLM must use an explicit opt-in/backend cost gate, grounded input, read-only draft suggestions and Owner confirmation.
+## Deferred / historical quote-first design (not current V1 default)
+Earlier [PR #19](https://github.com/buithinh2000/HandyOS/pull/19) through [PR #22](https://github.com/buithinh2000/HandyOS/pull/22) established a guided job-to-quote workspace with main tasks, optional subtasks, material identity/SKU/supplier provenance, quantity/pack/wastage calculation, quote costing, deterministic warnings and optional review. Those historical requirements **remain** for the legacy workspace / later separately approved phase; do not label them as newly activated Owner V1.
 
-## Definition of Done (per user-facing feature)
-1. Trace feature to a user story, user journey and business rule.
-2. Add design rationale and states: empty, populated, error, loading, mobile and legacy.
-3. Update schema/API if necessary with migration and authorization review.
-4. Pass automated tests for monetary arithmetic, storage/import, compatibility, failure cases, DOM interactions.
-5. Check full workflow in an actual browser; verify screenshots at mobile/tablet/desktop; record observed issues.
-6. Verify security, cost and deployment boundaries. Confirm CI and merge status. Test published website before claiming live release.
-7. State what is completed, what remains demo-only, and specific limitations.
+When eventually revisited, preserve these technical safeguards:
+- Main trade tasks do not auto-generate a 100-item checklist; subtasks are opt-in and legacy IDs/prices are retained.
+- Material products need exact brand/specification, supplier SKU if available, source/store/checked date, GST basis and verification state. Provisional prices must not be called verified live prices.
+- Purchase packs are rounded up only after consistent unit conversion and explicit wastage assumptions; invalid units block estimation.
+- Actual timesheet/cost transactions stay separate from preliminary quote allowances; flag possible material/labour double counting.
+- Deterministic quote review is not generative AI. Supplier APIs, real stock/orders or paid models require separate authorization.
 
-## Release gates
-**Source-only:** PR review, relevant unit tests and CI PASS. **Staging:** real browser UI walkthrough, backend integration, private login and deployment receipts. **Production:** tenant isolation, recoverable backups, audit logging, monitoring, cost controls, owner acceptance, legitimate client data path, documented rollback.
-
-## Explicit non-goals for this design pass
-No paid model, supplier API, order placement, stock checking, worker/client login or unverified production launch. No change to existing localStorage key or deletion of legacy job/task data.
+## Evidence and change history
+- [PR #24](https://github.com/buithinh2000/HandyOS/pull/24): Owner V1 scope reset.
+- [PR #25](https://github.com/buithinh2000/HandyOS/pull/25) through [PR #33](https://github.com/buithinh2000/HandyOS/pull/33): payroll, GST, reserve, remaining costs, variations, overview and payments.
+- [PR #41](https://github.com/buithinh2000/HandyOS/pull/41): Project Brain, cross-chat handoff, continuity CI and routine VIN self-review policy.
