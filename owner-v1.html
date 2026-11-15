@@ -119,7 +119,7 @@ function employeeAttendance(){
  const offset=(new Date(year,month-1,1).getDay()+6)%7;
  const records=state.jobs.flatMap(j=>(j.timesheets||[]).filter(t=>workerKey(t.worker)===workerKey(person)).map(t=>({...t,jobId:j.id,jobName:j.name})));
  const row=records.filter(t=>t.date===attendanceDate);
- const selected=editingAttendanceId?row.find(t=>t.id===editingAttendanceId):row.length===1?row[0]:null;
+ const selected=editingAttendanceId?row.find(t=>t.id===editingAttendanceId):null;
  const member=state.staff.find(x=>workerKey(x.name)===workerKey(person)),basis=selected?.payBasis||member?.payBasis||"hour";
  const daily=selected?.payBasis==="day",rate=selected?.rate??member?.rate??"";
  const days=Array.from({length:offset},()=>'<span></span>').concat(Array.from({length:last},(_,i)=>{const d=attendanceMonth+"-"+String(i+1).padStart(2,"0"),count=records.filter(x=>x.date===d).length;return '<button type="button" data-attendance-day="'+esc(d)+'" style="min-height:46px;'+(d===attendanceDate?"border:2px solid #2177b6;":"")+'">'+(i+1)+(count?" ✓":"")+'</button>'})).join("");
