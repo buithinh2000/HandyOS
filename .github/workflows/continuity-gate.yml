@@ -1,17 +1,6 @@
 name: HandyOS Project Brain continuity gate (source-only)
 on:
   pull_request:
-    paths:
-      - "PROJECT-BRAIN.md"
-      - "docs/DECISION-LEDGER.md"
-      - "docs/HANDOFF.md"
-      - ".github/pull_request_template.md"
-      - "owner-ledger-core.mjs"
-      - "owner-v1.html"
-      - "cloud/SECURITY-GATE.md"
-      - "ARCHITECTURE.md"
-      - "tests/continuity-gate.test.mjs"
-      - ".github/workflows/continuity-gate.yml"
   workflow_dispatch:
 permissions:
   contents: read
