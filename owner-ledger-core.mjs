@@ -20,7 +20,6 @@ export function normalize(db) {
  if(!Array.isArray(state.payrollSettlements))state.payrollSettlements=[];
  if(!Array.isArray(state.taxPayments))state.taxPayments=[];
  if(!Array.isArray(state.materialBills))state.materialBills=[];
- if(!Array.isArray(state.crewSessions))state.crewSessions=[];
  for(const job of state.jobs) {
   for(const field of ["tasks","categories","materials","timesheets","expenses","payments"])if(!Array.isArray(job[field]))job[field]=[];
   if(!Array.isArray(job.workerPayments))job.workerPayments=[];
