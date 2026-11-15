@@ -47,3 +47,6 @@ The Owner V1 Add Hours and Add Wage Payment controls still accepted date-shaped 
 
 ## Owner V1 expense-date input validation (source-only, 2026-11-15)
 Expense entry previously accepted any nonempty date string, although monthly/year expense filters depend on the date. This branch applies existing strict `isISODate` before adding expense rows. Added real-browser regression: blank/invalid date blocks adding an expense; valid date saves normally. No changes to stored records, amounts, GST/profit arithmetic, payroll, AWS, or live data. **Verify latest HEAD CI and merge before treating this as live main.**
+
+## Expense date-filter accuracy (source-only proposal, 2026-11-15)
+After PR #50 prevented invalid expense dates at new entry, historical malformed dates could still pass year/month string-prefix filters (e.g. `2026-02-30`). This patch applies the existing strict `isISODate` to expense rows **only when year/month filters are active**. The unfiltered Owner expense totals, Job profit math, original ledger rows and stored data remain unchanged; tests cover both views. **Pending exact-head CI and merge verification.** No AWS/SQL/cloud operations.
