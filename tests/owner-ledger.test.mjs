@@ -403,3 +403,22 @@ test("invalid calendar dates never leak into weekly monthly or yearly wage perio
  assert.equal(workerByPeriod([job],"Alex","month")[0].period,"2026-02");
  assert.equal(workerByPeriod([job],"Alex","year")[0].period,"2026");
 });
+
+test("year-filtered wage summary excludes impossible legacy dates without rewriting all-time ledger",()=>{
+ const a=j("legacy-date","Bathroom");
+ a.timesheets.push(worker("Alex","2026-02-30",8,40));
+ a.workerPayments.push({id:"bad-paid",worker:"Alex",paidOn:"2026-02-30",amount:100});
+ a.timesheets.push(worker("Alex","2026-02-28",2,50));
+ a.workerPayments.push({id:"valid-paid",worker:"Alex",paidOn:"2026-02-28",amount:40});
+ const annual=wageYearSummary([a],"2026");
+ assert.equal(annual.earned,100);
+ assert.equal(annual.paid,40);
+ assert.equal(annual.rows[0].hours,2);
+ assert.equal(annual.rows[0].difference,60);
+ const allTime=wageYearSummary([a],"");
+ assert.equal(allTime.earned,420);
+ assert.equal(allTime.paid,140);
+ assert.equal(workerTotals([a],"Alex").outstanding,280);
+ assert.equal(a.timesheets.length,2);
+ assert.equal(a.workerPayments.length,2);
+});
