@@ -12,7 +12,7 @@ test("mobile layout prioritizes touch targets, thumb navigation and safe-area sp
 });
 test("daily shortcuts route to existing attendance and bill flows without fake check-ins",()=>{
  assert.match(html,/id="quickAttendance"/);
- assert.match(html,/data-page-shortcut="employees"/);
+ assert.match(html,/if\(b\.id==="quickAttendance"\)\{/);
  assert.match(html,/id="quickBill"/);
  assert.match(html,/if\(b\.id==="quickBill"\)\{billEditorOpen=true/);
  assert.match(html,/id="billPhoto" type="file" accept="image\/\*" capture="environment"/);
