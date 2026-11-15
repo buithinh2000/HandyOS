@@ -18,6 +18,7 @@ export function normalize(db) {
  if(!Array.isArray(state.jobs))state.jobs=[];
  if(!Array.isArray(state.staff))state.staff=[];
  if(!Array.isArray(state.payrollSettlements))state.payrollSettlements=[];
+ if(!Array.isArray(state.taxPayments))state.taxPayments=[];
  for(const job of state.jobs) {
   for(const field of ["tasks","categories","materials","timesheets","expenses","payments"])if(!Array.isArray(job[field]))job[field]=[];
   if(!Array.isArray(job.workerPayments))job.workerPayments=[];
@@ -26,7 +27,19 @@ export function normalize(db) {
  return state;
 }
 export function labourRows(job) {
- return (job.timesheets||[]).map(t=>({...t,hours:Number(t.hours)||0,rate:Number(t.rate)||0,total:round2((Number(t.hours)||0)*(Number(t.rate)||0))}));
+ return (job.timesheets||[]).map(t=>{const daily=t.payBasis==="day";const units=daily?Number(t.days)||0:Number(t.hours)||0;const rate=Number(t.rate)||0;return {...t,payBasis:daily?"day":"hour",hours:daily?(Number(t.workedHours)||0):units,days:daily?units:0,rate,total:round2(units*rate)};});
+}
+// Clock entries are local same-day shifts. No overnight, automatic overtime or award rules.
+export function workedHours(start,end,breakMinutes=0){
+ const clock=x=>typeof x==="string"&&/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(x)?Number(x.slice(0,2))*60+Number(x.slice(3)):NaN;
+ const a=clock(start),b=clock(end),rest=Number(breakMinutes);
+ if(!Number.isFinite(a)||!Number.isFinite(b)||b<=a||!Number.isInteger(rest)||rest<0||rest>=b-a)return null;
+ return Math.round((b-a-rest)/60*100)/100;
+}
+export function employeeTaxSummary(records,name,period="",key=""){
+ const all=(records||[]).filter(x=>workerKey(x.worker)===workerKey(name)&&isISODate(x.date)&&Number.isFinite(Number(x.amount))&&Number(x.amount)>=0);
+ const filtered=all.filter(x=>!period||(period==="week"?weeklyStart(x.date)===key:period==="month"?x.date.slice(0,7)===key:x.date.slice(0,4)===key));
+ return Math.round(filtered.reduce((sum,x)=>sum+Number(x.amount),0)*100)/100;
 }
 export function weeklyStart(day) {
  if(!isISODate(day))return "";
@@ -39,8 +52,8 @@ export function labourByPeriod(job,period) {
  for(const t of labourRows(job)){
   if(!isISODate(t.date))continue;
   const key=period==="month"?t.date.slice(0,7):weeklyStart(t.date);
-  const row=grouped.get(key)||{period:key,hours:0,total:0,entries:0};
-  row.hours+=t.hours;row.total=round2(row.total+t.total);row.entries++;
+  const row=grouped.get(key)||{period:key,hours:0,days:0,total:0,entries:0};
+  row.hours+=t.hours;row.days=round2(row.days+t.days);row.total=round2(row.total+t.total);row.entries++;
   grouped.set(key,row);
  }
  return [...grouped.values()].sort((a,b)=>b.period.localeCompare(a.period));
@@ -63,13 +76,13 @@ export function workerTotals(jobs,name,jobId=""){
   for(const p of job.workerPayments||[])if(workerKey(p.worker)===key&&validMoney(p.amount))payments.push({...p,amount:money(p.amount),jobId:job.id,jobName:job.name});
  }
  const due=round2(earned.reduce((a,t)=>a+t.total,0)),paid=round2(payments.reduce((a,p)=>a+p.amount,0));
- return{earned, payments, due, paid, outstanding:round2(due-paid),hours:round2(earned.reduce((a,t)=>a+t.hours,0))};
+ return{earned, payments, due, paid, outstanding:round2(due-paid),hours:round2(earned.reduce((a,t)=>a+t.hours,0)),days:round2(earned.reduce((a,t)=>a+t.days,0))};
 }
 export function workerByPeriod(jobs,name,period="week",jobId=""){
  const data=workerTotals(jobs,name,jobId);const rows=new Map();
  const keyFor=d=>!isISODate(d)?"":period==="month"?d.slice(0,7):period==="year"?d.slice(0,4):weeklyStart(d);
- for(const t of data.earned){const k=keyFor(t.date);if(!k)continue;const row=rows.get(k)||{period:k,hours:0,earned:0,paid:0};row.hours=round2(row.hours+t.hours);row.earned=round2(row.earned+t.total);rows.set(k,row)}
- for(const p of data.payments){const k=keyFor(p.periodStart||p.paidOn);if(!k)continue;const row=rows.get(k)||{period:k,hours:0,earned:0,paid:0};row.paid=round2(row.paid+p.amount);rows.set(k,row)}
+ for(const t of data.earned){const k=keyFor(t.date);if(!k)continue;const row=rows.get(k)||{period:k,hours:0,days:0,earned:0,paid:0};row.hours=round2(row.hours+t.hours);row.days=round2(row.days+t.days);row.earned=round2(row.earned+t.total);rows.set(k,row)}
+ for(const p of data.payments){const k=keyFor(p.periodStart||p.paidOn);if(!k)continue;const row=rows.get(k)||{period:k,hours:0,days:0,earned:0,paid:0};row.paid=round2(row.paid+p.amount);rows.set(k,row)}
  return [...rows.values()].sort((a,b)=>b.period.localeCompare(a.period)).map(x=>({...x,outstanding:round2(x.earned-x.paid)}));
 }
 export function wageYearSummary(jobs,year="",staff=[]){
@@ -79,7 +92,7 @@ export function wageYearSummary(jobs,year="",staff=[]){
   const wages=worker.earned.filter(x=>!year||(isISODate(x.date)&&x.date.startsWith(year)));
   const payments=worker.payments.filter(x=>!year||(isISODate(x.paidOn)&&x.paidOn.startsWith(year)));
   const earned=round2(wages.reduce((s,x)=>s+x.total,0)),paid=round2(payments.reduce((s,x)=>s+x.amount,0));
-  return{name:worker.name,hours:round2(wages.reduce((s,x)=>s+x.hours,0)),earned,paid,difference:round2(earned-paid)};
+  return{name:worker.name,hours:round2(wages.reduce((s,x)=>s+x.hours,0)),days:round2(wages.reduce((s,x)=>s+x.days,0)),earned,paid,difference:round2(earned-paid)};
  });
  return{rows:results,earned:round2(results.reduce((s,x)=>s+x.earned,0)),paid:round2(results.reduce((s,x)=>s+x.paid,0))};
 }
@@ -88,10 +101,10 @@ export function periodSettlement(jobs,worker,period,key,jobId=""){
  if(!/^\d{4}-\d{2}(-\d{2})?$/.test(key))throw new Error("Invalid settlement period.");
  const row=workerByPeriod(jobs,worker,period,jobId).find(x=>x.period===key);
  if(!row)throw new Error("No recorded work or payments in this period.");
- return{worker,period,key,jobId,hours:row.hours,earned:row.earned,paid:row.paid,balance:row.outstanding};
+ return{worker,period,key,jobId,hours:row.hours,days:row.days,earned:row.earned,paid:row.paid,balance:row.outstanding};
 }
 export function isSettlementCurrent(jobs,s){
- try{const actual=periodSettlement(jobs,s.worker,s.period,s.key,s.jobId||"");return actual.hours===s.hours&&actual.earned===s.earned&&actual.paid===s.paid}catch{return false}
+ try{const actual=periodSettlement(jobs,s.worker,s.period,s.key,s.jobId||"");return actual.hours===s.hours&&(s.days===undefined||actual.days===s.days)&&actual.earned===s.earned&&actual.paid===s.paid}catch{return false}
 }
 export function employeesSummary(jobs,staff=[]){
  return workerNames(jobs,staff).map(name=>({name,...workerTotals(jobs,name)}));
@@ -114,6 +127,21 @@ export function expenseSummary(jobs,{jobId="",kind="",year="",month=""}={}){
  net:round2(entries.reduce((a,e)=>a+(Number.isFinite(e.net)?e.net:0),0)),
  paid:round2(entries.filter(e=>e.paidStatus==="paid").reduce((a,e)=>a+(money(e.amount)||0),0)),
  unclassified:entries.filter(e=>!Number.isFinite(e.net)).length};
+}
+// Date-scoped management view. Cash movements and accrued wages are distinct.
+export function financialPeriodSummary(state,{from="",to=""}={}){
+ const inside=d=>!from&&!to||isISODate(d)&&(!from||d>=from)&&(!to||d<=to);
+ const jobs=state.jobs||[];
+ const earned=round2(jobs.reduce((n,j)=>n+labourRows(j).filter(t=>inside(t.date)).reduce((a,t)=>a+t.total,0),0));
+ const wagePaid=round2(jobs.reduce((n,j)=>n+(j.workerPayments||[]).filter(p=>inside(p.paidOn)).reduce((a,p)=>a+(money(p.amount)||0),0),0));
+ const receipts=round2(jobs.reduce((n,j)=>n+(j.payments||[]).filter(p=>p.status==="received"&&inside(p.date)).reduce((a,p)=>a+(money(p.amount)||0),0),0));
+ const expensesPaid=round2(jobs.reduce((n,j)=>n+(j.expenses||[]).filter(e=>e.paidStatus==="paid"&&inside(e.date)).reduce((a,e)=>a+(money(e.amount)||0),0),0));
+ const expensesEx=round2(jobs.reduce((n,j)=>n+(j.expenses||[]).filter(e=>inside(e.date)).reduce((a,e)=>a+(Number.isFinite(expenseEx(e))?expenseEx(e):0),0),0));
+ const unknownGst=jobs.reduce((n,j)=>n+(j.expenses||[]).filter(e=>inside(e.date)&&!Number.isFinite(expenseEx(e))).length,0);
+ const taxesPaid=round2((state.taxPayments||[]).filter(p=>inside(p.date)).reduce((a,p)=>a+(money(p.amount)||0),0));
+ // Cash-flow estimate is NOT accounting profit. Tax payments are separate from GST reserve forecasts.
+ const netCash=round2(receipts-wagePaid-expensesPaid-taxesPaid);
+ return{receipts,earned,wagePaid,expensesPaid,expensesEx,unknownGst,taxesPaid,netCash};
 }
 export function companySummary(jobs){
  const expense=expenseSummary(jobs);const employees=employeesSummary(jobs);

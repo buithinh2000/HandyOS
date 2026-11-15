@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {parseOwnerBackup,csv,ownerExports} from "../owner-ledger-io.mjs";
-const fixture=()=>({jobs:[{id:"job-a",name:"Bathroom",code:"",stage:"active",contract:1100,expenses:[{id:"e1",date:"2026-11-12",kind:"material",title:"Tiles",amount:110,gstBasis:"inc",paidStatus:"paid"}],timesheets:[{id:"t1",date:"2026-11-12",worker:"Alex",hours:8,rate:40}],workerPayments:[{id:"w1",worker:"Alex",paidOn:"2026-11-13",amount:200}],payments:[{id:"p1",reference:"Progress 1",date:"2026-11-14",status:"received",amount:500}],tasks:[],categories:[],materials:[]}],payrollSettlements:[],staff:[]});
+const fixture=()=>({jobs:[{id:"job-a",name:"Bathroom",code:"",stage:"active",contract:1100,expenses:[{id:"e1",date:"2026-11-12",kind:"material",title:"Tiles",amount:110,gstBasis:"inc",paidStatus:"paid"}],timesheets:[{id:"t1",date:"2026-11-12",worker:"Alex",hours:8,rate:40}],workerPayments:[{id:"w1",worker:"Alex",paidOn:"2026-11-13",amount:200}],payments:[{id:"p1",reference:"Progress 1",date:"2026-11-14",status:"received",amount:500}],tasks:[],categories:[],materials:[]}],payrollSettlements:[],staff:[],taxPayments:[]});
 test("validated backup preserves ledger IDs, expenses and settlements",()=>{
  const data=fixture();data.payrollSettlements.push({worker:"Alex",period:"week",key:"2026-11-09",earned:320,paid:200});
  const result=parseOwnerBackup(JSON.stringify(data));
@@ -18,7 +18,7 @@ test("backup rejects corrupt, wrong schema, and duplicate job IDs",()=>{
 });
 test("CSV export has separate jobs, labour, wages, expenses and payments with consistent figures",()=>{
  const exports=ownerExports(fixture());
- assert.deepEqual(Object.keys(exports),["jobs","labour-hours","wage-payments","expenses","client-payments","staff"]);
+ assert.deepEqual(Object.keys(exports),["jobs","labour-hours","wage-payments","expenses","client-payments","staff","tax-payments"]);
  assert.match(exports.jobs,/\$?/); // files are plain numeric values, not live business data
  assert.match(exports.jobs,/"320"/);
  assert.match(exports["wage-payments"],/"200"/);
@@ -97,4 +97,21 @@ test("CSV respects saved GST components when present",()=>{
  const data=fixture();
  data.jobs[0].payments=[{reference:"Saved breakdown",date:"2026-11-04",status:"received",gstBasis:"no_gst",enteredAmount:200,amount:200,gstAmount:0,netAmount:200}];
  assert.match(ownerExports(data)["client-payments"],/"Saved breakdown","received","no_gst","200","0","200","200"/);
+});
+
+test("backup validates actual tax payments and exports them independently from forecast reserve",()=>{
+ const data=fixture();
+ data.taxPayments=[{id:"tax-1",date:"2026-11-13",kind:"GST / BAS",amount:250,notes:"Paid receipt"}];
+ const restored=parseOwnerBackup(JSON.stringify(data));
+ assert.equal(restored.taxPayments[0].amount,250);
+ assert.match(ownerExports(restored)["tax-payments"],/"2026-11-13","GST \/ BAS","250","Paid receipt"/);
+ const invalid=fixture();invalid.taxPayments=[{date:"2026-02-30",amount:250}];
+ assert.throws(()=>parseOwnerBackup(JSON.stringify(invalid)),/tax payment/);
+});
+test("attendance CSV includes clock times, notes, and single daily-rate cost",()=>{
+ const data=fixture();
+ data.jobs[0].timesheets=[{id:"work",date:"2026-11-12",worker:"Alex",payBasis:"day",days:1,startTime:"07:00",endTime:"15:30",breakMinutes:30,workedHours:8,notes:"Kitchen framing",rate:280}];
+ const out=ownerExports(data)["labour-hours"];
+ assert.match(out,/Wage basis/);
+ assert.match(out,/"day","07:00","15:30","30","Kitchen framing","280","280"/);
 });

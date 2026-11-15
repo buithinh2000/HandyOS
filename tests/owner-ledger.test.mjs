@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {normalize,expenseEx,weeklyStart,workerTotals,workerByPeriod,employeesSummary,expenseSummary,companySummary,summary,canClose,snapshot,wageYearSummary,periodSettlement,isSettlementCurrent,workerNames,jobGroup,paymentProgress,scheduleEntry,scheduleDays,isISODate,customerPayment,paymentBreakdown} from "../owner-ledger-core.mjs";
+import {normalize,expenseEx,weeklyStart,workerTotals,workerByPeriod,employeesSummary,expenseSummary,companySummary,summary,canClose,snapshot,wageYearSummary,periodSettlement,isSettlementCurrent,workerNames,jobGroup,paymentProgress,scheduleEntry,scheduleDays,isISODate,customerPayment,paymentBreakdown,financialPeriodSummary,workedHours} from "../owner-ledger-core.mjs";
 
 const j=(id,name)=>({id,name,stage:"active",contract:11000,tasks:[],categories:[],materials:[],expenses:[],timesheets:[],payments:[],workerPayments:[]});
 const worker=(name,date,hours,rate)=>({id:name+date,worker:name,date,hours,rate});
@@ -493,4 +493,45 @@ test("four scheduled payments distinguish two received, one sent, and one not se
  assert.equal(summary(job).received,330);
  assert.equal(companySummary([job]).received,330);
  assert.equal(paymentProgress(job).received,330);
+});
+
+test("attendance day rate and hourly rate contribute once each to wages and job cost",()=>{
+ const job=j("mixed-wages","Bathroom");
+ job.timesheets=[
+  {id:"day",worker:"Alex",date:"2026-11-12",payBasis:"day",days:1,rate:280,workedHours:8,startTime:"07:00",endTime:"15:30",breakMinutes:30,notes:"Finishing"},
+  {id:"half-day",worker:"Alex",date:"2026-11-13",payBasis:"day",days:0.5,rate:280,workedHours:4,startTime:"07:00",endTime:"11:00",breakMinutes:0},
+  {id:"hour",worker:"Lee",date:"2026-11-13",hours:6,rate:40}
+ ];
+ assert.equal(workerTotals([job],"Alex").due,420);
+ assert.equal(workerTotals([job],"Alex").days,1.5);
+ assert.equal(workerTotals([job],"Alex").hours,12);
+ assert.equal(workerTotals([job],"Lee").due,240);
+ assert.equal(summary(job).labour,660);
+ assert.equal(workerByPeriod([job],"Alex","week")[0].earned,420);
+ assert.equal(workerByPeriod([job],"Alex","month")[0].days,1.5);
+ assert.equal(wageYearSummary([job],"2026").earned,660);
+ assert.equal(workerTotals([job],"Alex").paid,0);
+});
+test("period dashboard separates received customer cash, wage cost, paid wages, expenses and actual tax",()=>{
+ const job=j("period-test","Office");
+ job.payments=[
+  {status:"received",date:"2026-11-02",amount:1100},
+  {status:"requested",date:"2026-11-03",amount:3300},
+  {status:"draft",date:"2026-11-04",amount:5500}
+ ];
+ job.timesheets=[{worker:"Alex",date:"2026-11-05",hours:8,rate:35}];
+ job.workerPayments=[{worker:"Alex",paidOn:"2026-11-06",amount:200}];
+ job.expenses=[{kind:"other",date:"2026-11-07",amount:110,gstBasis:"inc",paidStatus:"paid"}];
+ const data={jobs:[job],taxPayments:[{date:"2026-11-08",amount:50,kind:"GST / BAS"}]};
+ const month=financialPeriodSummary(data,{from:"2026-11-01",to:"2026-11-30"});
+ assert.deepEqual({receipts:month.receipts,earned:month.earned,wagePaid:month.wagePaid,expensesPaid:month.expensesPaid,expensesEx:month.expensesEx,taxesPaid:month.taxesPaid,netCash:month.netCash},
+ {receipts:1100,earned:280,wagePaid:200,expensesPaid:110,expensesEx:100,taxesPaid:50,netCash:740});
+ assert.equal(financialPeriodSummary(data,{from:"2026-12-01",to:"2026-12-31"}).receipts,0);
+ assert.equal(companySummary([job]).received,1100);
+ assert.equal(summary(job).labour,280,"Cash wage payment must not count as another profit cost");
+});
+test("start/finish and break produce valid hours; reject negative, overnight and invalid clock times",()=>{
+ assert.equal(workedHours("07:00","15:30",30),8);
+ assert.equal(workedHours("07:00","11:00",0),4);
+ for(const [start,end,rest] of [["17:00","07:00",0],["09:00","09:00",0],["07:00","15:00",480],["bad","12:00",0],["08:00","17:00",-1]])assert.equal(workedHours(start,end,rest),null);
 });
