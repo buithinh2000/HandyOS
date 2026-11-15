@@ -14,9 +14,8 @@ try{
  if(raw===null)state=normalize({});
  else{
   damagedRaw=raw;
-  const parsed=JSON.parse(raw);
-  if(!parsed||typeof parsed!=="object"||Array.isArray(parsed)||(parsed.jobs!==undefined&&!Array.isArray(parsed.jobs)))throw new Error("Invalid saved workspace format.");
-  state=normalize(parsed);damagedRaw=null;
+  // Use the exact same validation as manual JSON restore: malformed but parseable data must not be normalized to empty records.
+  state=parseOwnerBackup(raw);damagedRaw=null;
  }
 }catch(err){storageBlocked=true;storageError=String(err?.message||err);state=normalize({})}
 let page="jobs",jobId="",person="",period="week",year="",expenseKind="",expenseJob="",expenseMonth="",wageYear="";
