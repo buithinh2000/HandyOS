@@ -1,4 +1,4 @@
-import {normalize,summary,expenseEx} from "./owner-ledger-core.mjs";
+import {normalize,summary,expenseEx,paymentBreakdown} from "./owner-ledger-core.mjs";
 
 function record(x){return !!x&&typeof x==="object"&&!Array.isArray(x)}
 function arr(x){return Array.isArray(x)&&x.every(record)}
@@ -42,7 +42,8 @@ export function ownerExports(state){
  const hours=jobs.flatMap(j=>(j.timesheets||[]).map(x=>[j.name,x.worker||"",x.date||"",x.hours??"",x.rate??"",(Number(x.hours)||0)*(Number(x.rate)||0)]));
  const wagePayments=jobs.flatMap(j=>(j.workerPayments||[]).map(x=>[j.name,x.worker||"",x.paidOn||"",x.amount??""]));
  const expenses=jobs.flatMap(j=>(j.expenses||[]).map(x=>[j.name,x.date||"",x.kind||"",x.title||"",x.amount??"",x.gstBasis||"",Number.isFinite(expenseEx(x))?expenseEx(x):"Unknown",x.paidStatus||""]));
- const clientPayments=jobs.flatMap(j=>(j.payments||[]).map(x=>[j.name,x.date||"",x.reference||"",x.status||"",x.gstBasis||"inc (legacy)",x.enteredAmount??x.amount??"",x.gstAmount??(x.amount!=null?Math.round(Number(x.amount)/11*100)/100:""),x.netAmount??(x.amount!=null?Math.round(Number(x.amount)/1.1*100)/100:""),x.amount??""]));
+ // Older payments may lack saved GST breakdowns: compute from actual cash and declared basis, never assume No GST contains GST.
+ const clientPayments=jobs.flatMap(j=>paymentBreakdown(j).entries.map(x=>[j.name,x.date||"",x.reference||"",x.status||"",x.gstBasis||"inc (legacy)",x.enteredAmount??x.amount??"",x.gstAmount??(Number.isFinite(x.gst)?x.gst:""),x.netAmount??(Number.isFinite(x.net)?x.net:""),x.amount??""]));
  const staff=(state.staff||[]).map(x=>[x.name,x.role||"",x.rate??"",x.active===false?"inactive":"active"]);
  return{
   "jobs":csv(["Job","Code","Stage","Base contract incl GST","Approved variations incl GST","Adjusted contract incl GST","Adjusted contract ex GST","Cash received","Expenses ex GST","Other expenses (within total) ex GST","Labour earned","Remaining Costs ex GST (estimated)","Unbooked overhead allocation ex GST","Profit before reserve ex GST","Tax & Reserve Fund %","Tax & Reserve Fund AUD","Final estimated profit after reserve","Wages paid","Wages outstanding"],jobRows),
