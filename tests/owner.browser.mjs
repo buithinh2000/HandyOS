@@ -292,5 +292,24 @@ assert.equal(await finishedPage.locator("#saveJob").count(),1);
 assert.equal(await finishedPage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0].stage),"active");
 await finishedPage.close();
 
+// New unpriced jobs must fail the contract gate, not be mislabeled as dirty by the close guard.
+const unpricedPage=await browser.newPage();
+const unpricedAlerts=[];
+unpricedPage.on("dialog",d=>{unpricedAlerts.push(d.message());return d.accept("Unpriced sample")});
+await unpricedPage.goto(address);
+await unpricedPage.locator('[data-page="jobs"]').click();
+await unpricedPage.locator("#newJob").click();
+assert.equal(await unpricedPage.locator("#contract").inputValue(),"");
+await unpricedPage.locator("#closeJob").click();
+assert.match(unpricedAlerts.at(-1),/Agreed contract amount is required/);
+assert.equal(await unpricedPage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0].stage),"survey");
+assert.equal(await unpricedPage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0].closeSnapshot),undefined);
+// Actual unsaved contract edits must still be rejected before taking a snapshot.
+await unpricedPage.locator("#contract").fill("11000");
+await unpricedPage.locator("#closeJob").click();
+assert.match(unpricedAlerts.at(-1),/Save contract before closing/);
+assert.equal(await unpricedPage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")).jobs[0].contract),0);
+await unpricedPage.close();
+
 console.log("OWNER_BROWSER_QA_PASS");
 }finally{if(browser)await browser.close();await new Promise(ok=>server.close(ok))}
