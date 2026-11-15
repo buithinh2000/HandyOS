@@ -188,6 +188,28 @@
                   ]
                 },
                 {
+                  "Sid": "OwnerLedgerExactKeyListOnly",
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:ListBucket"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": [
+                        "LedgerBucket",
+                        "Arn"
+                      ]
+                    }
+                  ],
+                  "Condition": {
+                    "StringEquals": {
+                      "s3:prefix": {
+                        "Fn::Sub": "owners/${OwnerSub}/ledger.json"
+                      }
+                    }
+                  }
+                },
+                {
                   "Sid": "LedgerKMSOnlyViaS3",
                   "Effect": "Allow",
                   "Action": [
