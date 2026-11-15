@@ -56,6 +56,8 @@ async function dispatch(req){
   await client.query("select set_config('app.actor_sub',$1,true)",[sub]);
   const memberships=await context(client,sub);const ctx=chooseTenant(req,memberships);
   await client.query("select set_config('app.tenant_id',$1,true)",[ctx.tenant_id]);
+  // Role is obtained from verified Cognito membership, never from a browser header.
+  await client.query("select set_config('app.actor_role',$1,true)",[ctx.role]);
   if(req.method==="GET"&&url.pathname==="/v1/me")return{tenant_id:ctx.tenant_id,role:ctx.role,actor_id:sub};
   if(req.method==="GET"&&url.pathname==="/v1/renovation-catalog")return renovationCatalog;
   if(req.method==="GET"&&url.pathname==="/v1/jobs"){
