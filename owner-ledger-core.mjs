@@ -26,7 +26,7 @@ export function normalize(db) {
  return state;
 }
 export function labourRows(job) {
- return (job.timesheets||[]).map(t=>({...t,hours:Number(t.hours)||0,rate:Number(t.rate)||0,total:round2((Number(t.hours)||0)*(Number(t.rate)||0))}));
+ return (job.timesheets||[]).map(t=>{const daily=t.payBasis==="day";const units=daily?Number(t.days)||0:Number(t.hours)||0;const rate=Number(t.rate)||0;return {...t,payBasis:daily?"day":"hour",hours:daily?0:units,days:daily?units:0,rate,total:round2(units*rate)};});
 }
 export function weeklyStart(day) {
  if(!isISODate(day))return "";
@@ -39,8 +39,8 @@ export function labourByPeriod(job,period) {
  for(const t of labourRows(job)){
   if(!isISODate(t.date))continue;
   const key=period==="month"?t.date.slice(0,7):weeklyStart(t.date);
-  const row=grouped.get(key)||{period:key,hours:0,total:0,entries:0};
-  row.hours+=t.hours;row.total=round2(row.total+t.total);row.entries++;
+  const row=grouped.get(key)||{period:key,hours:0,days:0,total:0,entries:0};
+  row.hours+=t.hours;row.days=round2(row.days+t.days);row.total=round2(row.total+t.total);row.entries++;
   grouped.set(key,row);
  }
  return [...grouped.values()].sort((a,b)=>b.period.localeCompare(a.period));
@@ -63,13 +63,13 @@ export function workerTotals(jobs,name,jobId=""){
   for(const p of job.workerPayments||[])if(workerKey(p.worker)===key&&validMoney(p.amount))payments.push({...p,amount:money(p.amount),jobId:job.id,jobName:job.name});
  }
  const due=round2(earned.reduce((a,t)=>a+t.total,0)),paid=round2(payments.reduce((a,p)=>a+p.amount,0));
- return{earned, payments, due, paid, outstanding:round2(due-paid),hours:round2(earned.reduce((a,t)=>a+t.hours,0))};
+ return{earned, payments, due, paid, outstanding:round2(due-paid),hours:round2(earned.reduce((a,t)=>a+t.hours,0)),days:round2(earned.reduce((a,t)=>a+t.days,0))};
 }
 export function workerByPeriod(jobs,name,period="week",jobId=""){
  const data=workerTotals(jobs,name,jobId);const rows=new Map();
  const keyFor=d=>!isISODate(d)?"":period==="month"?d.slice(0,7):period==="year"?d.slice(0,4):weeklyStart(d);
- for(const t of data.earned){const k=keyFor(t.date);if(!k)continue;const row=rows.get(k)||{period:k,hours:0,earned:0,paid:0};row.hours=round2(row.hours+t.hours);row.earned=round2(row.earned+t.total);rows.set(k,row)}
- for(const p of data.payments){const k=keyFor(p.periodStart||p.paidOn);if(!k)continue;const row=rows.get(k)||{period:k,hours:0,earned:0,paid:0};row.paid=round2(row.paid+p.amount);rows.set(k,row)}
+ for(const t of data.earned){const k=keyFor(t.date);if(!k)continue;const row=rows.get(k)||{period:k,hours:0,days:0,earned:0,paid:0};row.hours=round2(row.hours+t.hours);row.days=round2(row.days+t.days);row.earned=round2(row.earned+t.total);rows.set(k,row)}
+ for(const p of data.payments){const k=keyFor(p.periodStart||p.paidOn);if(!k)continue;const row=rows.get(k)||{period:k,hours:0,days:0,earned:0,paid:0};row.paid=round2(row.paid+p.amount);rows.set(k,row)}
  return [...rows.values()].sort((a,b)=>b.period.localeCompare(a.period)).map(x=>({...x,outstanding:round2(x.earned-x.paid)}));
 }
 export function wageYearSummary(jobs,year="",staff=[]){
@@ -79,7 +79,7 @@ export function wageYearSummary(jobs,year="",staff=[]){
   const wages=worker.earned.filter(x=>!year||(isISODate(x.date)&&x.date.startsWith(year)));
   const payments=worker.payments.filter(x=>!year||(isISODate(x.paidOn)&&x.paidOn.startsWith(year)));
   const earned=round2(wages.reduce((s,x)=>s+x.total,0)),paid=round2(payments.reduce((s,x)=>s+x.amount,0));
-  return{name:worker.name,hours:round2(wages.reduce((s,x)=>s+x.hours,0)),earned,paid,difference:round2(earned-paid)};
+  return{name:worker.name,hours:round2(wages.reduce((s,x)=>s+x.hours,0)),days:round2(wages.reduce((s,x)=>s+x.days,0)),earned,paid,difference:round2(earned-paid)};
  });
  return{rows:results,earned:round2(results.reduce((s,x)=>s+x.earned,0)),paid:round2(results.reduce((s,x)=>s+x.paid,0))};
 }
@@ -88,10 +88,10 @@ export function periodSettlement(jobs,worker,period,key,jobId=""){
  if(!/^\d{4}-\d{2}(-\d{2})?$/.test(key))throw new Error("Invalid settlement period.");
  const row=workerByPeriod(jobs,worker,period,jobId).find(x=>x.period===key);
  if(!row)throw new Error("No recorded work or payments in this period.");
- return{worker,period,key,jobId,hours:row.hours,earned:row.earned,paid:row.paid,balance:row.outstanding};
+ return{worker,period,key,jobId,hours:row.hours,days:row.days,earned:row.earned,paid:row.paid,balance:row.outstanding};
 }
 export function isSettlementCurrent(jobs,s){
- try{const actual=periodSettlement(jobs,s.worker,s.period,s.key,s.jobId||"");return actual.hours===s.hours&&actual.earned===s.earned&&actual.paid===s.paid}catch{return false}
+ try{const actual=periodSettlement(jobs,s.worker,s.period,s.key,s.jobId||"");return actual.hours===s.hours&&(s.days===undefined||actual.days===s.days)&&actual.earned===s.earned&&actual.paid===s.paid}catch{return false}
 }
 export function employeesSummary(jobs,staff=[]){
  return workerNames(jobs,staff).map(name=>({name,...workerTotals(jobs,name)}));
