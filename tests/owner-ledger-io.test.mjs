@@ -18,7 +18,7 @@ test("backup rejects corrupt, wrong schema, and duplicate job IDs",()=>{
 });
 test("CSV export has separate jobs, labour, wages, expenses and payments with consistent figures",()=>{
  const exports=ownerExports(fixture());
- assert.deepEqual(Object.keys(exports),["jobs","labour-hours","wage-payments","expenses","client-payments","staff","material-reimbursements","tax-payments"]);
+ assert.deepEqual(Object.keys(exports),["jobs","labour-hours","weekly-bonuses","wage-payments","expenses","client-payments","staff","material-reimbursements","tax-payments"]);
  assert.match(exports.jobs,/\$?/); // files are plain numeric values, not live business data
  assert.match(exports.jobs,/"320"/);
  assert.match(exports["wage-payments"],/"200"/);
