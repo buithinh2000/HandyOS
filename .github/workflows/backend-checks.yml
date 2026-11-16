@@ -37,7 +37,7 @@ jobs:
       - name: Install pinned backend SDK packages (no AWS credentials)
         run: npm install --prefix backend --ignore-scripts --no-package-lock --no-audit --no-fund
       - name: Verify actual AWS SDK S3 imports without making requests
-        run: node --input-type=module -e "await import('./backend/node_modules/@aws-sdk/client-s3/dist-es/index.js').catch(async()=>await import('./backend/node_modules/@aws-sdk/client-s3/dist-cjs/index.js')); await import('./backend/node_modules/@aws-sdk/s3-request-presigner/dist-es/index.js').catch(async()=>await import('./backend/node_modules/@aws-sdk/s3-request-presigner/dist-cjs/index.js')); console.log('AWS_SDK_IMPORT_PASS');"
+        run: cd backend && node --input-type=module -e "await import('@aws-sdk/client-s3'); await import('@aws-sdk/s3-request-presigner'); console.log('AWS_SDK_IMPORT_PASS');"
       - name: Check baseline SQL isolation constraints
         run: |
           grep -q 'create table if not exists memberships' backend/migrations/001_initial.sql
