@@ -38,6 +38,20 @@ export function createReceiptS3Adapter({config,client,commands,presign}){
   typeof commands?.HeadObjectCommand!=="function")stop();
  const expectedKey=e=>keyCheck(e?.objectKey);
  return Object.freeze({
+  uploadHeaders(expected){
+   const key=expectedKey(expected),ext=key.slice(key.lastIndexOf(".")+1);
+   if(MIME[ext]!==expected.contentType||!Number.isSafeInteger(expected.contentLength)||
+    expected.contentLength<1||expected.contentLength>(ext==="pdf"?15:12)*1024*1024||
+    expected.privateOnly!==true||expected.requiredEncryption!=="aws:kms"||
+    expected.requiredMethod!=="PUT")stop();
+   return Object.freeze({
+    "content-type":expected.contentType,
+    "content-length":String(expected.contentLength),
+    "if-none-match":"*",
+    "x-amz-server-side-encryption":"aws:kms",
+    "x-amz-server-side-encryption-aws-kms-key-id":fixed.kmsKeyArn
+   });
+  },
   async signPut(expected){
    const key=expectedKey(expected),ext=key.slice(key.lastIndexOf(".")+1);
    if(MIME[ext]!==expected.contentType||!Number.isSafeInteger(expected.contentLength)||
