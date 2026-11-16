@@ -17,7 +17,7 @@ function text(value,max,required=false){
  return value.trim();
 }
 function money(value){
- if(typeof value!=="number"||!Number.isFinite(value)||value<=0||Math.round(value*100)!==value*100)invalid("Invalid receipt amount");
+ if(typeof value!=="number"||!Number.isFinite(value)||value<=0||value>=10000000000||Math.abs(Math.round(value*100)-value*100)>0.000001)invalid("Invalid receipt amount");
  return value;
 }
 function signedUrl(value){
