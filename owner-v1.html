@@ -322,7 +322,16 @@ function billCapturePanel(jobFilter="",mobileInbox=false){
  '<div class="metrics">'+metric("Not sent",cash(totals.draft))+metric("Sent",cash(totals.sent))+metric("Reimbursed",cash(totals.reimbursed))+'</div>'+
  '<button class="primary" id="toggleBillEditor">'+(editing?"Edit selected bill":"+ Add bill / photo")+'</button>'+
  (billEditorOpen?'<div class="card" id="billEditor"><div class="fields"><div><label>Job</label><select id="billJob">'+opt("","Select job","")+state.jobs.map(j=>opt(j.id,j.name,editing?.jobId||jobFilter||"")).join("")+'</select></div>'+
- field("Purchase date","billDate",editing?.date||today(),"date")+field("Store / receipt","billReference",editing?.reference||"")+
+ field("Purchase date","billDate",editing?.date||today(),"date")+
+ (()=>{
+  const savedStore=editing?.reference||"Bunnings";
+  const known=["Bunnings","Mitre 10","Bowens"];
+  const choice=known.includes(savedStore)?savedStore:"other";
+  return '<div><label for="billStoreSelect">Store</label><select id="billStoreSelect">'+
+   [...known.map(v=>opt(v,v,choice)),opt("other","Other — enter store name",choice)].join("")+
+   '</select></div><div id="billCustomStoreWrap" '+(choice==="other"?"":"hidden")+'>'
+   +field("Other store name","billReference",choice==="other"?savedStore:"")+'</div>';
+ })()+
  field("Amount paid AUD","billAmount",editing?.amount??"","number")+
  '<div><label>Status</label><select id="billStatus">'+["draft","sent","reimbursed"].map(v=>opt(v,v==="draft"?"Not sent":v==="sent"?"Sent to customer":"Reimbursed",editing?.status||"draft")).join("")+'</select></div></div>'+
  '<label for="billPhoto">iPhone photo or existing photo</label><input id="billPhoto" type="file" accept="image/*" capture="environment">'+
@@ -465,7 +474,7 @@ $("screen").onclick=event=>{
  if(b.dataset.editBill||b.dataset.viewBill){const id=b.dataset.editBill||b.dataset.viewBill;const bill=(state.materialBills||[]).find(x=>x.id===id);if(!bill)return;editingBillId=id;billImageDraft=null;billEditorOpen=true;render();return}
  if(b.id==="saveBill"){
   const job=state.jobs.find(j=>j.id===$("billJob").value),date=$("billDate").value,
-    reference=$("billReference").value.trim().slice(0,160),amount=money($("billAmount").value),
+    reference=($("billStoreSelect").value==="other"?$("billReference").value:$("billStoreSelect").value).trim().slice(0,160),amount=money($("billAmount").value),
     status=$("billStatus").value,notes=$("billNotes").value.trim().slice(0,500),
     original=(state.materialBills||[]).find(x=>x.id===editingBillId),image=billImageDraft||original?.image;
   if(!job||!isISODate(date)||!reference||!Number.isFinite(amount)||amount<=0||!["draft","sent","reimbursed"].includes(status)||!image)return alert("Choose a Job, date, store/reference, positive amount and receipt photo.");
@@ -571,6 +580,11 @@ async function compressBillPhoto(file){
  }finally{URL.revokeObjectURL(url)}
 }
 $("screen").addEventListener("change",async event=>{
+ if(event.target.id==="billStoreSelect"){
+  const other=event.target.value==="other",wrapper=$("billCustomStoreWrap");
+  if(wrapper){wrapper.hidden=!other;if(other)$("billReference")?.focus()}
+  return;
+ }
  if(event.target.id!=="billPhoto")return;
  const input=event.target,file=input.files?.[0];if(!file)return;
  try{

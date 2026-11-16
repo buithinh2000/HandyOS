@@ -36,7 +36,13 @@ try{
   assert.match(await page.locator('[role="status"]').innerText(),/Choose a job/);
   await page.locator('select[name="jobId"]').selectOption("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
   await page.locator('[name="boughtOn"]').fill("2026-11-16");
-  await page.locator('[name="storeReference"]').fill("Synthetic Bunnings");
+  assert.equal(await page.locator('[name="storeSelect"]').inputValue(),"Bunnings");
+  assert.equal(await page.locator('[data-custom-store]').isVisible(),false);
+  await page.locator('[name="storeSelect"]').selectOption("other");
+  assert.equal(await page.locator('[data-custom-store]').isVisible(),true);
+  await page.locator('[name="storeReference"]').fill("Local Hardware");
+  await page.locator('[name="storeSelect"]').selectOption("Mitre 10");
+  assert.equal(await page.locator('[data-custom-store]').isVisible(),false);
   await page.locator('[name="amountGross"]').fill("250.75");
   await page.locator('[name="file"]').setInputFiles({name:"synthetic.jpg",mimeType:"image/jpeg",buffer:Buffer.alloc(1024,1)});
   await page.locator('[type="submit"]').click();
@@ -44,6 +50,7 @@ try{
   const records=await page.evaluate(()=>window.record);
   assert.equal(records.length,1);
   assert.equal(records[0].details.amountGross,250.75);
+  assert.equal(records[0].details.storeReference,"Mitre 10");
   assert.equal(records[0].fileSize,1024);
   assert.equal(await page.evaluate(()=>localStorage.length),0);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,"mobile horizontal overflow");
