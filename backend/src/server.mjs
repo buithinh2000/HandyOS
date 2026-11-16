@@ -5,6 +5,7 @@ import pg from "pg";
 import { CognitoJwtVerifier } from "aws-jwt-verify";
 import { HttpError,sanitizeText,ensureUuid,parseJSON,taskColumns } from "./domain.mjs";
 import {matchReceiptRoute,dispatchReceiptRoute} from "./receipt-http-routes.mjs";
+import {sendHandyOsFrontend} from "./frontend-assets.mjs";
 
 const { Pool } = pg;
 const renovationCatalog = JSON.parse(readFileSync(new URL("../../shared/renovation-catalog.json",import.meta.url),"utf8"));
@@ -132,6 +133,9 @@ async function dispatch(req,{receiptWorkflow=null}={}){
 }
 export function createHandler({receiptWorkflow=null}={}){
  return async(req,res)=>{
+  // Only a fixed public UI asset allowlist may bypass Cognito.
+  // Every /v1/ business route still runs through JWT and tenant RLS.
+  if(sendHandyOsFrontend(req,res))return;
   const origin=req.headers.origin||"";
   const allowed=origin===allowedOrigin;
   if(req.method==="OPTIONS"){
