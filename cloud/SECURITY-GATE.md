@@ -44,6 +44,14 @@ The Lambda has no user-facing publicly callable Function URL. Never put a client
 5. Set CloudWatch logging to metadata only: **never** log request body, response state, Authorization header, access token, payroll amounts, or client names.
 6. Make isolation explicit: no reuse of BuiTai Core roles, secrets, production DB, token providers or shared ledger bucket.
 
+## Production-versus-staging warning (2026-11-16)
+**STOP:** This document's S3 JSON ledger, CloudFormation, Lambda and client adapter are only an isolated **staging experiment**. The canonical HandyOS production architecture is **dedicated RDS PostgreSQL with FORCE RLS plus a distinct private S3 receipt-photo store** (see `ARCHITECTURE.md`). Neither a working database nor a production-ready receipt uploader is established by these files.
+
+- The browser demo embeds compressed data URL photos within ledger JSON. The prototype GET/PUT API has a hard **2 MiB** total JSON limit. With repeated bills, this can reject entire writes; do not silently drop photos or auto-upload browser data.
+- A production data migration needs a deliberate, reversible metadata-to-RDS and image-to-private-S3 design, retention/restore evidence, and explicit Owner approval.
+- Inventory scripts inspect read-only metadata only. They do not prove database isolation, actual Cognito login, backups, correct resource ownership or permission to deploy.
+- Source-only gate `cloud/production-activation-gate.mjs` must report **NO_GO** for unverified conditions or an S3-only production model. Even its all-pass output is a proposal for independent evidence verification, not deploy permission.
+
 ## Go / no-go gates
 
 **NO-GO unless all PASS:**
