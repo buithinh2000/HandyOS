@@ -122,6 +122,22 @@ export function workerTotals(jobs,name,jobId=""){
  const due=round2(earned.reduce((a,t)=>a+t.total,0)),paid=round2(payments.reduce((a,p)=>a+p.amount,0));
  return{earned, payments, due, paid, outstanding:round2(due-paid),hours:round2(earned.reduce((a,t)=>a+t.hours,0)),days:round2(earned.reduce((a,t)=>a+t.days,0))};
 }
+// Owner-only read model. Attendance edits alter earned wages, never historical cash.
+// Saved settlements are snapshots and must be re-reviewed if the inputs change.
+export function payrollReconciliation(jobs,name,settlements=[]){
+ const worker=workerTotals(jobs,name);
+ const prior=(settlements||[]).filter(x=>workerKey(x.worker)===workerKey(name));
+ const stale=prior.filter(x=>!isSettlementCurrent(jobs,x));
+ const overpaid=round2(Math.max(0,worker.paid-worker.due));
+ const unpaid=round2(Math.max(0,worker.due-worker.paid));
+ return {
+  earned:worker.due,paid:worker.paid,balance:worker.outstanding,unpaid,overpaid,
+  dayOffCount:worker.earned.filter(x=>x.dayOff===true&&x.payBasis!=="bonus").length,
+  bonusEarned:round2(worker.earned.filter(x=>x.payBasis==="bonus").reduce((n,x)=>n+x.total,0)),
+  staleSettlements:stale.length,
+  status:overpaid>0?"overpaid_review":stale.length?"closeout_review":unpaid>0?"unpaid":"balanced"
+ };
+}
 export function workerByPeriod(jobs,name,period="week",jobId=""){
  const data=workerTotals(jobs,name,jobId);const rows=new Map();
  const keyFor=d=>!isISODate(d)?"":period==="month"?d.slice(0,7):period==="year"?d.slice(0,4):weeklyStart(d);
