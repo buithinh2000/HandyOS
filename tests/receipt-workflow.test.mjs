@@ -77,6 +77,16 @@ test("invalid receipt metadata rejects before committing pending upload",async()
   const x=setup();await assert.rejects(x.workflow.beginUpload({auth:"owner-token",jobId:job,details:{...details,...edit}}));assert.equal(x.pending.size,0);assert.equal(x.ready.size,0);
  }
 });
+test("normal cent amounts such as 0.29 are valid; excess precision is rejected",async()=>{
+ const small=setup();
+ await small.workflow.beginUpload({auth:"owner-token",jobId:job,details:{...details,amountGross:0.29}});
+ assert.equal(small.pending.size,1);
+ for(const amountGross of [0.001,10.005,10000000000]){
+  const x=setup();
+  await assert.rejects(x.workflow.beginUpload({auth:"owner-token",jobId:job,details:{...details,amountGross}}),/amount/);
+  assert.equal(x.pending.size,0);
+ }
+});
 test("signed URL failures leave an inert pending intent, no fake receipt",async()=>{
  const x=setup({failSign:true});
  await assert.rejects(begin(x.workflow),/storage unavailable/);
