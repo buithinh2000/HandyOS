@@ -1,0 +1,55 @@
+name: HandyOS single-package build (NO DEPLOY)
+on:
+  pull_request:
+    paths:
+      - "Dockerfile"
+      - ".dockerignore"
+      - "backend/**"
+      - "shared/**"
+      - "scripts/verify-one-package.mjs"
+      - ".github/workflows/one-package-build.yml"
+  push:
+    paths:
+      - "Dockerfile"
+      - ".dockerignore"
+      - "backend/**"
+      - "shared/**"
+      - "scripts/verify-one-package.mjs"
+      - ".github/workflows/one-package-build.yml"
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate one-package contract offline
+        run: node scripts/verify-one-package.mjs
+      - name: Build HandyOS API as single immutable Docker artifact
+        run: docker build --pull --tag handyos-api:source-check .
+      - name: Verify image does not include local demo, AWS templates or secret files
+        run: |
+          docker run --rm --entrypoint node handyos-api:source-check -e "
+            const fs=require('node:fs');
+            const p='/opt/handyos';
+            for(const path of ['cloud','owner-v1.html','workspace.html','index.html','.env','.git','backend/test']){
+              if(fs.existsSync(p+'/'+path))throw Error('Unsafe image member: '+path)
+            }
+            for(const path of ['backend/src/server.mjs','shared/renovation-catalog.json']){
+              if(!fs.existsSync(p+'/'+path))throw Error('Missing packaged runtime '+path)
+            }
+            console.log('HandyOS API image boundaries PASS')
+          "
+      - name: Fail closed when runtime configuration is missing
+        run: |
+          set +e
+          docker run --rm handyos-api:source-check > /tmp/handyos-startup-check.log 2>&1
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then echo "ERROR: API started without verified config"; exit 1; fi
+          grep -q 'Missing configuration: DATABASE_URL' /tmp/handyos-startup-check.log
+          echo "HandyOS startup blocks missing configuration as expected"
