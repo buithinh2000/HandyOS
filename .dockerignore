@@ -1,0 +1,23 @@
+# Only the API package and shared catalog are copied into the image.
+**/.git
+**/.github
+**/node_modules
+**/.env
+**/.env.*
+**/*secret*
+**/*credential*
+**/artifacts
+**/tests
+**/cloud
+**/docs
+**/owner-v1.html
+**/workspace.html
+**/index.html
+**/*.pdf
+**/*.jpg
+**/*.jpeg
+**/*.png
+**/*.webp
+**/*.zip
+**/*.tar
+**/*.tar.gz
