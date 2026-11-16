@@ -4,6 +4,18 @@ Status: **SOURCE-ONLY. NOT CONNECTED. NOT PRODUCTION-READY.** Checked against ma
 ## Decision
 **Owner-approved account strategy (2026-11-16): use the same AWS account as BuiTai, but create and operate dedicated, isolated HandyOS resources.** Sharing the AWS account/region or a suitable existing VPC networking boundary is allowed only after verified security review; sharing BuiTai Core database/schema/tables, application runtime, IAM roles, Cognito pool, secrets, S3 buckets/object prefixes, KMS data keys, logging roles, CI deployment identity, or backups is **not** allowed. HandyOS must have its own PostgreSQL instance or database cluster with independent credentials, own Cognito pool/app client, API service/role, private versioned S3 receipt bucket, encryption key/policy and named resource tags. No changes to BuiTai Core or other ventures. This is an architecture decision, **not** approval of paid provisioning or production data migration. Keep the stack in [ARCHITECTURE.md](../ARCHITECTURE.md). The connected Supabase project is excluded from HandyOS entirely.
 
+## Two-phase receipt upload (source-only, not deployed) — 2026-11-16
+
+A file appearing in the browser must not imply it has been durably stored on S3. The prepared `backend/src/receipt-workflow.mjs` now models a strict three-operation process, backed by a new **pending upload-intent** table (`backend/migrations/004_receipt_upload_intents.sql`):
+
+1. **Begin:** after independently verified Cognito Owner/Manager role and PostgreSQL tenant/job access, validate amount, purchase date, GST basis and media size/type; reserve an intent and generate a short-lived, private signed S3 upload URL through a future signer.
+2. **Confirm:** the server rereads the persisted intent and HEAD-checks the exact object in private S3 for matching key, MIME, byte length and KMS encryption. In a **single PostgreSQL transaction**, insert one material-reimbursement record, mark the intent committed and write an audit event. If verification fails, pending intent remains; **no bill is created**. Retried confirmations must not duplicate bills.
+3. **View:** reauthorize Owner/Manager and tenant/job/receipt on every request; only a verified/committed reimbursement can obtain a short-lived private GET URL.
+
+The workflow currently uses **injected repository and storage interfaces** with fake implementations in tests. The actual PostgreSQL repository transaction, AWS SDK signer/HEAD adapter, signed-route HTTP handlers, login and deploy are **NOT YET implemented or live**. Do not treat source-only passing tests as an upload service. Do not store the signed URL in PostgreSQL, client backups or logs. Orphaned pending uploads need an approved secure retention/cleanup policy. SHA and content-signature checks, malware scanning, S3 key policy, billing limits and authenticated staging end-to-end tests remain deployment blockers.
+
+This avoids an accidental cost/profit change: material reimbursements remain **pass-through**, separate from job costs and contract progress payments.
+
 ## Receipt media API contract (source-only, not deployed) — 2026-11-16
 
 Canonical design: PostgreSQL owns receipt records, job link, amount, GST basis, state transitions and audit history. **A dedicated HandyOS S3 bucket** stores the photo/PDF bytes. The database stores only `receipt_object_key`, content type and optional verified metadata; **never** base64 blobs, public URLs, presigned URLs or AWS tokens.

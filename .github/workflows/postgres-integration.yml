@@ -41,7 +41,10 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f backend/migrations/001_initial.sql
           psql -X -v ON_ERROR_STOP=1 -f backend/migrations/002_rls.sql
           psql -X -v ON_ERROR_STOP=1 -f backend/migrations/003_owner_operations.sql
+          psql -X -v ON_ERROR_STOP=1 -f backend/migrations/004_receipt_upload_intents.sql
       - name: Verify tenant isolation and job/task insert
         run: psql -X -v ON_ERROR_STOP=1 -f backend/test/postgres-smoke.sql
       - name: Verify owner-only payroll, receipts and tenant RLS
         run: psql -X -v ON_ERROR_STOP=1 -f backend/test/operations-rls-smoke.sql
+      - name: Verify receipt upload isolation and no phantom reimbursement
+        run: psql -X -v ON_ERROR_STOP=1 -f backend/test/receipt-intents-rls-smoke.sql
