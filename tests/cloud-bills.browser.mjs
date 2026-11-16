@@ -41,7 +41,7 @@ try{
   await page.locator('[name="storeSelect"]').selectOption("other");
   assert.equal(await page.locator('[data-custom-store]').isVisible(),true);
   await page.locator('[name="storeReference"]').fill("Local Hardware");
-  await page.locator('[name="storeSelect"]').selectOption("Mitre 10");
+  await page.locator('[name="storeSelect"]').selectOption("Reece");
   assert.equal(await page.locator('[data-custom-store]').isVisible(),false);
   await page.locator('[name="amountGross"]').fill("250.75");
   await page.locator('[name="file"]').setInputFiles({name:"synthetic.jpg",mimeType:"image/jpeg",buffer:Buffer.alloc(1024,1)});
@@ -50,7 +50,7 @@ try{
   const records=await page.evaluate(()=>window.record);
   assert.equal(records.length,1);
   assert.equal(records[0].details.amountGross,250.75);
-  assert.equal(records[0].details.storeReference,"Mitre 10");
+  assert.equal(records[0].details.storeReference,"Reece");
   assert.equal(records[0].fileSize,1024);
   assert.equal(await page.evaluate(()=>localStorage.length),0);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,"mobile horizontal overflow");

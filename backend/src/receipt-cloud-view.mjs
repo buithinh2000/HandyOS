@@ -34,7 +34,7 @@ export function mountCloudBills({root,controller,jobs=[]}={}){
   <div class="fields">
    <label>Job<select name="jobId" required><option value="">Choose job</option></select></label>
    <label>Purchase date<input name="boughtOn" type="date" required></label>
-   <label>Store<select name="storeSelect"><option value="Bunnings">Bunnings</option><option value="Mitre 10">Mitre 10</option><option value="Bowens">Bowens</option><option value="other">Other — enter store name</option></select></label>\n   <label data-custom-store hidden>Other store name<input name="storeReference" maxlength="160" autocomplete="off" placeholder="Enter store name"></label>
+   <label>Store<select name="storeSelect"><option value="Bunnings">Bunnings</option><option value="Mitre 10">Mitre 10</option><option value="Bowens">Bowens</option><option value="Reece">Reece</option><option value="other">Other — enter store name</option></select></label>\n   <label data-custom-store hidden>Other store name<input name="storeReference" maxlength="160" autocomplete="off" placeholder="Enter store name"></label>
    <label>Amount paid (AUD)<input name="amountGross" type="number" min="0.01" step="0.01" inputmode="decimal" required></label>
    <label>GST<select name="gstBasis"><option value="inc">Includes GST</option><option value="ex">Excludes GST</option><option value="no_gst">No GST</option></select></label>
    <label>Receipt photo or PDF<input name="file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required></label>
