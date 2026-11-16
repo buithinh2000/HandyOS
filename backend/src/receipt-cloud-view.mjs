@@ -36,7 +36,7 @@ export function mountCloudBills({root,controller,jobs=[]}={}){
    <label>Store / receipt<input name="storeReference" maxlength="160" required autocomplete="off" placeholder="e.g. Bunnings"></label>
    <label>Amount paid (AUD)<input name="amountGross" type="number" min="0.01" step="0.01" inputmode="decimal" required></label>
    <label>GST<select name="gstBasis"><option value="inc">Includes GST</option><option value="ex">Excludes GST</option><option value="no_gst">No GST</option></select></label>
-   <label>Receipt photo or PDF<input name="file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" capture="environment" required></label>
+   <label>Receipt photo or PDF<input name="file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required></label>
    <label class="full">Notes (optional)<textarea name="notes" maxlength="500" rows="2"></textarea></label>
   </div>
   <p class="hint">Camera or Photo Library on iPhone. JPEG, PNG, WebP up to 12 MB, PDF up to 15 MB. HEIC must be converted to JPEG first.</p>
@@ -57,7 +57,6 @@ export function mountCloudBills({root,controller,jobs=[]}={}){
   saved:"Bill saved securely. Not sent to customer.",
   "retry-needed":"Could not verify the save. Check the bill list before trying again."
  };
- const previous=controller.onStatus;
  // Controller's notify should be bound by the parent application.
  const setStatus=state=>message(steps[state]||"Ready to save receipt");
  const onSubmit=async event=>{
