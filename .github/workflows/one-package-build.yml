@@ -5,6 +5,7 @@ on:
       - "Dockerfile"
       - ".dockerignore"
       - "backend/**"
+      - "web/**"
       - "shared/**"
       - "scripts/verify-one-package.mjs"
       - ".github/workflows/one-package-build.yml"
@@ -13,6 +14,7 @@ on:
       - "Dockerfile"
       - ".dockerignore"
       - "backend/**"
+      - "web/**"
       - "shared/**"
       - "scripts/verify-one-package.mjs"
       - ".github/workflows/one-package-build.yml"
@@ -39,10 +41,10 @@ jobs:
             for(const path of ['cloud','owner-v1.html','workspace.html','index.html','.env','.git','backend/test']){
               if(fs.existsSync(p+'/'+path))throw Error('Unsafe image member: '+path)
             }
-            for(const path of ['backend/src/server.mjs','shared/renovation-catalog.json']){
+            for(const path of ['backend/src/server.mjs','shared/renovation-catalog.json','web/index.html','web/boot.mjs']){
               if(!fs.existsSync(p+'/'+path))throw Error('Missing packaged runtime '+path)
             }
-            console.log('HandyOS API image boundaries PASS')
+            console.log('HandyOS frontend + API image boundaries PASS')
           "
       - name: Fail closed when runtime configuration is missing
         run: |

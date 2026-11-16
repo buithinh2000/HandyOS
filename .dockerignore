@@ -12,7 +12,7 @@
 **/docs
 **/owner-v1.html
 **/workspace.html
-**/index.html
+/index.html
 **/*.pdf
 **/*.jpg
 **/*.jpeg
