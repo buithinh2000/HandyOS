@@ -29,6 +29,8 @@ jobs:
           node --check backend/test/receipt-sdk-factory.test.mjs
           node --check backend/test/receipt-sdk-real-signing.test.mjs
           node --check backend/src/receipt-iphone-upload.mjs
+          node --check backend/src/receipt-cloud-controller.mjs
+          node --check backend/test/receipt-cloud-controller.test.mjs
           node --check backend/test/receipt-iphone-upload.test.mjs
           node --check backend/test/receipt-s3-adapter.test.mjs
           node --check backend/src/receipt-http-routes.mjs
@@ -36,7 +38,7 @@ jobs:
           node --check backend/test/receipt-repository.integration.mjs
           node --check backend/test/security.test.mjs
       - name: Run security domain unit tests (no cloud credentials)
-        run: node --test backend/test/security.test.mjs backend/test/receipt-http-routes.test.mjs backend/test/receipt-s3-adapter.test.mjs backend/test/receipt-sdk-factory.test.mjs backend/test/receipt-iphone-upload.test.mjs
+        run: node --test backend/test/receipt-cloud-controller.test.mjs backend/test/security.test.mjs backend/test/receipt-http-routes.test.mjs backend/test/receipt-s3-adapter.test.mjs backend/test/receipt-sdk-factory.test.mjs backend/test/receipt-iphone-upload.test.mjs
       - name: Install pinned backend SDK packages (no AWS credentials)
         run: npm install --prefix backend --ignore-scripts --no-package-lock --no-audit --no-fund
       - name: Verify actual AWS SDK S3 imports without making requests
