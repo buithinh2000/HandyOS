@@ -835,5 +835,33 @@ assert.equal(offState.jobs[0].timesheets.length,1);
 assert.equal(offState.jobs[0].timesheets[0].statusHistory.length,2);
 await offPage.close();
 
+// iPhone payroll reconciliation after Day off: show reviewed balances and explicit payment guard.
+const reconcilePage=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+const reconcileMessages=[];
+reconcilePage.on("dialog",d=>{reconcileMessages.push(d.message());return d.type()==="prompt"?d.accept("Payroll sample"):d.accept()});
+await reconcilePage.goto(address);
+await reconcilePage.evaluate(()=>{
+ const key="handyos-workspace-v07";
+ const entry={jobs:[{id:"job-reconcile",name:"Payroll test",stage:"active",contract:11000,
+ timesheets:[{id:"day-reconcile",worker:"Reconcile Alex",date:"2026-11-16",payBasis:"day",days:1,rate:250,dayOff:true}],
+ expenses:[],payments:[],workerPayments:[{id:"paid-reconcile",worker:"Reconcile Alex",paidOn:"2026-11-16",amount:200}]}],
+ staff:[{id:"staff-reconcile",name:"Reconcile Alex",payBasis:"day",rate:250,active:true}],
+ payrollSettlements:[],taxPayments:[],materialBills:[]};
+ localStorage.setItem(key,JSON.stringify(entry));
+});
+await reconcilePage.reload();
+await reconcilePage.locator('[data-page="employees"]').click();
+await reconcilePage.locator('[data-open="worker"][data-name="Reconcile Alex"]').first().click();
+assert.match(await reconcilePage.locator("#payrollReview").innerText(),/Paid above wages/);
+assert.match(await reconcilePage.locator("#payrollReview").innerText(),/\\$200\\.00/);
+await reconcilePage.locator("#wageJob").selectOption("job-reconcile");
+await reconcilePage.locator("#wageAmount").fill("25");
+await reconcilePage.locator("#addWage").click();
+assert.match(reconcileMessages.join(" "),/exceeds the unpaid wage balance/);
+const reconcileState=await reconcilePage.evaluate(()=>JSON.parse(localStorage.getItem("handyos-workspace-v07")));
+assert.equal(reconcileState.jobs[0].workerPayments.length,2);
+assert.equal(reconcileState.jobs[0].timesheets.length,1);
+await reconcilePage.close();
+
 console.log("OWNER_BROWSER_QA_PASS");
 }finally{if(browser)await browser.close();await new Promise(ok=>server.close(ok))}
