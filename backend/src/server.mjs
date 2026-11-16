@@ -6,6 +6,7 @@ import { CognitoJwtVerifier } from "aws-jwt-verify";
 import { HttpError,sanitizeText,ensureUuid,parseJSON,taskColumns } from "./domain.mjs";
 import {matchReceiptRoute,dispatchReceiptRoute} from "./receipt-http-routes.mjs";
 import {sendHandyOsFrontend} from "./frontend-assets.mjs";
+import {createHandyOsReceiptRuntime} from "./receipt-runtime.mjs";
 
 const { Pool } = pg;
 const renovationCatalog = JSON.parse(readFileSync(new URL("../../shared/renovation-catalog.json",import.meta.url),"utf8"));
@@ -148,6 +149,13 @@ export function createHandler({receiptWorkflow=null}={}){
  };
 }
 if(process.argv[1] && import.meta.url===new URL("file://"+process.argv[1]).href){
- const server=http.createServer(createHandler());
- server.listen(Number(process.env.PORT)||8080,"0.0.0.0",()=>console.log("HandyOS API listening"));
+ // Runtime composition is explicit; without approved isolated resources,
+ // receipt routes continue returning 503 rather than fake cloud persistence.
+ createHandyOsReceiptRuntime({env:process.env,pool}).then(runtime=>{
+  const server=http.createServer(createHandler({receiptWorkflow:runtime.workflow}));
+  const shutdown=()=>server.close(()=>{runtime.close();pool.end().catch(()=>{});});
+  process.once("SIGTERM",shutdown);process.once("SIGINT",shutdown);
+  server.listen(Number(process.env.PORT)||8080,"0.0.0.0",
+   ()=>console.log("HandyOS API listening; receipts:",runtime.enabled?"enabled":"disabled"));
+ }).catch(()=>{console.error("HandyOS receipt runtime activation blocked");process.exitCode=1;pool.end().catch(()=>{});});
 }
