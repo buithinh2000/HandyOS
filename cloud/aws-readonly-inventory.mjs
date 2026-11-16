@@ -7,7 +7,7 @@ import {pathToFileURL} from "node:url";
 
 const ACCOUNT=/^[0-9]{12}$/;
 const REGION=/^ap-(?:southeast|northeast|south)-[1-9]$/;
-const PREFIX=/^handyos[-/]/i;
+const PREFIX=/^(?:handyos[-/]|alias\/handyos[-/])/i;
 const QUERIES=Object.freeze([
  Object.freeze({key:"rds",args:["rds","describe-db-instances"],field:"DBInstances",name:"DBInstanceIdentifier"}),
  Object.freeze({key:"cognito",args:["cognito-idp","list-user-pools","--max-results","60"],field:"UserPools",name:"Name"}),
