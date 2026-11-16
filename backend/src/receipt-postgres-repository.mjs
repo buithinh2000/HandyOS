@@ -4,7 +4,7 @@
 // Caller NEVER supplies a database role, storage key, or tenant privileges as authority.
 import {randomUUID} from "node:crypto";
 
-const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function uuid(x){if(typeof x!=="string"||!UUID.test(x))throw Error("Invalid identifier");return x.toLowerCase()}
 function authCheck(auth){
  if(auth?.verifiedByApi!==true||typeof auth.actorSub!=="string"||auth.actorSub.length<8||auth.actorSub.length>255)
