@@ -117,7 +117,7 @@ body>main>.muted{margin:4px 0 0}
 <header><strong>HandyOS / Owner V1</strong><div class="header-tools"><button id="exportCsv">Export CSV</button><button id="backup">Backup JSON</button><button id="restore">Restore backup</button></div></header><main><h1>Business Manager</h1><p class="muted">Jobs, employees, expenses, progress payments and estimated profit.</p><p class="notice"><b>Browser-only demo.</b> No secure login or cloud sync. Do not enter real employee, customer or payroll information. Personal employee links are deferred.</p>
 <nav id="nav" class="nav" aria-label="Owner sections"><button data-page="company">Today</button><button data-page="jobs">Jobs</button><button data-page="employees">People</button><button data-page="expenses">Money</button><button data-page="receipts">Bills</button></nav><section id="screen"></section><footer class="muted" style="font-size:12px;margin-top:36px"><details><summary style="cursor:pointer">Older prototypes (separate demo data)</summary><p>These older tools are not the current Owner V1 and do not share all records with it.</p><p><a href="legacy-dashboard.html">Legacy dashboard</a> · <a href="workspace.html">Workspace</a> · <a href="renovation.html">Job Planner</a> · <a href="operations.html">Operations</a> · <a href="quotes.html">Quote Studio</a></p></details></footer></main>
 <script type="module">
-import {STORE_KEY,normalize,money,dollars,summary,jobGroup,paymentProgress,scheduleDays,scheduleEntry,isISODate,canClose,snapshot,workerKey,workerNames,workerTotals,workerByPeriod,employeesSummary,customerPayment,paymentBreakdown,wageYearSummary,periodSettlement,isSettlementCurrent,companySummary,expenseSummary,financialPeriodSummary,materialBillSummary,startCrewSession,finishCrewSession,recordWeeklyBonus,weeklyStart,setAttendanceDayOff} from "./owner-ledger-core.mjs";
+import {STORE_KEY,normalize,money,dollars,summary,jobGroup,paymentProgress,scheduleDays,scheduleEntry,isISODate,canClose,snapshot,workerKey,workerNames,workerTotals,workerByPeriod,employeesSummary,customerPayment,paymentBreakdown,wageYearSummary,periodSettlement,isSettlementCurrent,companySummary,expenseSummary,financialPeriodSummary,materialBillSummary,startCrewSession,finishCrewSession,recordWeeklyBonus,weeklyStart,setAttendanceDayOff,payrollReconciliation} from "./owner-ledger-core.mjs";
 import {parseOwnerBackup,ownerExports} from "./owner-ledger-io.mjs";
 const $=id=>document.getElementById(id),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])),today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-")},uid=()=>crypto.randomUUID();
 // Unreadable browser data is never replaced silently by an empty ledger.
@@ -255,9 +255,17 @@ return '<div class="row"><h2>Employees</h2><button id="toggleStaffForm" class="p
  const weekStart=weeklyStart(today());
  const memberBonuses=state.jobs.flatMap(j=>(j.wageAdjustments||[]).filter(a=>workerKey(a.worker)===workerKey(person))
    .map(a=>({...a,jobName:j.name}))).sort((a,b)=>b.date.localeCompare(a.date));
- const member=state.staff.find(x=>x.name.trim().toLowerCase()===person.trim().toLowerCase()),w=workerTotals(state.jobs,person),rows=workerByPeriod(state.jobs,person,period),settlements=state.payrollSettlements.filter(x=>x.worker.trim().toLowerCase()===person.trim().toLowerCase()),seenClosePeriods=new Set();
+ const member=state.staff.find(x=>x.name.trim().toLowerCase()===person.trim().toLowerCase()),w=workerTotals(state.jobs,person),rows=workerByPeriod(state.jobs,person,period),settlements=state.payrollSettlements.filter(x=>x.worker.trim().toLowerCase()===person.trim().toLowerCase()),seenClosePeriods=new Set(),reconcile=payrollReconciliation(state.jobs,person,state.payrollSettlements);
  return '<button class="back" data-back="employees">← All employees</button><h2>'+esc(person)+'</h2><div class="metrics">'+metric("Hours",w.hours)+metric("Days",w.days)+metric("Earned",cash(w.due))+metric("Paid",cash(w.paid))+metric("Outstanding",cash(w.outstanding))+'</div>'+(w.outstanding<0?'<p class="notice"><b>Payroll needs review.</b> Wages paid exceed corrected earned wages by '+cash(-w.outstanding)+'. No payment has been reversed.</p>':'')+
  employeeAttendance()+
+ '<section class="card" id="payrollReview"><h3>Payroll reconciliation</h3><p class="muted">Live totals after attendance corrections and weekly bonuses. Cash already paid is unchanged.</p>'+
+ '<div class="metrics">'+metric("Earned",cash(reconcile.earned))+metric("Actually paid",cash(reconcile.paid))+
+ metric("Still due",cash(reconcile.unpaid))+metric("Paid above earnings",cash(reconcile.overpaid))+'</div>'+
+ (reconcile.recordedDaysOff?'<p class="muted">Day-off corrections: '+reconcile.recordedDaysOff+' recorded workdays excluded from wages.</p>':'')+
+ (reconcile.staleSettlementCount?'<p class="warn"><b>Review '+reconcile.staleSettlementCount+' previously saved payroll closeout(s).</b> Totals changed since snapshot.</p>':'')+
+ (reconcile.overpaid>0?'<p class="warn"><b>Action needed.</b> Prior wage payments exceed corrected earnings. Verify records manually; HandyOS will not refund, deduct or erase a payment.</p>':'')+
+ '<p class="muted">Payments are grouped by payment date and are not assigned to individual workdays. This is a management estimate, not a payslip or automatic payroll.</p></section>'+
+
 
  '<div class="card" id="weeklyBonusPanel"><h3>Weekly bonus</h3><p class="muted">Bonus adds to earned wages and Job costs once. It is not money paid, Other Expenses or staff reimbursement.</p>'+
  '<div class="fields"><div><label for="bonusJob">Job</label><select id="bonusJob">'+opt("","Select Job","")+state.jobs.filter(j=>jobGroup(j)!=="finished").map(j=>opt(j.id,j.name,"")).join("")+'</select></div>'+
@@ -536,7 +544,12 @@ $("screen").onclick=event=>{
   try{recordWeeklyBonus(job,{id:uid(),worker:person,date,amount,notes});persist()}catch(err){alert(err.message)}
   return;
  }
- if(b.id==="addWage"){const target=state.jobs.find(j=>j.id===$("wageJob").value),amount=positive("wageAmount"),paidOn=$("wageDate").value;if(!target||!amount||!isISODate(paidOn))return alert("Select a job and enter a valid payment date and positive amount.");target.workerPayments??=[];target.workerPayments.push({id:uid(),worker:person,paidOn,amount});persist();return}
+ if(b.id==="addWage"){const target=state.jobs.find(j=>j.id===$("wageJob").value),amount=positive("wageAmount"),paidOn=$("wageDate").value;
+ if(!target||!amount||!isISODate(paidOn))return alert("Select a job and enter a valid payment date and positive amount.");
+ const reconciliation=payrollReconciliation(state.jobs,person,state.payrollSettlements);
+ if(amount>reconciliation.unpaid&&!confirm("This payment exceeds the currently unpaid wage balance of "+cash(reconciliation.unpaid)+". Only continue if this is intentional (for example a wage advance). Continue recording cash paid?"))return;
+ if(!confirm("Record "+cash(amount)+" actually paid to "+person+"? This does not create additional earned wages."))return;
+ target.workerPayments??=[];target.workerPayments.push({id:uid(),worker:person,paidOn,amount});persist();return}
  if(b.dataset.delete&&j){if(!confirm("Delete entry?"))return;j[b.dataset.delete]=j[b.dataset.delete].filter(x=>x.id!==b.dataset.id);persist();return}
  if(b.dataset.removeWage){if(!confirm("Delete wage payment?"))return;const target=state.jobs.find(j=>j.id===b.dataset.job);target.workerPayments=target.workerPayments.filter(x=>x.id!==b.dataset.removeWage);persist()}
 };
