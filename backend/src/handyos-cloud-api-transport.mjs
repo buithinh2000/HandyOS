@@ -25,7 +25,8 @@ function routeAllowed(method,path){
 }
 export function createHandyOsApiTransport({apiOrigin,uiOrigin,locationOrigin,session,fetcher}={}){
  const fixed=validateHandyOsApiOrigin({apiOrigin,uiOrigin});
- if(locationOrigin!==fixed.uiOrigin||typeof session?.accessToken!=="function"||
+ if((typeof location!=="undefined"&&location.origin!==fixed.uiOrigin)||
+  locationOrigin!==fixed.uiOrigin||typeof session?.accessToken!=="function"||
   typeof session?.tenantId!=="function"||typeof fetcher!=="function")unavailable();
  return Object.freeze({
   async request({method="GET",path,json}={}){
