@@ -41,7 +41,7 @@ function contextCheck(ctx,jobId){
 export function createReceiptWorkflow({repository,media,newId=randomUUID}){
  const methods=["authorizeOwnerJob","reserveUpload","findPending","commitVerified","findReady"];
  for(const m of methods)if(typeof repository?.[m]!=="function")invalid("Missing repository method "+m);
- for(const m of ["signPut","head","signGet"])if(typeof media?.[m]!=="function")invalid("Missing storage method "+m);
+ for(const m of ["signPut","uploadHeaders","head","signGet"])if(typeof media?.[m]!=="function")invalid("Missing storage method "+m);
  async function authorized(auth,jobId){
   if(typeof jobId!=="string")invalid("Invalid job ID");
   return contextCheck(await repository.authorizeOwnerJob(auth,jobId),jobId);
@@ -59,8 +59,17 @@ export function createReceiptWorkflow({repository,media,newId=randomUUID}){
    await repository.reserveUpload(ctx,{id:receiptId,objectId,jobId,tenantId:ctx.tenantId,
     boughtOn,storeReference,notes,amountGross,gstBasis:details.gstBasis,
     objectKey:expected.objectKey,contentType:expected.contentType,contentLength:expected.contentLength});
+   const uploadHeaders=media.uploadHeaders(expected);
+   if(!uploadHeaders||typeof uploadHeaders!=="object"||
+      uploadHeaders["content-type"]!==expected.contentType||
+      uploadHeaders["content-length"]!==String(expected.contentLength)||
+      uploadHeaders["if-none-match"]!=="*"||
+      uploadHeaders["x-amz-server-side-encryption"]!=="aws:kms"||
+      typeof uploadHeaders["x-amz-server-side-encryption-aws-kms-key-id"]!=="string")
+    invalid("Unsafe receipt upload headers");
    const uploadUrl=signedUrl(await media.signPut(expected));
-   return {receiptId,uploadUrl,contentType:expected.contentType,expiresInSeconds:expected.expiresInSeconds,
+   return {receiptId,uploadUrl,uploadHeaders,
+    contentType:expected.contentType,expiresInSeconds:expected.expiresInSeconds,
     requiredMethod:"PUT",requiredEncryption:expected.requiredEncryption};
   },
   async confirmUpload({auth,jobId,receiptId}){

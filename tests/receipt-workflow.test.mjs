@@ -21,6 +21,11 @@ function setup({role="owner",headOverride=null,failSign=false}={}){
   async findReady(ctx,id){calls.push("ready");return ready.get(id)}
  };
  const media={
+  uploadHeaders(x){calls.push("uploadHeaders");return {
+   "content-type":x.contentType,"content-length":String(x.contentLength),
+   "if-none-match":"*","x-amz-server-side-encryption":"aws:kms",
+   "x-amz-server-side-encryption-aws-kms-key-id":"arn:aws:kms:ap-southeast-1:000000000000:key/11111111-1111-4111-8111-111111111111"
+  }},
   async signPut(x){calls.push("signPut");if(failSign)throw Error("storage unavailable");return "https://private-s3.example/path?signature=synthetic"},
   async head(x){calls.push("head");return {...{key:x.objectKey,contentType:x.contentType,contentLength:x.contentLength,
    encryption:"aws:kms",kmsKeyArn:"arn:aws:kms:ap-southeast-1:000000000000:key/fake"},...(headOverride||{})}},
@@ -37,9 +42,10 @@ test("staged upload only reserves metadata, never creates a reimbursement",async
  const started=await begin(workflow);
  assert.equal(started.receiptId,ids[0]);
  assert.equal(started.requiredMethod,"PUT");assert.equal(started.requiredEncryption,"aws:kms");
+ assert.equal(started.uploadHeaders["content-length"],"1024");assert.equal(started.uploadHeaders["if-none-match"],"*");
  assert.equal(started.expiresInSeconds,180);assert.match(started.uploadUrl,/^https:/);
  assert.equal(pending.size,1);assert.equal(ready.size,0);
- assert.deepEqual(calls,["auth","reserve","signPut"]);
+ assert.deepEqual(calls,["auth","reserve","uploadHeaders","signPut"]);
 });
 test("only verified HEAD creates bill; GET is private and reauthorizes",async()=>{
  const {workflow,pending,ready,calls}=setup();
@@ -49,7 +55,7 @@ test("only verified HEAD creates bill; GET is private and reauthorizes",async()=
  assert.equal(pending.size,0);assert.equal(ready.size,1);
  const url=await workflow.viewReceipt({auth:"owner-token",jobId:job,receiptId:ids[0]});
  assert.match(url.viewUrl,/^https:/);assert.equal(url.expiresInSeconds,180);
- assert.deepEqual(calls,["auth","reserve","signPut","auth","pending","head","commit","auth","ready","signGet"]);
+ assert.deepEqual(calls,["auth","reserve","uploadHeaders","signPut","auth","pending","head","commit","auth","ready","signGet"]);
  await assert.rejects(confirm(workflow),/not found/);
 });
 test("mismatched HEAD, missing image and spoofed key do not create a bill",async()=>{
