@@ -853,7 +853,7 @@ await reconcilePage.reload();
 await reconcilePage.locator('[data-page="employees"]').click();
 await reconcilePage.locator('[data-open="worker"][data-name="Reconcile Alex"]').first().click();
 assert.match(await reconcilePage.locator("#payrollReview").innerText(),/Paid above wages/);
-assert.match(await reconcilePage.locator("#payrollReview").innerText(),/\\$200\\.00/);
+assert.match(await reconcilePage.locator("#payrollReview").innerText(),/\$200\.00/);
 await reconcilePage.locator("#wageJob").selectOption("job-reconcile");
 await reconcilePage.locator("#wageAmount").fill("25");
 await reconcilePage.locator("#addWage").click();
