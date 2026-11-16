@@ -30,3 +30,15 @@ The manifest must NOT contain DB connection strings, tokens, passwords, secret v
 ## Current blockers
 
 There is no verified dedicated HandyOS Cognito pool, privately provisioned PostgreSQL database, S3 receipt bucket/KMS configuration, production runtime, backup restoration evidence or live staging sign-in. Existing mock CI tests, an S3 JSON owner-ledger template and the source-level PKCE/UI code do not close these gates. Report the system as **NOT LIVE**.
+
+## Metadata-only AWS inventory script (not run against AWS)
+
+`cloud/aws-readonly-inventory.mjs` is an explicit-invocation AWS CLI utility. It uses a **hard-coded allowlist** of only seven read-only metadata actions: STS GetCallerIdentity; RDS DescribeDBInstances; Cognito ListUserPools; S3 ListBuckets; IAM ListRoles; KMS ListAliases; and Secrets Manager ListSecrets (names only; **never** GetSecretValue). It requires an independently approved expected account ID and region before any request; it aborts if the identity does not match. Only `handyos-` / `handyos/` and `alias/handyos-` resource names are printed; other ventures are represented as counts, not names or ARNs. The report makes **no claim** about resource ownership, isolation, active IAM permissions, database contents, backup status, configuration or available AWS credits.
+
+After a separately authorized read-only AWS session is available, execute locally with read-only IAM credentials and AWS CLI v2:
+
+```bash
+node cloud/aws-readonly-inventory.mjs <approved-12-digit-account> <approved-ap-region>
+```
+
+The tool prints a JSON summary to standard output and never reads secrets or writes files. Do not paste output containing other sensitive inventory details into support channels; verify the output with the owner. **No command above has been executed against real AWS in this PR.** Never auto-run this inventory from public GitHub Actions or use existing venture deployment roles to grant new permissions.
