@@ -46,6 +46,29 @@ jobs:
             }
             console.log('HandyOS frontend + API image boundaries PASS')
           "
+      - name: Export a single downloadable image bundle (main only, NEVER deploy)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p dist
+          docker save handyos-api:source-check | gzip -1 > dist/handyos-image.tar.gz
+          (cd dist && sha256sum handyos-image.tar.gz > SHA256SUMS.txt)
+          cat > dist/INSTALL.txt <<'EOF'
+          HandyOS source-only Docker image artifact.
+          IMPORTANT: NOT configured for production and NOT live.
+          Contains cloud frontend and API, but requires separately verified dedicated
+          Cognito, PostgreSQL, private S3, secrets and approved hosting.
+          Verify: sha256sum -c SHA256SUMS.txt
+          Load: docker load -i handyos-image.tar.gz
+          Never embed passwords or tokens in the image.
+          EOF
+      - name: Upload HandyOS release bundle (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: handyos-one-image-source-bundle
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
       - name: Fail closed when runtime configuration is missing
         run: |
           set +e

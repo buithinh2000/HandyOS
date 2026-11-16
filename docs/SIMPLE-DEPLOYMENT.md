@@ -42,3 +42,9 @@ Web frontend và API chung một Docker image, dù bên ngoài có thể dùng h
 Để bật giao diện sau khi hạ tầng đã được phê duyệt và triển khai, môi trường chạy phải cung cấp `HANDYOS_UI_ORIGIN`, `HANDYOS_API_ORIGIN`, `HANDYOS_COGNITO_DOMAIN`, `HANDYOS_COGNITO_CLIENT_ID` và `FRONTEND_ORIGIN` (đúng bằng UI origin), ngoài cấu hình backend. Không hardcode token hay mật khẩu vào code, không cung cấp AWS key cho frontend. `/config.json` trả 503 nếu thiếu hoặc sai định danh HandyOS.
 
 **Vẫn chưa có trang đăng nhập cloud hoạt động thực tế hoặc lưu bill lên AWS thật.** Đây là gói phát hành *source-only* có kiểm thử, không phải thông báo go-live.
+
+## Một file tải về sau khi CI build trên main
+
+Khi commit được merge vào `main`, workflow **HandyOS single-package build (NO DEPLOY)** tạo GitHub Actions artifact `handyos-one-image-source-bundle` có `handyos-image.tar.gz` (Docker image frontend + API), `SHA256SUMS.txt` (kiểm tra toàn vẹn) và `INSTALL.txt`. Đây là file gói cho kỹ thuật viên cài đặt; **không phải** một website đã kết nối AWS. Không tự triển khai, không tự tạo database, không tự phát sinh tài nguyên AWS hay di chuyển dữ liệu cũ. Chỉ tải gói xuống và triển khai khi đã có môi trường HandyOS riêng được phê duyệt.
+
+Đường dẫn: GitHub repo → Actions → **HandyOS single-package build (NO DEPLOY)** → lần chạy thành công trên `main` → Artifacts. CI giữ artifact 7 ngày, không tạo GitHub Release công khai. Nếu muốn phát hành cho khách hàng thật, cần kiểm chứng backup, mật khẩu runtime và dữ liệu riêng trước.
