@@ -48,3 +48,10 @@ jobs:
         run: psql -X -v ON_ERROR_STOP=1 -f backend/test/operations-rls-smoke.sql
       - name: Verify receipt upload isolation and no phantom reimbursement
         run: psql -X -v ON_ERROR_STOP=1 -f backend/test/receipt-intents-rls-smoke.sql
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install test-only PostgreSQL adapter dependencies
+        run: npm install --prefix backend --ignore-scripts --no-package-lock --no-audit --no-fund
+      - name: Verify single atomic, RLS-scoped receipt commit in PostgreSQL
+        run: node backend/test/receipt-repository.integration.mjs
