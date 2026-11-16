@@ -50,6 +50,8 @@ jobs:
         run: node tests/owner.browser.mjs
       - name: Verify standalone authenticated cloud Bills screen with fake API
         run: node tests/cloud-bills.browser.mjs
+      - name: Verify authenticated cloud Bills browser composition (mock HTTPS staging)
+        run: node tests/cloud-bills-authenticated.browser.mjs
       - name: Upload mobile and desktop evidence
         if: always()
         uses: actions/upload-artifact@v4
