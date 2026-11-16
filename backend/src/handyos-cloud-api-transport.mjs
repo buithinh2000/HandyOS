@@ -29,6 +29,28 @@ export function createHandyOsApiTransport({apiOrigin,uiOrigin,locationOrigin,ses
   locationOrigin!==fixed.uiOrigin||typeof session?.accessToken!=="function"||
   typeof session?.tenantId!=="function"||typeof fetcher!=="function")unavailable();
  return Object.freeze({
+  async listCompanies(){
+   // Only bearer token, no tenant guess from browser storage or URL.
+   let token;
+   try{token=await session.accessToken()}catch{unavailable()}
+   if(typeof token!=="string"||token.length<20||token.length>20000||/\s/.test(token))unavailable();
+   let res;
+   try{res=await fetcher(fixed.apiOrigin+"/v1/companies",{
+    method:"GET",headers:{authorization:"Bearer "+token},mode:"cors",
+    credentials:"omit",redirect:"error",cache:"no-store"
+   })}catch{unavailable()}
+   if(!res||res.ok!==true||res.status!==200)unavailable();
+   let value;try{value=await res.json()}catch{unavailable()}
+   if(!Array.isArray(value?.companies)||value.companies.length>100)unavailable();
+   const seen=new Set(),valid=[];
+   for(const m of value.companies){
+    if(!m||!UUID.test(m.tenant_id)||!["owner","manager"].includes(m.role)||
+     seen.has(m.tenant_id))unavailable();
+    seen.add(m.tenant_id);
+    valid.push(Object.freeze({tenant_id:m.tenant_id,role:m.role}));
+   }
+   return Object.freeze(valid);
+  },
   async request({method="GET",path,json}={}){
    if(typeof path!=="string"||!routeAllowed(method,path)||path.includes("%")||path.includes("//"))unavailable();
    if(method==="GET"&&json!==undefined)unavailable();
