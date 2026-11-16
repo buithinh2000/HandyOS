@@ -25,7 +25,7 @@ export function validateReceiptS3Config({bucket,kmsKeyArn,region,accountId,endpo
   typeof region!=="string"||!/^ap-[a-z]+-\d$/.test(region)||
   typeof accountId!=="string"||!/^\d{12}$/.test(accountId)||
   typeof endpointHost!=="string"||!/^[a-z0-9.-]+$/.test(endpointHost)||
-  !endpointHost.endsWith(".amazonaws.com")||!endpointHost.startsWith(bucket+".s3."))stop();
+  endpointHost!==bucket+".s3."+region+".amazonaws.com")stop();
  const m=ARN.exec(kmsKeyArn||"");
  if(!m||m[1]!==region||m[2]!==accountId)stop();
  return Object.freeze({bucket,kmsKeyArn,region,accountId,endpointHost});
