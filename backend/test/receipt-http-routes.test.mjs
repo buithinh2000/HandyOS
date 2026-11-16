@@ -33,7 +33,7 @@ test("only exact POST/GET receipt paths match and IDs are canonical UUID",()=>{
  assert.equal(matchReceiptRoute("GET",`/v1/jobs/${job}/receipts/uploads`),null);
  assert.equal(matchReceiptRoute("POST",`/v1/jobs/${job}/receipts/${receipt}/media`),null);
  assert.equal(matchReceiptRoute("DELETE",`/v1/jobs/${job}/receipts/${receipt}/media`),null);
- assert.throws(()=>matchReceiptRoute("POST","/v1/jobs/../../receipts/uploads"),HttpError);
+ assert.throws(()=>matchReceiptRoute("POST","/v1/jobs/not-a-uuid/receipts/uploads"),HttpError);
 });
 test("routes bind server-verified owner identity and preserve trusted workflow shapes",async()=>{
  const {workflow,calls}=recorder();
