@@ -20,7 +20,7 @@ function make(head={}){
 }
 test("dedicated HandyOS AWS identity is mandatory and fails closed",()=>{
  assert.equal(validateReceiptS3Config(config).bucket,bucket);
- for(const x of [{bucket:"buitai-core-receipts"},{bucket:"other-handyos-receipts"},{region:"ap-southeast-2"},{accountId:"000000000000"},{kmsKeyArn:"arn:aws:kms:ap-southeast-1:000000000000:key/11111111-1111-4111-8111-111111111111"},{endpointHost:"evil.example.com"}])
+ for(const x of [{bucket:"buitai-core-receipts"},{bucket:"other-handyos-receipts"},{region:"ap-southeast-2"},{accountId:"000000000000"},{kmsKeyArn:"arn:aws:kms:ap-southeast-1:000000000000:key/11111111-1111-4111-8111-111111111111"},{endpointHost:"evil.example.com"},{endpointHost:bucket+".s3.ap-southeast-2.amazonaws.com"}])
   assert.throws(()=>validateReceiptS3Config({...config,...x}),/not authorized/);
  assert.throws(()=>createReceiptS3Adapter({config,client:null}),/not authorized/);
 });
