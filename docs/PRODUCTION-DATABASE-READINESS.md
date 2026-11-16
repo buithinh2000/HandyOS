@@ -1,6 +1,10 @@
 # HandyOS real-use database activation — prerequisites and safe rollout
 Status: **SOURCE-ONLY. NOT CONNECTED. NOT PRODUCTION-READY.** Checked against main source as of 2026-11-15.
 
+## Canonical AWS staging preparation — offline-only preflight
+
+`cloud/handyos-staging-readiness.mjs` implements a local, read-only **NO_GO / EVIDENCE_REVIEW_ONLY** policy for a prospective dedicated HandyOS AWS staging environment. The policy never calls AWS and **never grants deployment permission**, even when every user-supplied checkbox passes. It blocks the historical `cloud/staging-stack.json` / `cloud/lambda.mjs` / `cloud/owner-api.mjs` S3 JSON ledger prototype as canonical production/deployment architecture. It requires dedicated PostgreSQL + separately encrypted S3 receipts, distinct IAM/Cognito/secret/backup identities, resource ownership evidence, RLS/backup/restore proof, explicit cost ceiling, security negative tests and account/region approval. The current repository cannot infer any existing real-resource identity from its old template or tests. See `cloud/CANONICAL-STAGING-PLAN.md` for the actual prerequisites and STOP conditions.
+
 ## Decision
 **Owner-approved account strategy (2026-11-16): use the same AWS account as BuiTai, but create and operate dedicated, isolated HandyOS resources.** Sharing the AWS account/region or a suitable existing VPC networking boundary is allowed only after verified security review; sharing BuiTai Core database/schema/tables, application runtime, IAM roles, Cognito pool, secrets, S3 buckets/object prefixes, KMS data keys, logging roles, CI deployment identity, or backups is **not** allowed. HandyOS must have its own PostgreSQL instance or database cluster with independent credentials, own Cognito pool/app client, API service/role, private versioned S3 receipt bucket, encryption key/policy and named resource tags. No changes to BuiTai Core or other ventures. This is an architecture decision, **not** approval of paid provisioning or production data migration. Keep the stack in [ARCHITECTURE.md](../ARCHITECTURE.md). The connected Supabase project is excluded from HandyOS entirely.
 
