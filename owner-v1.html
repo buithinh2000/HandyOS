@@ -325,7 +325,7 @@ function billCapturePanel(jobFilter="",mobileInbox=false){
  field("Purchase date","billDate",editing?.date||today(),"date")+
  (()=>{
   const savedStore=editing?.reference||"Bunnings";
-  const known=["Bunnings","Mitre 10","Bowens"];
+  const known=["Bunnings","Mitre 10","Bowens","Reece"];
   const choice=known.includes(savedStore)?savedStore:"other";
   return '<div><label for="billStoreSelect">Store</label><select id="billStoreSelect">'+
    [...known.map(v=>opt(v,v,choice)),opt("other","Other — enter store name",choice)].join("")+
