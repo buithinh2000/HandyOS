@@ -4,6 +4,7 @@ on:
     paths:
       - "workspace.html"
       - "owner-v1.html"
+      - "web/**"
       - "index.html"
       - "legacy-dashboard.html"
       - "owner-ledger-core.mjs"
@@ -54,6 +55,8 @@ jobs:
         run: node tests/cloud-bills-authenticated.browser.mjs
       - name: Verify Cognito PKCE redirect callback, company picker and sign out in browser
         run: node tests/handyos-login.browser.mjs
+      - name: Verify packaged web entrypoint on iPhone and desktop
+        run: node tests/handyos-packaged-web.browser.mjs
       - name: Upload mobile and desktop evidence
         if: always()
         uses: actions/upload-artifact@v4
