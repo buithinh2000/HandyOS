@@ -339,8 +339,8 @@ function crewPanel(){
  '<p class="muted">All selected staff share these times and break. Hourly rates use actual hours; daily rates use the chosen day portion. Review each worker before saving.</p>'+
  '<button class="crew-primary" id="crewCheckOut">Check out · Record wages</button></section>';
  return begin+'<div class="fields"><div><label for="crewJob">Today\'s Job</label><select id="crewJob">'+opt("","Select booked / active Job","")+eligible.map(j=>opt(j.id,j.name,"")).join("")+'</select></div></div>'+
- '<p class="muted">Select workers present today. Check-in does not add wages; checkout records the day once.</p>'+
- '<div class="crew-staff">'+(staff.length?staff.map(x=>'<label class="crew-worker"><input type="checkbox" data-crew-staff="'+esc(x.id)+'"> <span>'+esc(x.name)+' · '+cash(x.rate)+' / '+esc(x.payBasis||"hour")+'</span></label>').join(""):'<p class="muted">Add workers under People first.</p>')+'</div>'+
+ '<p class="muted">All active staff are selected by default. Untick anyone who is away today. Check-in does not add wages; checkout records the day once.</p>'+
+ '<div class="crew-staff">'+(staff.length?staff.map(x=>'<label class="crew-worker"><input type="checkbox" data-crew-staff="'+esc(x.id)+'" checked> <span>'+esc(x.name)+' · '+cash(x.rate)+' / '+esc(x.payBasis||"hour")+'</span></label>').join(""):'<p class="muted">Add workers under People first.</p>')+'</div>'+
  '<button class="crew-primary" id="crewCheckIn" '+(!staff.length||!eligible.length?"disabled":"")+'>Check in crew now</button></section>';
 }
 function company(){
