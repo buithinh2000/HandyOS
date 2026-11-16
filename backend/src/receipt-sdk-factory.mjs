@@ -40,8 +40,7 @@ export async function createHandyOsReceiptSdk({config,enabled=false,verifiedIsol
  const {S3Client,PutObjectCommand,GetObjectCommand,HeadObjectCommand}=sdk.s3||{};
  if(typeof S3Client!=="function"||typeof sdk.presigner?.getSignedUrl!=="function")
   throw Error("HandyOS SDK dependencies unavailable");
- const client=new S3Client({region:fixed.region,forcePathStyle:false,
-  endpoint:"https://"+fixed.endpointHost});
+ const client=new S3Client({region:fixed.region,forcePathStyle:false});
  const adapter=createReceiptS3Adapter({
   config:fixed,client,
   commands:{PutObjectCommand,GetObjectCommand,HeadObjectCommand},
