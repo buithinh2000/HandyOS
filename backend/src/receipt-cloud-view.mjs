@@ -33,7 +33,7 @@ export function mountCloudBills({root,controller,jobs=[]}={}){
   <div class="fields">
    <label>Job<select name="jobId" required><option value="">Choose job</option></select></label>
    <label>Purchase date<input name="boughtOn" type="date" required></label>
-   <label>Store / receipt<input name="storeReference" maxlength="160" required autocomplete="off" placeholder="e.g. Bunnings"></label>
+   <label>Store<select name="storeSelect"><option value="Bunnings">Bunnings</option><option value="Mitre 10">Mitre 10</option><option value="Bowens">Bowens</option><option value="other">Other — enter store name</option></select></label>\n   <label data-custom-store hidden>Other store name<input name="storeReference" maxlength="160" autocomplete="off" placeholder="Enter store name"></label>
    <label>Amount paid (AUD)<input name="amountGross" type="number" min="0.01" step="0.01" inputmode="decimal" required></label>
    <label>GST<select name="gstBasis"><option value="inc">Includes GST</option><option value="ex">Excludes GST</option><option value="no_gst">No GST</option></select></label>
    <label>Receipt photo or PDF<input name="file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required></label>
@@ -49,6 +49,10 @@ export function mountCloudBills({root,controller,jobs=[]}={}){
   select.append(option);
  }
  const form=element(section,"form"),status=element(section,"[role=status]"),submit=element(section,'[type="submit"]');
+ const storeSelect=element(form,'[name="storeSelect"]'),customStore=element(form,"[data-custom-store]");
+ const updateStore=()=>{customStore.hidden=storeSelect.value!=="other";element(form,'[name="storeReference"]').required=!customStore.hidden};
+ storeSelect.addEventListener("change",updateStore);
+ updateStore();
  const message=text=>{status.textContent=text};
  const steps={
   preparing:"Checking job and preparing secure upload…",
@@ -72,13 +76,13 @@ export function mountCloudBills({root,controller,jobs=[]}={}){
   try{
    const result=await controller.save({jobId,file,details:{
     boughtOn:element(form,'[name="boughtOn"]').value,
-    storeReference:element(form,'[name="storeReference"]').value,
+    storeReference:storeSelect.value==="other"?element(form,'[name="storeReference"]').value:storeSelect.value,
     amountGross:amount,
     gstBasis:element(form,'[name="gstBasis"]').value,
     notes:element(form,'[name="notes"]').value
    }});
    if(!result?.mediaReady||result.status!=="draft")throw Error("Not verified");
-   form.reset();message(steps.saved);
+   form.reset();updateStore();message(steps.saved);
   }catch{
    message(steps["retry-needed"]);
   }finally{submit.disabled=false}
@@ -87,6 +91,7 @@ export function mountCloudBills({root,controller,jobs=[]}={}){
  root.replaceChildren(section);
  return Object.freeze({setStatus,destroy(){
   form.removeEventListener("submit",onSubmit);
+  storeSelect.removeEventListener("change",updateStore);
   if(root.contains(section))root.removeChild(section);
  }});
 }
