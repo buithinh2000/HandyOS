@@ -27,6 +27,7 @@ jobs:
           node --check backend/src/receipt-s3-adapter.mjs
           node --check backend/src/receipt-sdk-factory.mjs
           node --check backend/test/receipt-sdk-factory.test.mjs
+          node --check backend/test/receipt-sdk-real-signing.test.mjs
           node --check backend/test/receipt-s3-adapter.test.mjs
           node --check backend/src/receipt-http-routes.mjs
           node --check backend/test/receipt-http-routes.test.mjs
@@ -38,6 +39,8 @@ jobs:
         run: npm install --prefix backend --ignore-scripts --no-package-lock --no-audit --no-fund
       - name: Verify actual AWS SDK S3 imports without making requests
         run: cd backend && node --input-type=module -e "await import('@aws-sdk/client-s3'); await import('@aws-sdk/s3-request-presigner'); console.log('AWS_SDK_IMPORT_PASS');"
+      - name: Test actual SigV4 upload headers with offline fake credentials
+        run: cd backend && node --test test/receipt-sdk-real-signing.test.mjs
       - name: Check baseline SQL isolation constraints
         run: |
           grep -q 'create table if not exists memberships' backend/migrations/001_initial.sql
