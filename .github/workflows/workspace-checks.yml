@@ -32,7 +32,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: node --test tests/workspace.test.mjs tests/owner-ledger.test.mjs tests/owner-crew.test.mjs tests/owner-attendance-day-off.test.mjs tests/owner-payroll-reconciliation.test.mjs tests/owner-production-activation-gate.test.mjs tests/owner-weekly-bonus.test.mjs tests/owner-ledger-io.test.mjs tests/owner-cloud-api.test.mjs tests/owner-sync-client.test.mjs tests/owner-staging-template.test.mjs tests/owner-first-read-build.test.mjs tests/owner-lock-digest.test.mjs tests/owner-preflight-readonly.test.mjs tests/owner-aws-inventory.test.mjs
+      - run: node --test tests/workspace.test.mjs tests/owner-ledger.test.mjs tests/owner-crew.test.mjs tests/owner-attendance-day-off.test.mjs tests/owner-payroll-reconciliation.test.mjs tests/owner-production-activation-gate.test.mjs tests/receipt-media-contract.test.mjs tests/owner-weekly-bonus.test.mjs tests/owner-ledger-io.test.mjs tests/owner-cloud-api.test.mjs tests/owner-sync-client.test.mjs tests/owner-staging-template.test.mjs tests/owner-first-read-build.test.mjs tests/owner-lock-digest.test.mjs tests/owner-preflight-readonly.test.mjs tests/owner-aws-inventory.test.mjs
 
   owner-browser-qa:
     runs-on: ubuntu-24.04
