@@ -30,6 +30,7 @@ jobs:
           node --check backend/test/receipt-sdk-real-signing.test.mjs
           node --check backend/src/receipt-iphone-upload.mjs
           node --check backend/src/receipt-cloud-controller.mjs
+          node --check backend/src/receipt-cloud-view.mjs
           node --check backend/test/receipt-cloud-controller.test.mjs
           node --check backend/test/receipt-iphone-upload.test.mjs
           node --check backend/test/receipt-s3-adapter.test.mjs
