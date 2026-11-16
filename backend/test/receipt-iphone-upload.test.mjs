@@ -31,7 +31,7 @@ test("failed or unexpected S3 HTTP response never confirms or creates a receipt"
  }
 });
 test("confirmation failure does not mark local receipt as successful",async()=>{
- for(const confirmResponse of [null,{id,mediaReady:false,status:"draft"},{id:"other",mediaReady:true,status:"draft"}]){
+ for(const confirmResponse of [false,{id,mediaReady:false,status:"draft"},{id:"other",mediaReady:true,status:"draft"}]){
   const x=capture({confirmResponse});await assert.rejects(x.run(),/unavailable/);
  }
 });
