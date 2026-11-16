@@ -19,6 +19,7 @@ export function mountCloudBills({root,controller,jobs=[]}={}){
  .handyos-cloud-bills{font:inherit;color:#183047;max-width:720px}
  .handyos-cloud-bills .fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
  .handyos-cloud-bills label{display:grid;gap:5px;font-size:14px;font-weight:600}
+ .handyos-cloud-bills [hidden]{display:none!important}
  .handyos-cloud-bills input,.handyos-cloud-bills select,.handyos-cloud-bills textarea{width:100%;box-sizing:border-box;padding:12px;border:1px solid #bacbd9;border-radius:9px;font:inherit;background:white;color:#183047}
  .handyos-cloud-bills .full{grid-column:1/-1}
  .handyos-cloud-bills button{min-height:44px;border:0;border-radius:9px;background:#125889;color:white;padding:12px 18px;font:inherit;font-weight:700;cursor:pointer}
