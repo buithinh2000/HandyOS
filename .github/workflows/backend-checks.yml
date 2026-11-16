@@ -23,6 +23,8 @@ jobs:
           node --check backend/src/domain.mjs
           node --check backend/src/server.mjs
           node --check backend/src/receipt-workflow.mjs
+          node --check backend/src/receipt-postgres-repository.mjs
+          node --check backend/test/receipt-repository.integration.mjs
           node --check backend/test/security.test.mjs
       - name: Run security domain unit tests (no cloud credentials)
         run: node --test backend/test/security.test.mjs
