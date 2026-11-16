@@ -48,6 +48,8 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Run Owner V1 real-browser journey
         run: node tests/owner.browser.mjs
+      - name: Verify standalone authenticated cloud Bills screen with fake API
+        run: node tests/cloud-bills.browser.mjs
       - name: Upload mobile and desktop evidence
         if: always()
         uses: actions/upload-artifact@v4
