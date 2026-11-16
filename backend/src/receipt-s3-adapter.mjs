@@ -21,7 +21,7 @@ function urlCheck(url,host){
 }
 /** Runtime config comes from independently verified server environment only. */
 export function validateReceiptS3Config({bucket,kmsKeyArn,region,accountId,endpointHost}={}){
- if(typeof bucket!=="string"||!BUCKET.test(bucket)||!/handyos/i.test(bucket)||bucket.includes("..")||
+ if(typeof bucket!=="string"||!BUCKET.test(bucket)||!bucket.startsWith("handyos-")||bucket.includes("..")||
   typeof region!=="string"||!/^ap-[a-z]+-\d$/.test(region)||
   typeof accountId!=="string"||!/^\d{12}$/.test(accountId)||
   typeof endpointHost!=="string"||!/^[a-z0-9.-]+$/.test(endpointHost)||
@@ -54,6 +54,7 @@ export function createReceiptS3Adapter({config,client,commands,presign}){
   async head(expected){
    const key=expectedKey(expected);
    const result=await client.send(new commands.HeadObjectCommand({Bucket:fixed.bucket,Key:key}));
+   if(result?.ServerSideEncryption!=="aws:kms"||result?.SSEKMSKeyId!==fixed.kmsKeyArn)stop();
    return Object.freeze({
     key,contentType:result?.ContentType,contentLength:result?.ContentLength,
     encryption:result?.ServerSideEncryption,kmsKeyArn:result?.SSEKMSKeyId
