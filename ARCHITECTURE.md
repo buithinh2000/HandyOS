@@ -7,6 +7,13 @@ HandyOS shares the **same AWS account** as BuiTai to avoid unnecessary account o
 
 Before provision, the HandyOS-specific account inventory must show the exact account/region. Use distinct `handyos-` resource names, least-privilege IAM scoped to those resources, resource tags (Project=HandyOS, Environment=staging/prod), separate CloudWatch groups and budgets/alarms. Existing VPC networking may be considered only with a reviewed non-overlapping network/security boundary and without modifying another project's routes/security groups. Production creation, resource mutation and paid services still require a separate review and explicit spending approval. Keep all existing workloads untouched.
 
+## Cloud deployment model reconciliation — 2026-11-16
+The repository contains a **historical source-only S3 JSON Owner-ledger staging template** at `cloud/staging-stack.json`. Its Lambda, HTTP API and conditional-write tests are useful for a bounded prototype, but this is **not** the canonical HandyOS production database. It must not be promoted or described as deployed production or substituted for the dedicated HandyOS RDS PostgreSQL required below.
+
+Production must use a dedicated, private PostgreSQL DB and least-privileged runtime role with verified FORCE RLS. Customer reimbursement bills/photos require **separate private, encrypted, versioned S3 object storage** with authorized image access; store metadata and payment state in Postgres. Inline receipt images in the current browser-local JSON are not a sustainable production data model and can exceed the prototype's 2 MiB save limit. Never silently strip or migrate photos. A source-only NO-GO evaluator in `cloud/production-activation-gate.mjs` rejects S3-only storage, absent isolation evidence and absent explicit approvals; passing its inputs is not proof of a real AWS deployment.
+
+Use the same approved AWS account as BuiTai only after actual identity and cost checks; preserve all BuiTai Core and other venture resources unchanged. All AWS/SQL/IAM/Secrets/Cloudflare mutations require separate scoped Owner approval.
+
 ## Locked stack
 - Cloudflare: DNS/WAF/HTTPS and frontend hosting on Cloudflare Pages. Public login assets do not contain customer data.
 - AWS Cognito: verified access tokens; email sign-in, and Google federation after OAuth provider setup.
