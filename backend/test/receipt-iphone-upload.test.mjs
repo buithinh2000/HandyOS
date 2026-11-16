@@ -22,7 +22,9 @@ test("iPhone PUT uses precisely signed headers, omits credentials and confirms o
  assert.equal(put,1);assert.equal(confirm,1);
  assert.equal(request.options.method,"PUT");assert.equal(request.options.body,file);
  assert.equal(request.options.credentials,"omit");assert.equal(request.options.redirect,"error");
- assert.deepEqual(request.options.headers,headers);
+ assert.equal("content-length" in request.options.headers,false);
+ const {"content-length":_forbidden,...browserHeaders}=headers;
+ assert.deepEqual(request.options.headers,browserHeaders);
 });
 test("failed or unexpected S3 HTTP response never confirms or creates a receipt",async()=>{
  for(const putResponse of [{status:403,ok:false},{status:412,ok:false},{status:301,ok:false},{status:200,ok:false},{status:206,ok:true}]){
