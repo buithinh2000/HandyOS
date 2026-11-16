@@ -27,7 +27,10 @@ export async function uploadReceiptFromIphone({file,beginResponse,put,confirmRec
  // Only caller-controlled injectors: browser fetch and authenticated API confirm.
  // Confirm is never called if S3 returned an error, redirected, or network failed.
  if(typeof put!=="function"||typeof confirmReceipt!=="function")invalid();
- const headers=validate(beginResponse,file);
+ const signedHeaders=validate(beginResponse,file);
+ // Content-Length is a forbidden browser-controlled request header.
+ // Browser derives it from the Blob/File body; never set it in fetch().
+ const {"content-length":_browserComputedLength,...headers}=signedHeaders;
  let response;
  try{
   response=await put(beginResponse.uploadUrl,{method:"PUT",headers,body:file,
