@@ -52,6 +52,8 @@ jobs:
         run: node tests/cloud-bills.browser.mjs
       - name: Verify authenticated cloud Bills browser composition (mock HTTPS staging)
         run: node tests/cloud-bills-authenticated.browser.mjs
+      - name: Verify Cognito PKCE redirect callback, company picker and sign out in browser
+        run: node tests/handyos-login.browser.mjs
       - name: Upload mobile and desktop evidence
         if: always()
         uses: actions/upload-artifact@v4

@@ -25,7 +25,7 @@ async function authenticate(req){
  catch{throw new HttpError(401,"Invalid or expired access token")}
 }
 async function context(client,sub){
- const {rows}=await client.query("select tenant_id,role from memberships where cognito_sub=$1 and status='active' order by case role when 'owner' then 1 else 2 end,tenant_id limit 2",[sub]);
+ const {rows}=await client.query("select tenant_id,role from memberships where cognito_sub=$1 and status='active' order by case role when 'owner' then 1 else 2 end,tenant_id limit 100",[sub]);
  if(!rows.length)throw new HttpError(403,"No active company membership");
  // Client MUST explicitly select tenant if the account belongs to more than one company.
  return rows;
@@ -67,7 +67,13 @@ async function dispatch(req,{receiptWorkflow=null}={}){
  }
  return transaction(async client=>{
   await client.query("select set_config('app.actor_sub',$1,true)",[sub]);
-  const memberships=await context(client,sub);const ctx=chooseTenant(req,memberships);
+  const memberships=await context(client,sub);
+  // Initial company picker: scoped to verified Cognito sub and active membership.
+  // Never trust a browser-supplied tenant as authority.
+  if(req.method==="GET"&&url.pathname==="/v1/companies")
+   return {companies:memberships.filter(m=>["owner","manager"].includes(m.role))
+    .map(m=>({tenant_id:m.tenant_id,role:m.role}))};
+  const ctx=chooseTenant(req,memberships);
   await client.query("select set_config('app.tenant_id',$1,true)",[ctx.tenant_id]);
   // Role is obtained from verified Cognito membership, never from a browser header.
   await client.query("select set_config('app.actor_role',$1,true)",[ctx.role]);
