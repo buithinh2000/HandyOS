@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import pg from "pg";
 import { CognitoJwtVerifier } from "aws-jwt-verify";
 import { HttpError,sanitizeText,ensureUuid,parseJSON,taskColumns } from "./domain.mjs";
+import {matchReceiptRoute,dispatchReceiptRoute} from "./receipt-http-routes.mjs";
 
 const { Pool } = pg;
 const renovationCatalog = JSON.parse(readFileSync(new URL("../../shared/renovation-catalog.json",import.meta.url),"utf8"));
@@ -49,9 +50,21 @@ async function canAccessJob(client,ctx,sub,jobId,write=false){
 async function transaction(work){
  const client=await pool.connect();try{await client.query("begin");const result=await work(client);await client.query("commit");return result}catch(err){await client.query("rollback");throw err}finally{client.release()}
 }
-async function dispatch(req){
+async function dispatch(req,{receiptWorkflow=null}={}){
  const url=new URL(req.url||"/", "http://localhost");
+ const route=matchReceiptRoute(req.method,url.pathname);
  const sub=await authenticate(req);
+ if(route){
+  // Resolve the selected company via server-verified Cognito membership.
+  // Run the receipt workflow only after this short transaction commits.
+  // Its PostgreSQL repository separately rechecks active membership and job.
+  const identity=await transaction(async client=>{
+   await client.query("select set_config('app.actor_sub',$1,true)",[sub]);
+   const memberships=await context(client,sub),ctx=chooseTenant(req,memberships);
+   return {verifiedByApi:true,actorSub:sub,tenantId:ctx.tenant_id,role:ctx.role};
+  });
+  return await dispatchReceiptRoute({route,identity,workflow:receiptWorkflow,readBody:()=>body(req)});
+ }
  return transaction(async client=>{
   await client.query("select set_config('app.actor_sub',$1,true)",[sub]);
   const memberships=await context(client,sub);const ctx=chooseTenant(req,memberships);
@@ -111,7 +124,7 @@ async function dispatch(req){
   throw new HttpError(404,"Route not found");
  });
 }
-export function createHandler(){
+export function createHandler({receiptWorkflow=null}={}){
  return async(req,res)=>{
   const origin=req.headers.origin||"";
   const allowed=origin===allowedOrigin;
@@ -120,7 +133,7 @@ export function createHandler(){
   }
   if(origin && !allowed){reply(res,403,{error:"Origin denied"},allowedOrigin);return}
   if(req.url==="/healthz"){reply(res,200,{status:"ok"},allowedOrigin);return}
-  try{const value=await dispatch(req);reply(res,req.method==="POST"?201:200,value,allowedOrigin)}
+  try{const value=await dispatch(req,{receiptWorkflow});reply(res,req.method==="POST"?201:200,value,allowedOrigin)}
   catch(err){const status=err instanceof HttpError?err.status:500;if(status===500)console.error("Internal API error",err?.name||"Error");reply(res,status,{error:status===500?"Internal server error":err.message},allowedOrigin)}
  };
 }
