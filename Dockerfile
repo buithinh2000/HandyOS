@@ -8,6 +8,7 @@ RUN cd backend && npm install --omit=dev --ignore-scripts --no-audit --no-fund -
  && npm cache clean --force
 COPY backend/src ./backend/src
 COPY shared ./shared
+COPY web ./web
 USER node
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=4s --start-period=20s --retries=3 \
