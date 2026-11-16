@@ -24,12 +24,14 @@ jobs:
           node --check backend/src/server.mjs
           node --check backend/src/receipt-workflow.mjs
           node --check backend/src/receipt-postgres-repository.mjs
+          node --check backend/src/receipt-s3-adapter.mjs
+          node --check backend/test/receipt-s3-adapter.test.mjs
           node --check backend/src/receipt-http-routes.mjs
           node --check backend/test/receipt-http-routes.test.mjs
           node --check backend/test/receipt-repository.integration.mjs
           node --check backend/test/security.test.mjs
       - name: Run security domain unit tests (no cloud credentials)
-        run: node --test backend/test/security.test.mjs backend/test/receipt-http-routes.test.mjs
+        run: node --test backend/test/security.test.mjs backend/test/receipt-http-routes.test.mjs backend/test/receipt-s3-adapter.test.mjs
       - name: Check baseline SQL isolation constraints
         run: |
           grep -q 'create table if not exists memberships' backend/migrations/001_initial.sql
