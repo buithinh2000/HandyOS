@@ -789,7 +789,7 @@ assert.equal(await billsMobile.locator("#billInboxStatus").count(),1);
 assert.equal(await billsMobile.locator("#billPanel").count(),1);
 await billsMobile.locator("#toggleBillEditor").click();
 await billsMobile.locator("#billJob").selectOption({index:1});
-await billsMobile.locator("#billReference").fill("Bunnings sample");
+assert.equal(await billsMobile.locator("#billStoreSelect").inputValue(),"Bunnings");
 await billsMobile.locator("#billAmount").fill("160");
 const imageBuffer=Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/7QAAAABJRU5ErkJggg==","base64");
 await billsMobile.locator("#billPhoto").setInputFiles({name:"test-receipt.png",mimeType:"image/png",buffer:imageBuffer});
