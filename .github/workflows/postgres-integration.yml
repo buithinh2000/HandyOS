@@ -44,12 +44,15 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f backend/migrations/004_receipt_upload_intents.sql
           psql -X -v ON_ERROR_STOP=1 -f backend/migrations/005_payroll_week_closures.sql
           psql -X -v ON_ERROR_STOP=1 -f backend/migrations/006_staff_expense_adjustments.sql
+          psql -X -v ON_ERROR_STOP=1 -f backend/migrations/007_job_financial_settings.sql
       - name: Verify tenant isolation and job/task insert
         run: psql -X -v ON_ERROR_STOP=1 -f backend/test/postgres-smoke.sql
       - name: Verify owner-only payroll, receipts and tenant RLS
         run: psql -X -v ON_ERROR_STOP=1 -f backend/test/operations-rls-smoke.sql
       - name: Verify weekly payroll settlement RLS and payment allocation
         run: psql -X -v ON_ERROR_STOP=1 -f backend/test/weekly-payroll-rls-smoke.sql
+      - name: Verify financial settings, cost RLS and customer pass-through
+        run: psql -X -v ON_ERROR_STOP=1 -f backend/test/job-financials-rls-smoke.sql
       - name: Verify employee other expense privacy and week isolation
         run: psql -X -v ON_ERROR_STOP=1 -f backend/test/staff-expense-rls-smoke.sql
       - name: Verify receipt upload isolation and no phantom reimbursement
