@@ -32,7 +32,7 @@ export async function dispatchDailyCrew({method,path,query,ctx,db,readBody,now=(
   const roleLabel=d.roleLabel===undefined?"":typeof d.roleLabel==="string"&&d.roleLabel.length<=100?d.roleLabel.trim():null;
   if(roleLabel===null||!["day","hour"].includes(d.wageUnit)||
    typeof d.defaultRate!=="number"||!Number.isFinite(d.defaultRate)||
-   d.defaultRate<0||d.defaultRate>100000||Math.round(d.defaultRate*100)!==d.defaultRate*100)
+   d.defaultRate<0||d.defaultRate>100000||Math.abs(Math.round(d.defaultRate*100)-d.defaultRate*100)>0.000001)
    throw new HttpError(400,"Invalid staff payment settings");
   const id=randomUUID();
   await db.query("insert into staff_profiles(id,tenant_id,display_name,role_label,wage_unit,default_rate) values($1,$2,$3,$4,$5,$6)",[id,tenant,name,roleLabel,d.wageUnit,d.defaultRate]);
@@ -56,9 +56,10 @@ export async function dispatchDailyCrew({method,path,query,ctx,db,readBody,now=(
   const started=now();
   if(!(started instanceof Date)||Number.isNaN(started.getTime()))throw new HttpError(503,"Clock unavailable");
   const row=person.rows[0],id=randomUUID();
-  const result=await db.query("insert into attendance_entries(id,tenant_id,job_id,staff_id,work_date,started_at,rate_unit,rate_snapshot) values($1,$2,$3,$4,$5,$6,$7,$8) returning id,job_id,staff_id,work_date,started_at,finished_at,rate_unit,rate_snapshot",
+  const result=await db.query("insert into attendance_entries(id,tenant_id,job_id,staff_id,work_date,started_at,rate_unit,rate_snapshot) values($1,$2,$3,$4,$5,$6,$7,$8) on conflict(tenant_id,staff_id,work_date) do nothing returning id,job_id,staff_id,work_date,started_at,finished_at,rate_unit,rate_snapshot",
    [id,tenant,job,staff,date,started.toISOString(),row.wage_unit,row.default_rate]);
   await db.query("insert into audit_events(tenant_id,actor_sub,action,entity_type,entity_id) values($1,$2,'checked_in','attendance',$3)",[tenant,ctx.actorSub,id]);
+  if(result.rowCount!==1)throw new HttpError(409,"Employee already has attendance for this date");
   return {entry:result.rows[0]};
  }
  const m=/^\/v1\/attendance\/([0-9a-f-]{36})\/check-out$/i.exec(path);
