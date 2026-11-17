@@ -220,6 +220,7 @@ try{
   assert.equal(await page.locator('[data-workspace-root] [data-page-body] [data-calendar-day="'+yesterday+'"]').getAttribute("aria-pressed"),"true");
   assert.equal(await page.locator("[data-workspace-root] [data-page-body] [data-backfill]").isVisible(),true);
   assert.equal(await page.locator("[data-workspace-root] [data-page-body] [data-check-in]").isVisible(),false);
+  await page.locator("[data-workspace-root] [data-page-body] [data-staff]").selectOption(staff);
   await page.locator("[data-workspace-root] [data-page-body] [data-backfill] [data-break-minutes]").fill("30");
   await page.locator("[data-workspace-root] [data-page-body] [data-backfill] [data-day-portion]").selectOption("0.5");
   await page.locator("[data-workspace-root] [data-page-body] [data-backfill] button").click();
