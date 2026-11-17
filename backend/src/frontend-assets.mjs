@@ -9,7 +9,7 @@ const ASSETS=Object.freeze({
  "/auth/callback":{file:"../../web/index.html",type:"text/html; charset=utf-8"},
  "/assets/boot.mjs":{file:"../../web/boot.mjs",type:"text/javascript; charset=utf-8"},
  ...Object.fromEntries([
- "handyos-login-shell","handyos-today-view","handyos-cognito-pkce","handyos-cloud-api-transport",
+ "handyos-login-shell","handyos-today-view","handyos-payroll-view","handyos-cognito-pkce","handyos-cloud-api-transport",
  "handyos-cloud-bills-app","receipt-cloud-controller","receipt-cloud-view",
  "receipt-iphone-upload"
  ].map(x=>["/assets/"+x+".mjs",{file:"./"+x+".mjs",type:"text/javascript; charset=utf-8"}]))
