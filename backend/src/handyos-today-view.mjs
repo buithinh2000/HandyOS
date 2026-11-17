@@ -42,21 +42,10 @@ export async function mountHandyOsToday({root,api}={}){
  </form>
  <h3>Today's attendance</h3>
  <div data-attendance></div>
- <button type="button" data-add-staff>Add employee</button>
- <form data-staff-form hidden>
- <label>Employee name<input data-staff-name maxlength="160" required></label>
- <label>Role (optional)<input data-staff-role maxlength="100"></label>
- <div class="crew-grid">
- <label>Wage basis<select data-wage-unit><option value="day">Daily</option><option value="hour">Hourly</option></select></label>
- <label>Default rate (AUD)<input type="number" min="0" max="100000" step="0.01" data-wage-rate required></label>
- </div>
- <button type="submit">Save employee</button>
- </form>
  <p role="status" data-status aria-live="polite">Loading today…</p>`;
  const date=container.querySelector("[data-work-date]"),jobs=container.querySelector("[data-job]"),
   staff=container.querySelector("[data-staff]"),records=container.querySelector("[data-attendance]"),
-  inForm=container.querySelector("[data-check-in]"),staffForm=container.querySelector("[data-staff-form]"),
-  addStaff=container.querySelector("[data-add-staff]"),status=container.querySelector("[data-status]");
+  inForm=container.querySelector("[data-check-in]"),status=container.querySelector("[data-status]");
  date.value=localDay();
  root.replaceChildren(container);
  let disposed=false,busy=false;
@@ -122,33 +111,10 @@ export async function mountHandyOsToday({root,api}={}){
   }catch{say("Could not save check-in. Check for a duplicate date or retry.")}
   finally{busy=false;button.disabled=false}
  }
- async function saveStaff(event){
-  event.preventDefault();
-  if(busy)return;
-  busy=true;const button=staffForm.querySelector("button");button.disabled=true;say("Saving employee…");
-  try{
-   const name=staffForm.querySelector("[data-staff-name]").value.trim(),
-    role=staffForm.querySelector("[data-staff-role]").value.trim(),
-    unit=staffForm.querySelector("[data-wage-unit]").value,
-    rate=Number(staffForm.querySelector("[data-wage-rate]").value);
-   if(!name||!Number.isFinite(rate))throw Error("Invalid entry");
-   const response=await api.request({method:"POST",path:"/v1/staff",
-    json:{displayName:name,roleLabel:role,wageUnit:unit,defaultRate:rate}});
-   if(!response.staff||!UUID.test(response.staff.id))throw Error("Employee not confirmed");
-   option(staff,response.staff.display_name,response.staff.id);
-   staff.value=response.staff.id;staffForm.hidden=true;staffForm.reset();
-   say("Employee saved on server.");
-  }catch{say("Could not save employee. Check the details and retry.")}
-  finally{busy=false;button.disabled=false}
- }
  inForm.addEventListener("submit",saveCheckIn);
- staffForm.addEventListener("submit",saveStaff);
- const toggle=()=>{staffForm.hidden=!staffForm.hidden};
- addStaff.addEventListener("click",toggle);
  const change=async()=>{if(busy)return;try{await refresh();say("Attendance updated.")}catch{say("Unable to load this date.")}};
  date.addEventListener("change",change);
  try{await prepare()}catch{say("Today is unavailable. Try refreshing after signing in.")}
  return Object.freeze({destroy(){disposed=true;inForm.removeEventListener("submit",saveCheckIn);
-  staffForm.removeEventListener("submit",saveStaff);date.removeEventListener("change",change);
-  addStaff.removeEventListener("click",toggle);if(root.contains(container))root.removeChild(container)}});
+  date.removeEventListener("change",change);if(root.contains(container))root.removeChild(container)}});
 }
