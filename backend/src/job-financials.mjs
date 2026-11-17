@@ -66,7 +66,9 @@ export async function readJobFinancials({db,tenant,jobId}){
  let extras=0;for(const a of adjustments.rows)extras+=moneyToCents(a.amount);
  const general=Object.values(category).reduce((a,b)=>a+b,0);
  const totalCosts=general+wages+extras;
- // Combined tax/reserve is a planning set-aside from the EX-GST contract, not actual tax paid.
+ // Partial legacy cloud calculation, NOT the approved Owner V1 reserve rule.
+ // The Owner-approved basis is adjusted contract INC GST (see Issue #116).
+ // Keep source values for backward compatibility but never assert profitReady.
  const reserve=Math.round(contract*reservePercent/100);
  const profit=contract-totalCosts-reserve;
  let pendingReimbursement=0,reimbursed=0;
@@ -88,8 +90,9 @@ export async function readJobFinancials({db,tenant,jobId}){
    customerReceiptsReimbursedGross:money(reimbursed),
    includedInProfit:false},
   expenseEntries:expense.rows,
-  warnings:[...(unpaidAttendance?["Open attendance has no final wage amount yet; profit is provisional."]:[]),...(!setting.rowCount?["Contract amount has not been entered yet. Profit is provisional."]:[])],
-  provisional:Boolean(unpaidAttendance||!setting.rowCount)
+  warnings:["Final forecast profit NOT READY: approved variations, future remaining costs, overhead and Owner-approved INC-GST tax/reserve base require parity reconciliation.",...(unpaidAttendance?["An open attendance entry is not yet costed."]:[]),...(!setting.rowCount?["Contract amount has not been entered yet."]:[])],
+  provisional:true,
+  profitReady:false
  };
 }
 export async function dispatchJobFinancials({method,path,ctx,db,readBody}){

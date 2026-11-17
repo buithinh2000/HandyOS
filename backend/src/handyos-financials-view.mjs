@@ -64,8 +64,10 @@ export async function mountJobFinancials({root,api,jobId}={}){
   if(!r?.totals||!r?.costs||!r?.settings||!r?.passThrough)throw Error("Financial data unavailable");
   if(disposed)return;
   summary.replaceChildren();costs.replaceChildren();reimbursements.replaceChildren();
-  for(const [label,key] of [["Contract EX GST","contractExGst"],["Tax & reserve allocation","reserveAllocation"],["Estimated profit EX GST","estimatedProfitExGst"]])
-   field(summary,label,money(r.totals[key]));
+  field(summary,"Contract EX GST",money(r.totals.contractExGst));
+  field(summary,"Tax & reserve — preliminary",money(r.totals.reserveAllocation));
+  field(summary,"Final forecast profit EX GST",r.profitReady===true&&r.provisional===false?
+   money(r.totals.estimatedProfitExGst):"NOT READY — reconciliation required");
   for(const [label,key] of [["Materials","materials"],["Manual labour","labourManual"],["Subcontractors","subcontractors"],
     ["Equipment","equipment"],["Other costs","other"],["Earned employee wages","attendanceWages"],
     ["Employee bonuses/allowances/expenses","weeklyBonuses"],["Total company costs EX GST","totalExGst"]])
@@ -73,7 +75,7 @@ export async function mountJobFinancials({root,api,jobId}={}){
   field(reimbursements,"Customer bills pending (INC GST)",money(r.passThrough.customerReceiptsPendingGross));
   field(reimbursements,"Customer bills reimbursed (INC GST)",money(r.passThrough.customerReceiptsReimbursedGross));
   const messages=Array.isArray(r.warnings)?r.warnings:[];
-  warning.textContent=messages.join(" ");
+  warning.textContent=messages.join(" ") || (r.profitReady===true&&r.provisional===false?"":"Final profit cannot yet be relied upon.");
   contract.elements.contract.value=r.settings.contractExGst;
   contract.elements.reserve.value=r.settings.reservePercent;
   say("Financials loaded from server.");

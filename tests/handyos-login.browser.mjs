@@ -160,6 +160,8 @@ try{
   await page.locator("[data-workspace-root] [data-page-body] [data-detail-financials]").click();
   await page.locator("[data-workspace-root] [data-page-body] [data-financial-summary] strong").first().waitFor();
   assert.match(await page.locator("[data-workspace-root] [data-page-body] [data-financial-summary]").innerText(),/10,000\.00/);
+  assert.match(await page.locator("[data-workspace-root] [data-page-body] [data-financial-summary]").innerText(),/NOT READY/,
+   "A partial profit projection cannot appear as a final forecast");
   assert.equal(await page.locator("[data-workspace-root] [data-page-body] [data-create-task]").isVisible(),false);
   await page.locator("[data-workspace-root] [data-page-body] [data-edit-contract]").click();
   await page.locator("[data-workspace-root] [data-page-body] [data-contract-form] input[name=contract]").fill("12000");
