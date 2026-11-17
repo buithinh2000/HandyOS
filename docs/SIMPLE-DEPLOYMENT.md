@@ -58,3 +58,7 @@ Khi môi trường hợp lệ đã được phê duyệt, một binary ứng d�
 ## Daily crew API for authenticated Owner/Manager
 
 Backend routes in the same verified Cognito + tenant-scoped transaction as Jobs: `GET /v1/staff` lists employees; `POST /v1/staff` creates an employee with hourly/daily rate; `GET /v1/attendance?date=YYYY-MM-DD` lists a selected workday; `POST /v1/attendance/check-in` accepts jobId, staffId and local workDate; `POST /v1/attendance/:id/check-out` completes the open record. Employee day/hour pay is snapshotted from staff profile at check-in, never accepted from the browser. Duplicate same-day entries return 409, including simultaneous requests under SQL uniqueness, and financial/attendance actions write audit records. These routes use the existing dedicated HandyOS PostgreSQL tables in migration 003, already protected by FORCE RLS. Worker/Homeowner cannot read payroll. Source-only: not a live production deployment, no AWS writes.
+
+## Trang Today trên HandyOS cloud
+
+Sau đăng nhập Cognito, hệ thống mở **Today · Crew check-in** ở đầu trang, trước Bills. Owner/Manager chọn công trình và nhân viên, bấm Check in; phần Today's attendance hiển thị các entry từ API và có Check out đối với entry đang mở. Nút Add employee cho phép tạo hồ sơ nhân viên với mức lương ngày/giờ. Dữ liệu luôn lấy từ API PostgreSQL xác thực; không dựa trên demo `localStorage`. Hệ thống chỉ báo thành công sau khi server xác nhận. Kiểm thử trình duyệt iPhone và desktop sử dụng fake backend, không gọi AWS. Chưa kết nối cơ sở dữ liệu production.
