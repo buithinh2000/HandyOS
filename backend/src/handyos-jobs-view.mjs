@@ -1,6 +1,6 @@
 // HandyOS cloud Jobs: one overview, tap a job for details.
 // Authenticated API only; never read or write the legacy browser demo store.
-const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STAGES=new Set(["survey","scope","estimate","quoted","approved","scheduled","active","handover","closed"]);
 function txt(tag,value,parent,attrs={}){
  const e=document.createElement(tag);e.textContent=value;
@@ -130,6 +130,6 @@ export async function mountHandyOsJobs({root,api,onJobsChanged}={}){
  panel.querySelector("[data-new-job]").addEventListener("click",onNew);
  jobForm.addEventListener("submit",onJob);taskForm.addEventListener("submit",onTask);
  try{await refresh();message("Select a job for details.")}
- catch(error){console.warn("HANDYOS_JOBS_DEBUG",error?.name,error?.message);message("Could not load jobs. Please retry after sign-in.")}
+ catch{message("Could not load jobs. Please retry after sign-in.")}
  return Object.freeze({refresh,destroy(){disposed=true;root.replaceChildren()}});
 }
