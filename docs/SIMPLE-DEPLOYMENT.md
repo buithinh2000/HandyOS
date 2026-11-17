@@ -70,3 +70,7 @@ The mobile cloud app now exposes **Employees → employee → Weekly payroll** i
 Totals shown are earned, extras, due, paid and remaining; negative remaining indicates overpayment. Closing a week is allowed only when no attendance remains checked in, the week has work/adjustments and total paid exactly equals total due. Closure stores an immutable snapshot and blocks API changes to that week's attendance/bonuses/payments. Mobile shows an employee overview then the selected employee's detail. A backup restore and production-grade accounting review are needed before using real payroll data. All new data is from HandyOS PostgreSQL RLS, not localStorage.
 
 Migration `005_payroll_week_closures.sql` is **not applied in production** by this PR; the migration is only executed in isolated GitHub PostgreSQL integration tests.
+
+## Employee profile: extras and other expenses
+
+Employees → select employee shows the base daily/hourly wage rate. Its weekly payroll includes separate **Bonus**, **Allowance** and **Other expense / reimbursement** fields, notes, attached job and selected workweek. These are **one-off week-specific additions**, not an automatic wage-rate change and not customer material reimbursement bills. The underlying adjustments table remains tenant-scoped under FORCE RLS; after settlement the employee's week is immutable. Weekly due = wages earned from completed attendance + bonus + allowance + employee expenses. Paid is recorded separately. Source-only until private HandyOS production migrations are approved and deployed.
