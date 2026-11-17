@@ -88,7 +88,7 @@ export async function dispatchDailyCrew({method,path,query,ctx,db,readBody,now=(
  }
  if(method==="GET"&&path==="/v1/attendance"){
   const date=isoDay(query.get("date"));
-  const result=await db.query("select a.id,a.job_id,a.staff_id,a.work_date,a.started_at,a.finished_at,a.break_minutes,a.paid_day_portion,a.rate_unit,a.rate_snapshot,s.display_name,j.name as job_name from attendance_entries a join staff_profiles s on s.id=a.staff_id and s.tenant_id=a.tenant_id join jobs j on j.id=a.job_id and j.tenant_id=a.tenant_id where a.tenant_id=$1 and a.work_date=$2 order by a.started_at,a.id limit 200",[tenant,date]);
+  const result=await db.query("select a.id,a.job_id,a.staff_id,a.work_date,a.started_at,a.finished_at,a.break_minutes,a.paid_day_portion,a.rate_unit,a.rate_snapshot,a.notes,a.updated_at,s.display_name,j.name as job_name from attendance_entries a join staff_profiles s on s.id=a.staff_id and s.tenant_id=a.tenant_id join jobs j on j.id=a.job_id and j.tenant_id=a.tenant_id where a.tenant_id=$1 and a.work_date=$2 order by a.started_at,a.id limit 200",[tenant,date]);
   return {attendance:result.rows};
  }
  if(method==="POST"&&path==="/v1/attendance/backfill"){
@@ -119,6 +119,64 @@ export async function dispatchDailyCrew({method,path,query,ctx,db,readBody,now=(
   if(result.rowCount!==1)throw new HttpError(409,"Employee already has attendance for this date");
   await db.query("insert into audit_events(tenant_id,actor_sub,action,entity_type,entity_id) values($1,$2,'backfilled','attendance',$3)",[tenant,ctx.actorSub,id]);
   return {entry:result.rows[0]};
+ }
+ const correction=/^\/v1\/attendance\/([0-9a-f-]{36})\/correct$/i.exec(path);
+ if(method==="POST"&&correction){
+  const id=ensureUuid(correction[1]);
+  const d=payload(await readBody(),["startedAt","finishedAt","breakMinutes","paidDayPortion","notes","reason","expectedUpdatedAt"]);
+  if(typeof d.reason!=="string"||d.reason.trim().length<3||d.reason.length>500)
+   throw new HttpError(400,"Correction reason required");
+  if(typeof d.expectedUpdatedAt!=="string"||!Number.isFinite(Date.parse(d.expectedUpdatedAt)))
+   throw new HttpError(400,"Expected record version required");
+  const initial=await db.query("select staff_id,work_date from attendance_entries where tenant_id=$1 and id=$2",[tenant,id]);
+  if(initial.rowCount!==1)throw new HttpError(404,"Attendance not found");
+  const date=isoDay(initial.rows[0].work_date instanceof Date?
+   initial.rows[0].work_date.toISOString().slice(0,10):String(initial.rows[0].work_date).slice(0,10));
+  const staff=ensureUuid(initial.rows[0].staff_id);
+  await openPayrollWeek(db,tenant,staff,date);
+  const existing=await db.query(`select id,job_id,staff_id,work_date,started_at,finished_at,
+   break_minutes,paid_day_portion,notes,rate_unit,rate_snapshot,updated_at
+   from attendance_entries where tenant_id=$1 and id=$2 for update`,[tenant,id]);
+  if(existing.rowCount!==1)throw new HttpError(404,"Attendance not found");
+  const old=existing.rows[0],version=new Date(old.updated_at).toISOString();
+  if(old.staff_id!==staff||date!==String(old.work_date instanceof Date?
+   old.work_date.toISOString().slice(0,10):old.work_date).slice(0,10)||
+   version!==new Date(d.expectedUpdatedAt).toISOString())
+   throw new HttpError(409,"Attendance changed; refresh before editing");
+  const start=recordedTime(d.startedAt,date);
+  const finish=d.finishedAt===null?null:recordedTime(d.finishedAt,date);
+  if(old.finished_at!==null&&finish===null)
+   throw new HttpError(400,"Completed attendance cannot be reopened");
+  const duration=finish?(finish.getTime()-start.getTime())/60000:null;
+  const breaks=d.breakMinutes,portion=d.paidDayPortion;
+  if((finish&&(duration<=0||duration>1440))||!Number.isInteger(breaks)||
+     breaks<0||breaks>600||(finish&&breaks>=duration)||
+     (portion!==0.5&&portion!==1)||
+     typeof d.notes!=="string"||d.notes.length>500)
+   throw new HttpError(400,"Invalid correction details");
+  const snapshot=row=>({
+   startedAt:new Date(row.started_at).toISOString(),
+   finishedAt:row.finished_at?new Date(row.finished_at).toISOString():null,
+   breakMinutes:Number(row.break_minutes),paidDayPortion:Number(row.paid_day_portion),
+   notes:row.notes
+  });
+  const before=snapshot(old);
+  const after={startedAt:start.toISOString(),finishedAt:finish?finish.toISOString():null,
+   breakMinutes:breaks,paidDayPortion:portion,notes:d.notes.trim()};
+  if(JSON.stringify(before)===JSON.stringify(after))throw new HttpError(400,"No changes to save");
+  const saved=await db.query(`update attendance_entries set started_at=$3,finished_at=$4,
+    break_minutes=$5,paid_day_portion=$6,notes=$7,updated_at=clock_timestamp()
+    where tenant_id=$1 and id=$2 and updated_at=$8
+    returning id,job_id,staff_id,work_date,started_at,finished_at,break_minutes,paid_day_portion,notes,updated_at`,
+   [tenant,id,after.startedAt,after.finishedAt,breaks,portion,after.notes,old.updated_at]);
+  if(saved.rowCount!==1)throw new HttpError(409,"Attendance changed; refresh before editing");
+  await db.query(`insert into attendance_corrections
+   (tenant_id,attendance_id,job_id,staff_id,work_date,changed_by,reason,before_record,after_record)
+   values($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb)`,
+   [tenant,id,old.job_id,staff,date,ctx.actorSub,d.reason.trim(),
+    JSON.stringify(before),JSON.stringify(after)]);
+  await db.query("insert into audit_events(tenant_id,actor_sub,action,entity_type,entity_id) values($1,$2,'corrected','attendance',$3)",[tenant,ctx.actorSub,id]);
+  return {entry:saved.rows[0]};
  }
  if(method==="POST"&&path==="/v1/attendance/check-in"){
   const d=payload(await readBody(),["jobId","staffId","workDate"]);
