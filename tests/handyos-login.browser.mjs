@@ -88,7 +88,7 @@ try{
   await setup();
   assert.equal(page.url(),ui+"/","Callback code must be removed from navigation history");
   assert.equal(await page.locator("[data-bills]").isVisible(),true);
-  assert.equal(await page.locator('select[name="jobId"] option').count(),2);
+  assert.equal(await page.locator('[data-bills-root] select[name="jobId"] option').count(),2);
   assert.equal(await page.locator("[data-today-root] h2").innerText(),"Today · Crew check-in");
   await page.locator("[data-today-root] [data-job]").selectOption(job);
   await page.locator("[data-today-root] [data-staff]").selectOption(staff);
