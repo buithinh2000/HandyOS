@@ -195,7 +195,13 @@ try{
   await page.locator("[data-workspace-root] [data-page-body] [data-job]").selectOption(job);
   await page.locator("[data-workspace-root] [data-page-body] [data-staff]").selectOption(staff);
   await page.locator("[data-workspace-root] [data-page-body] [data-check-in] button").click();
-  await page.getByText("Check-in saved on server.").waitFor();
+  await page.getByText("Check-in saved. Open the job below when you need to check out.").waitFor();
+  const todayJob=page.locator('[data-workspace-root] [data-page-body] [data-job-session="'+job+'"]');
+  assert.equal(await todayJob.getAttribute("open"),null,"New check-in must not force checkout screen open");
+  assert.equal(await page.locator("[data-workspace-root] [data-page-body] [data-checkout]").isVisible(),false);
+  assert.equal(await page.locator("[data-workspace-root] [data-page-body] [data-staff]").inputValue(),"",
+   "Check-in form should be ready for the next employee");
+  await page.locator('[data-workspace-root] [data-page-body] [data-job-toggle="'+job+'"]').click();
   await page.locator("[data-workspace-root] [data-page-body] [data-checkout]").click();
   await page.getByText("Check-out saved on server.").waitFor();
   assert.equal(await page.evaluate(()=>window.crewEntries[0].finished_at!==null),true);
@@ -214,6 +220,7 @@ try{
   assert.equal(await page.locator('[data-workspace-root] [data-page-body] [data-calendar-day="'+yesterday+'"]').getAttribute("aria-pressed"),"true");
   assert.equal(await page.locator("[data-workspace-root] [data-page-body] [data-backfill]").isVisible(),true);
   assert.equal(await page.locator("[data-workspace-root] [data-page-body] [data-check-in]").isVisible(),false);
+  await page.locator("[data-workspace-root] [data-page-body] [data-staff]").selectOption(staff);
   await page.locator("[data-workspace-root] [data-page-body] [data-backfill] [data-break-minutes]").fill("30");
   await page.locator("[data-workspace-root] [data-page-body] [data-backfill] [data-day-portion]").selectOption("0.5");
   await page.locator("[data-workspace-root] [data-page-body] [data-backfill] button").click();
