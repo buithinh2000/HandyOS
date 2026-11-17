@@ -121,3 +121,58 @@ test("reject foreign tenant and malformed job/staff/body before SQL",async()=>{
  await assert.rejects(route(db,"/v1/staff","GET",null,"homeowner"),e=>e.status===403);
  assert.equal(calls.length,0);
 });
+
+test("missed past workday is a completed audited shift with payroll snapshot, not today's time",async()=>{
+ const {db,calls}=setup((sql)=>{
+  if(sql.includes("from staff_profiles"))return{rowCount:1,rows:[{wage_unit:"day",default_rate:"250.00"}]};
+  if(sql.includes("from jobs"))return{rowCount:1,rows:[{id:job}]};
+  if(sql.includes("from attendance_entries"))return{rowCount:0,rows:[]};
+  return{rowCount:1,rows:[{id:entry,finished_at:"2026-11-17T05:00:00.000Z"}]};
+ });
+ const result=await dispatchDailyCrew({db,method:"POST",path:"/v1/attendance/backfill",
+  query:new URLSearchParams(),ctx,now:()=>new Date("2026-11-18T10:00:00+11:00"),
+  readBody:async()=>({jobId:job,staffId:staff,workDate:"2026-11-17",
+   startedAt:"2026-11-17T08:00:00+11:00",finishedAt:"2026-11-17T16:00:00+11:00",
+   breakMinutes:30,paidDayPortion:0.5,notes:"Forgot yesterday"})});
+ assert.equal(result.entry.id,entry);
+ const row=calls.find(x=>x.text.includes("insert into attendance_entries"));
+ assert.equal(row.values[5],"2026-11-16T21:00:00.000Z");
+ assert.equal(row.values[6],"2026-11-17T05:00:00.000Z");
+ assert.equal(row.values[7],30);
+ assert.equal(row.values[8],0.5);
+ assert.equal(row.values[10],"250.00");
+ assert.ok(calls.some(x=>x.text.includes("'backfilled'")));
+});
+test("historical backfill rejects current/future day, wrong date timestamp, bad breaks, duplicate",async()=>{
+ const base={jobId:job,staffId:staff,workDate:"2026-11-17",
+  startedAt:"2026-11-17T08:00:00+11:00",finishedAt:"2026-11-17T16:00:00+11:00",
+  breakMinutes:0,paidDayPortion:1};
+ for(const bad of [{workDate:"2026-11-18"},{workDate:"2026-11-19"},
+  {startedAt:"2026-11-18T08:00:00+11:00"},{finishedAt:"2026-11-17T07:00:00+11:00"},
+  {breakMinutes:600},{paidDayPortion:2},{rate:500}]){
+  const {db,calls}=setup();
+  await assert.rejects(dispatchDailyCrew({db,method:"POST",path:"/v1/attendance/backfill",
+   query:new URLSearchParams(),ctx,now:()=>new Date("2026-11-18T10:00:00+11:00"),
+   readBody:async()=>({...base,...bad})}),e=>e.status===400);
+  assert.equal(calls.some(x=>x.text.includes("insert into attendance_entries")),false);
+ }
+ const {db,calls}=setup(sql=>sql.includes("from attendance_entries")?
+  {rowCount:1,rows:[{id:entry}]}:{rowCount:1,rows:[{wage_unit:"day",default_rate:"250.00"}]});
+ await assert.rejects(dispatchDailyCrew({db,method:"POST",path:"/v1/attendance/backfill",
+  query:new URLSearchParams(),ctx,now:()=>new Date("2026-11-18T10:00:00+11:00"),
+  readBody:async()=>base}),e=>e.status===409);
+ assert.equal(calls.some(x=>x.text.includes("insert into attendance_entries")),false);
+});
+test("closed payroll week blocks historical attendance before any new entry",async()=>{
+ const calls=[];const db={query:async(sql,values)=>{
+  calls.push(sql);
+  if(sql.includes("pg_advisory_xact_lock"))return{rowCount:1,rows:[{}]};
+  if(sql.includes("weekly_payroll_closures"))return{rowCount:1,rows:[{id:entry}]};
+  throw Error("Must stop at closure");
+ }};
+ await assert.rejects(dispatchDailyCrew({db,method:"POST",path:"/v1/attendance/backfill",
+  query:new URLSearchParams(),ctx,now:()=>new Date("2026-11-18T10:00:00+11:00"),
+  readBody:async()=>({jobId:job,staffId:staff,workDate:"2026-11-17",
+   startedAt:"2026-11-17T08:00:00+11:00",finishedAt:"2026-11-17T16:00:00+11:00"})}),e=>e.status===409);
+ assert.equal(calls.some(x=>x.includes("insert into attendance_entries")),false);
+});

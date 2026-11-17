@@ -32,7 +32,8 @@ export async function mountHandyOsToday({root,api}={}){
  </style>
  <h2>Today · Crew check-in</h2>
  <p>Record work at the job site. Payroll remains private to management.</p>
- <label>Work date<input type="date" data-work-date required></label>
+ <label>Work date · choose a day to view or record missed attendance<input type="date" data-work-date required></label>
+ <p data-day-context></p>
  <form data-check-in>
  <div class="crew-grid">
  <label>Job<select data-job required></select></label>
@@ -40,16 +41,36 @@ export async function mountHandyOsToday({root,api}={}){
  </div>
  <button type="submit">Check in employee</button>
  </form>
- <h3>Today's attendance</h3>
+ <form data-backfill hidden>
+  <h3>Record missed attendance</h3>
+  <p>Enter actual start and finish times for this past date, not the current time.</p>
+  <div class="crew-grid">
+   <label>Actual start time<input type="time" data-start-time value="08:00" required></label>
+   <label>Actual finish time<input type="time" data-finish-time value="16:00" required></label>
+   <label>Unpaid break (minutes)<input type="number" data-break-minutes min="0" max="600" step="1" value="0" required></label>
+   <label>Paid day portion<select data-day-portion><option value="1">Full day</option><option value="0.5">Half day</option></select></label>
+  </div>
+  <label>Notes (optional)<input data-backfill-notes maxlength="500"></label>
+  <button type="submit">Save missed workday</button>
+ </form>
+ <h3 data-attendance-heading>Attendance for selected date</h3>
  <div data-attendance></div>
  <p role="status" data-status aria-live="polite">Loading today…</p>`;
  const date=container.querySelector("[data-work-date]"),jobs=container.querySelector("[data-job]"),
   staff=container.querySelector("[data-staff]"),records=container.querySelector("[data-attendance]"),
-  inForm=container.querySelector("[data-check-in]"),status=container.querySelector("[data-status]");
+  inForm=container.querySelector("[data-check-in]"),backfillForm=container.querySelector("[data-backfill]"),
+  context=container.querySelector("[data-day-context]"),heading=container.querySelector("[data-attendance-heading]"),
+  status=container.querySelector("[data-status]");
  date.value=localDay();
  root.replaceChildren(container);
  let disposed=false,busy=false;
  const say=s=>{if(!disposed)status.textContent=s};
+ const setMode=()=>{
+  const past=date.value<localDay(),future=date.value>localDay();
+  inForm.hidden=past||future;backfillForm.hidden=!past;
+  heading.textContent=`Attendance · ${date.value}`;
+  context.textContent=past?"Past date — enter actual worked hours to record a completed shift.":future?"Future date — view only; no advance attendance.":"Today — use live check-in/check-out.";
+ };
  function optionList(select,data,selectedLabel,labelField){
   const selected=select.value;select.replaceChildren();option(select,selectedLabel,"");
   for(const item of data){
@@ -61,6 +82,7 @@ export async function mountHandyOsToday({root,api}={}){
  async function refresh(){
   const day=date.value;
   if(!/^\d{4}-\d{2}-\d{2}$/.test(day))throw Error("Invalid day");
+  setMode();
   const result=await api.request({path:"/v1/attendance?date="+day});
   if(!Array.isArray(result.attendance))throw Error("Invalid attendance response");
   if(disposed)return;
@@ -74,7 +96,7 @@ export async function mountHandyOsToday({root,api}={}){
    const detail=document.createElement("small");
    detail.textContent=item.finished_at?"Checked out":"Checked in";
    card.append(name,job,detail);
-   if(!item.finished_at){
+   if(!item.finished_at&&day===localDay()){
     const button=document.createElement("button");
     button.type="button";button.textContent="Check out";button.dataset.checkout=item.id;
     button.addEventListener("click",async()=>{
@@ -111,10 +133,37 @@ export async function mountHandyOsToday({root,api}={}){
   }catch{say("Could not save check-in. Check for a duplicate date or retry.")}
   finally{busy=false;button.disabled=false}
  }
+ function dateTimeISO(workDate,time){
+  if(!/^\d{2}:\d{2}$/.test(time))throw Error("Invalid shift time");
+  const dt=new Date(workDate+"T"+time+":00");
+  if(Number.isNaN(dt.getTime()))throw Error("Invalid shift time");
+  return dt.toISOString();
+ }
+ async function saveBackfill(event){
+  event.preventDefault();
+  if(busy||date.value>=localDay()||!jobs.value||!staff.value||!backfillForm.reportValidity())return;
+  const start=container.querySelector("[data-start-time]").value;
+  const finish=container.querySelector("[data-finish-time]").value;
+  if(finish<=start){say("Finish time must be after start time.");return}
+  busy=true;const button=backfillForm.querySelector('button[type="submit"]');
+  button.disabled=true;say("Saving missed workday…");
+  try{
+   await api.request({method:"POST",path:"/v1/attendance/backfill",json:{
+    jobId:jobs.value,staffId:staff.value,workDate:date.value,
+    startedAt:dateTimeISO(date.value,start),finishedAt:dateTimeISO(date.value,finish),
+    breakMinutes:Number(container.querySelector("[data-break-minutes]").value),
+    paidDayPortion:Number(container.querySelector("[data-day-portion]").value),
+    notes:container.querySelector("[data-backfill-notes]").value
+   }});
+   await refresh();say("Past attendance saved on server. Check employee payroll for this week.");
+  }catch{say("Could not save missed workday. Check for an existing day or a closed payroll week.")}
+  finally{busy=false;button.disabled=false}
+ }
  inForm.addEventListener("submit",saveCheckIn);
+ backfillForm.addEventListener("submit",saveBackfill);
  const change=async()=>{if(busy)return;try{await refresh();say("Attendance updated.")}catch{say("Unable to load this date.")}};
  date.addEventListener("change",change);
  try{await prepare()}catch{say("Today is unavailable. Try refreshing after signing in.")}
  return Object.freeze({destroy(){disposed=true;inForm.removeEventListener("submit",saveCheckIn);
-  date.removeEventListener("change",change);if(root.contains(container))root.removeChild(container)}});
+  date.removeEventListener("change",change);backfillForm.removeEventListener("submit",saveBackfill);if(root.contains(container))root.removeChild(container)}});
 }
