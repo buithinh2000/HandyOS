@@ -22,6 +22,12 @@ Status: reconstructed from Owner conversation context and merged GitHub changes;
 | Prior to reset | Jobs -> main tasks -> opt-in subtasks, avoid auto-generating huge trade checklists; exact product/price review in legacy quote workflow. | [PR19](https://github.com/buithinh2000/HandyOS/pull/19) to [PR22](https://github.com/buithinh2000/HandyOS/pull/22); PRODUCT_DESIGN_STANDARD.md | Historical/legacy, not current V1 priority |
 | 2026-11-15 | Isolated AWS+Cloudflare deployment, no shared Core data/roles; source-only cloud sync with independent security gates before real data. | [PR34](https://github.com/buithinh2000/HandyOS/pull/34)–[PR40](https://github.com/buithinh2000/HandyOS/pull/40), cloud/SECURITY-GATE.md | Source prepared; NOT DEPLOYED |
 
+## 2026-11-18 — Cloud Financials parity remains P0 blocked
+
+Issue [#116](https://github.com/buithinh2000/HandyOS/issues/116) records a verified mismatch. Source cloud PR #114 calculates a partial reserve against **EX-GST** contract and does not model approved variations, remaining future costs and unbooked overhead, whereas the Owner V1 decision and ledger formula below require one combined configurable reserve against approved adjusted **INC-GST** contract. Do **not** silently replace the approved formula with the newer partial calculation.
+
+Safety follow-up: cloud Financials now returns `profitReady:false`, `provisional:true`, and an explicit warning; the authenticated UI shows `NOT READY` rather than treating the raw subtotal as final profit. This is a *source-only safety block*, not an accounting fix, data migration or AWS deployment. A later parity PR must cover stored assumptions, future costs, variations, GST/no-GST, employee extras and customer pass-through with cents-accurate tests before enabling final profit.
+
 ## Current mathematical decision contract (from main owner-ledger-core.mjs)
 ```text
 adjusted_contract_inc = base_contract_inc + approved_variation_inc
