@@ -62,3 +62,11 @@ Backend routes in the same verified Cognito + tenant-scoped transaction as Jobs:
 ## Trang Today trên HandyOS cloud
 
 Sau đăng nhập Cognito, hệ thống mở **Today · Crew check-in** ở đầu trang, trước Bills. Owner/Manager chọn công trình và nhân viên, bấm Check in; phần Today's attendance hiển thị các entry từ API và có Check out đối với entry đang mở. Nút Add employee cho phép tạo hồ sơ nhân viên với mức lương ngày/giờ. Dữ liệu luôn lấy từ API PostgreSQL xác thực; không dựa trên demo `localStorage`. Hệ thống chỉ báo thành công sau khi server xác nhận. Kiểm thử trình duyệt iPhone và desktop sử dụng fake backend, không gọi AWS. Chưa kết nối cơ sở dữ liệu production.
+
+## Weekly payroll (Owner/Manager only)
+
+The mobile cloud app now exposes **Employees → employee → Weekly payroll** immediately below Today. It reads the original wage snapshot for completed check-in/out days, deducts the recorded unpaid break for hourly pay, and adds independently recorded week-specific bonuses or allowances. Bank transfers are **explicitly allocated to a Monday-start workweek**, because the payment date might be later. Older payments with no allocation are preserved as unallocated and are **not silently counted** in a week.
+
+Totals shown are earned, extras, due, paid and remaining; negative remaining indicates overpayment. Closing a week is allowed only when no attendance remains checked in, the week has work/adjustments and total paid exactly equals total due. Closure stores an immutable snapshot and blocks API changes to that week's attendance/bonuses/payments. Mobile shows an employee overview then the selected employee's detail. A backup restore and production-grade accounting review are needed before using real payroll data. All new data is from HandyOS PostgreSQL RLS, not localStorage.
+
+Migration `005_payroll_week_closures.sql` is **not applied in production** by this PR; the migration is only executed in isolated GitHub PostgreSQL integration tests.
