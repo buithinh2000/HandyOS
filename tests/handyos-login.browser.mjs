@@ -11,7 +11,7 @@ const receipt="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const staff="cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const attendance="dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 const ids=["handyos-login-shell","handyos-cognito-pkce","handyos-cloud-api-transport",
- "handyos-cloud-bills-app","handyos-today-view","handyos-payroll-view","receipt-cloud-view","receipt-cloud-controller","receipt-iphone-upload"];
+ "handyos-cloud-bills-app","handyos-today-view","handyos-jobs-view","handyos-payroll-view","receipt-cloud-view","receipt-cloud-controller","receipt-iphone-upload"];
 const modules=Object.fromEntries(ids.map(x=>["/"+x+".mjs",readFileSync("backend/src/"+x+".mjs","utf8")]));
 const html='<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><div id="app"></div></body></html>';
 let browser;
@@ -31,14 +31,25 @@ try{
   const setup=async()=>{
    await page.evaluate(async({ui,api,issuer,tenant,job,receipt,staff,attendance})=>{
     const {mountHandyOsLoginShell}=await import("/handyos-login-shell.mjs");
-    window.requests=[];window.crewEntries=[];window.payrollClosed=false;
+    window.requests=[];window.crewEntries=[];window.payrollClosed=false;window.jobs=[{id:job,name:"Renovation sample",stage:"survey"}];window.tasks=[];
     const fetcher=async(url,opts)=>{
      window.requests.push({url,method:opts.method,headers:opts.headers});
      let data;
      if(url===issuer+"/oauth2/token")data={token_type:"Bearer",access_token:"synthetic-access-token-long-enough",expires_in:3600};
      else if(url===api+"/v1/companies")data={companies:[{tenant_id:tenant,role:"owner"}]};
      else if(url===api+"/v1/me")data={tenant_id:tenant,role:"owner"};
-     else if(url===api+"/v1/jobs")data={jobs:[{id:job,name:"Renovation sample"}]};
+     else if(url===api+"/v1/jobs"&&opts.method==="GET")data={jobs:window.jobs};
+     else if(url===api+"/v1/jobs"&&opts.method==="POST"){
+      const body=JSON.parse(opts.body);
+      const created={id:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",name:body.name,code:body.code,stage:"survey"};
+      window.jobs.unshift(created);data={job:created,categories:0,tasks_created:0};
+     }
+     else if(url===api+"/v1/jobs/"+job+"/tasks"&&opts.method==="GET")data={tasks:window.tasks};
+     else if(url===api+"/v1/jobs/"+job+"/tasks"&&opts.method==="POST"){
+      const body=JSON.parse(opts.body);
+      const task={id:"ffffffff-ffff-4fff-8fff-ffffffffffff",title:body.title,status:"todo"};
+      window.tasks.push(task);data={task};
+     }
      else if(url===api+"/v1/staff"&&opts.method==="GET")data={staff:[{id:staff,display_name:"Sam",active:true,wage_unit:"day",default_rate:"250.00"}]};
      else if(url.startsWith(api+"/v1/attendance?date=")&&opts.method==="GET")data={attendance:window.crewEntries};
      else if(url===api+"/v1/attendance/check-in"&&opts.method==="POST"){
@@ -90,6 +101,20 @@ try{
   assert.equal(await page.locator("[data-bills]").isVisible(),true);
   assert.equal(await page.locator('[data-bills-root] select[name="jobId"] option').count(),2);
   assert.equal(await page.locator("[data-today-root] h2").innerText(),"Today · Crew check-in");
+  assert.equal(await page.locator("[data-jobs-root] [data-job-list] button").count(),1);
+  await page.locator("[data-jobs-root] [data-job-list] button").first().click();
+  await page.getByText("Job details loaded.").waitFor();
+  await page.locator("[data-jobs-root] [data-create-task] input").fill("Install plasterboard");
+  await page.locator("[data-jobs-root] [data-create-task] button").click();
+  await page.getByText("Task saved on server.").waitFor();
+  assert.equal(await page.evaluate(()=>window.tasks.length),1);
+  await page.locator("[data-jobs-root] [data-back]").click();
+  await page.locator("[data-jobs-root] [data-new-job]").click();
+  await page.locator("[data-jobs-root] [data-create-job] input[name=name]").fill("Kitchen extension");
+  await page.locator("[data-jobs-root] [data-create-job] input[name=code]").fill("JOB-24");
+  await page.locator("[data-jobs-root] [data-create-job] button").click();
+  await page.getByText("Job saved on server.").waitFor();
+  assert.equal(await page.evaluate(()=>window.jobs.length),2);
   await page.locator("[data-today-root] [data-job]").selectOption(job);
   await page.locator("[data-today-root] [data-staff]").selectOption(staff);
   await page.locator("[data-today-root] [data-check-in] button").click();
