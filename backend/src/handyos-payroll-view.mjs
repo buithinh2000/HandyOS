@@ -42,7 +42,18 @@ export async function mountHandyOsPayroll({root,api}={}){
  .handyos-payroll form{display:grid;gap:8px;border-top:1px solid #e2ebf1;padding-top:10px}
  </style>
  <h2>Employees · Weekly payroll</h2>
- <div class="payroll-list" data-staff-overview></div>
+ <section data-overview>
+  <button type="button" data-create-employee>+ Add employee</button>
+  <form data-employee-form hidden>
+   <h3>New employee</h3>
+   <label>Employee name<input name="displayName" maxlength="160" required></label>
+   <label>Trade / role<input name="roleLabel" maxlength="100"></label>
+   <label>Pay basis<select name="wageUnit"><option value="day">Daily</option><option value="hour">Hourly</option></select></label>
+   <label>Base wage (AUD)<input name="defaultRate" type="number" min="0" max="100000" step="0.01" required></label>
+   <button type="submit">Save employee</button>
+  </form>
+  <div class="payroll-list" data-staff-overview></div>
+ </section>
  <section data-staff-detail hidden>
   <button type="button" data-back>All employees</button>
   <h3 data-worker></h3>
@@ -71,7 +82,9 @@ export async function mountHandyOsPayroll({root,api}={}){
  </section>
  <p role="status" data-payroll-status aria-live="polite">Loading employees…</p>`;
  root.replaceChildren(panel);
- const list=panel.querySelector("[data-staff-overview]"),detail=panel.querySelector("[data-staff-detail]"),
+ const overview=panel.querySelector("[data-overview]"),addEmployee=panel.querySelector("[data-create-employee]"),
+  employeeForm=panel.querySelector("[data-employee-form]"),
+  list=panel.querySelector("[data-staff-overview]"),detail=panel.querySelector("[data-staff-detail]"),
   weeklyDate=panel.querySelector("[data-week]"),totals=panel.querySelector("[data-totals]"),
   work=panel.querySelector("[data-work-summary]"),title=panel.querySelector("[data-worker]"),
   status=panel.querySelector("[data-payroll-status]"),close=panel.querySelector("[data-close]"),
@@ -118,9 +131,9 @@ export async function mountHandyOsPayroll({root,api}={}){
  }
  const open=async staff=>{
   selected=staff;title.textContent=staff.display_name;
-  list.hidden=true;detail.hidden=false;await load();
+  overview.hidden=true;detail.hidden=false;await load();
  };
- const onBack=()=>{selected=null;report=null;detail.hidden=true;list.hidden=false;say("Select an employee to view payroll.")};
+ const onBack=()=>{selected=null;report=null;detail.hidden=true;overview.hidden=false;say("Select an employee to view payroll.")};
  const onRefresh=()=>load();
  const onSave=async(evt,action)=>{
   evt.preventDefault();
@@ -152,6 +165,38 @@ export async function mountHandyOsPayroll({root,api}={}){
   }catch{say("Payroll could not be closed. Verify payments and open attendance.")}
   finally{busy=false}
  };
+ async function onCreateEmployee(event){
+  event.preventDefault();
+  if(busy)return;
+  const name=employeeForm.elements.displayName.value.trim(),
+   role=employeeForm.elements.roleLabel.value.trim(),
+   unit=employeeForm.elements.wageUnit.value,
+   rateText=employeeForm.elements.defaultRate.value,
+   rate=Number(rateText);
+  if(!name||!rateText||!Number.isFinite(rate)||rate<0||rate>100000||
+   !["day","hour"].includes(unit)){
+   say("Enter an employee name and a valid wage rate.");return;
+  }
+  busy=true;const button=employeeForm.querySelector('button[type="submit"]');
+  button.disabled=true;say("Saving employee…");
+  try{
+   const response=await api.request({method:"POST",path:"/v1/staff",
+    json:{displayName:name,roleLabel:role,wageUnit:unit,defaultRate:rate}});
+   if(!response?.staff||!UUID.test(response.staff.id)||
+    typeof response.staff.display_name!=="string")throw Error("Employee not confirmed");
+   // Update only this employee directory; do not reload Today or any other screen.
+   const empty=list.querySelector("p");empty?.remove();
+   const employee=response.staff;
+   const btn=element("button",employee.display_name,list);
+   btn.type="button";btn.addEventListener("click",()=>open(employee));
+   employeeForm.reset();employeeForm.hidden=true;
+   say("Employee saved on server.");
+  }catch{say("Could not save employee. Check details and retry.")}
+  finally{busy=false;button.disabled=false}
+ }
+ const toggleEmployee=()=>{employeeForm.hidden=!employeeForm.hidden};
+ addEmployee.addEventListener("click",toggleEmployee);
+ employeeForm.addEventListener("submit",onCreateEmployee);
  panel.querySelector("[data-back]").addEventListener("click",onBack);
  panel.querySelector("[data-refresh]").addEventListener("click",onRefresh);
  bonus.addEventListener("submit",onBonus);payment.addEventListener("submit",onPayment);
@@ -163,7 +208,7 @@ export async function mountHandyOsPayroll({root,api}={}){
   if(!Array.isArray(staffResp.staff)||!Array.isArray(jobResp.jobs))throw Error("Invalid lists");
   selectOptions(bonus.elements.jobId,jobResp.jobs,"Job");
   selectOptions(payment.elements.jobId,jobResp.jobs,"Job");
-  if(!staffResp.staff.length)element("p","No employees yet. Add one in Today.",list);
+  if(!staffResp.staff.length)element("p","No employees yet. Add your first employee here.",list);
   for(const staff of staffResp.staff){
    if(!UUID.test(staff.id)||typeof staff.display_name!=="string")throw Error("Invalid employee");
    const btn=element("button",staff.display_name+(staff.active?"":" (Inactive)"),list);
@@ -171,5 +216,6 @@ export async function mountHandyOsPayroll({root,api}={}){
   }
   say("Select an employee to see their weekly wages.");
  }catch{say("Employee payroll is unavailable. Please refresh after signing in.")}
- return Object.freeze({destroy(){disposed=true;root.replaceChildren()}});
+ return Object.freeze({destroy(){disposed=true;addEmployee.removeEventListener("click",toggleEmployee);
+  employeeForm.removeEventListener("submit",onCreateEmployee);root.replaceChildren()}});
 }
