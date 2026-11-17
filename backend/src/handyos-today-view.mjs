@@ -61,11 +61,11 @@ export async function mountHandyOsToday({root,api}={}){
   <label>Selected work date<input type="date" data-work-date required></label>
  </div>
  <p data-day-context></p>
- <form data-check-in>
- <div class="crew-grid">
+ <div class="crew-grid" data-attendance-selectors>
  <label>Job<select data-job required></select></label>
  <label>Employee<select data-staff required></select></label>
  </div>
+ <form data-check-in>
  <button type="submit">Check in employee</button>
  </form>
  <form data-backfill hidden>
