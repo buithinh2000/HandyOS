@@ -12,7 +12,9 @@ function isoDay(v){
 }
 // Historical shifts must carry actual timestamps; never replace missed clock-ins with "now".
 function melbourneDay(date){
- return new Intl.DateTimeFormat("en-CA",{timeZone:"Australia/Melbourne",year:"numeric",month:"2-digit",day:"2-digit"}).format(date);
+ const parts=new Intl.DateTimeFormat("en-US",{timeZone:"Australia/Melbourne",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(date);
+ const value=key=>parts.find(part=>part.type===key)?.value;
+ return `${value("year")}-${value("month")}-${value("day")}`;
 }
 function recordedTime(value,workDate){
  if(typeof value!=="string"||!/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(value))
@@ -122,6 +124,7 @@ export async function dispatchDailyCrew({method,path,query,ctx,db,readBody,now=(
   if(current.rowCount!==1)throw new HttpError(409,"No open attendance entry to check out");
   const workDate=current.rows[0].work_date instanceof Date?
    current.rows[0].work_date.toISOString().slice(0,10):String(current.rows[0].work_date).slice(0,10);
+  if(workDate!==melbourneDay(now()))throw new HttpError(409,"Historical open shift needs an audited correction; do not check out with current time");
   await openPayrollWeek(db,tenant,ensureUuid(current.rows[0].staff_id),workDate);
   const finished=now();
   if(!(finished instanceof Date)||Number.isNaN(finished.getTime()))throw new HttpError(503,"Clock unavailable");
