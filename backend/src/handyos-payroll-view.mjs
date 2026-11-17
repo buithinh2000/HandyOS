@@ -77,7 +77,7 @@ export async function mountHandyOsPayroll({root,api}={}){
  let selected=null,disposed=false,busy=false,report=null;
  const say=value=>{if(!disposed)status.textContent=value};
  weeklyDate.value=currentMonday();
- payment.elements.paidOn.value=new Date().toLocaleDateString("en-CA"); // local day
+ {const today=new Date();payment.elements.paidOn.value=[today.getFullYear(),String(today.getMonth()+1).padStart(2,"0"),String(today.getDate()).padStart(2,"0")].join("-");}
  async function load(){
   if(!selected||busy)return;
   const d=new Date(weeklyDate.value+"T00:00:00Z");
@@ -129,7 +129,7 @@ export async function mountHandyOsPayroll({root,api}={}){
     {jobId,amount,paidOn:form.elements.paidOn.value,reference:form.elements.reference.value};
    const result=await api.request({method:"POST",path:"/v1/payroll/"+selected.id+"/weeks/"+weeklyDate.value+"/"+action,json:body});
    if(!result?.payroll)throw Error("Server did not confirm");
-   form.reset();await load();say(action==="bonus"?"Bonus saved on server.":"Payment saved on server.");
+   form.reset();busy=false;await load();say(action==="bonus"?"Bonus saved on server.":"Payment saved on server.");
   }catch{say("Unable to save. Please check payroll is still open.")}
   finally{busy=false;button.disabled=false}
  };
@@ -140,7 +140,7 @@ export async function mountHandyOsPayroll({root,api}={}){
   try{
    const result=await api.request({method:"POST",path:"/v1/payroll/"+selected.id+"/weeks/"+weeklyDate.value+"/close",json:{}});
    if(!result?.payroll?.closed)throw Error("Closure not confirmed");
-   await load();say("Payroll week closed and saved.");
+   busy=false;await load();say("Payroll week closed and saved.");
   }catch{say("Payroll could not be closed. Verify payments and open attendance.")}
   finally{busy=false}
  };
