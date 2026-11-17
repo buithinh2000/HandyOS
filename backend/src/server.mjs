@@ -8,6 +8,7 @@ import {matchReceiptRoute,dispatchReceiptRoute} from "./receipt-http-routes.mjs"
 import {sendHandyOsFrontend} from "./frontend-assets.mjs";
 import {createHandyOsReceiptRuntime} from "./receipt-runtime.mjs";
 import {dispatchDailyCrew} from "./daily-crew.mjs";
+import {dispatchWeeklyPayroll} from "./weekly-payroll.mjs";
 
 const { Pool } = pg;
 const renovationCatalog = JSON.parse(readFileSync(new URL("../../shared/renovation-catalog.json",import.meta.url),"utf8"));
@@ -82,6 +83,10 @@ async function dispatch(req,{receiptWorkflow=null}={}){
   await client.query("select set_config('app.actor_role',$1,true)",[ctx.role]);
   if(/^\/v1\/(staff|attendance)(?:\/|$)/.test(url.pathname)){
    return dispatchDailyCrew({method:req.method,path:url.pathname,query:url.searchParams,
+    ctx:{...ctx,actorSub:sub},db:client,readBody:()=>body(req)});
+  }
+  if(/^\/v1\/payroll(?:\/|$)/.test(url.pathname)){
+   return dispatchWeeklyPayroll({method:req.method,path:url.pathname,query:url.searchParams,
     ctx:{...ctx,actorSub:sub},db:client,readBody:()=>body(req)});
   }
   if(req.method==="GET"&&url.pathname==="/v1/me")return{tenant_id:ctx.tenant_id,role:ctx.role,actor_id:sub};
