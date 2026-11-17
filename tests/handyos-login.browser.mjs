@@ -70,6 +70,17 @@ try{
       data={staff:{id:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",display_name:body.displayName,active:true,
        role_label:body.roleLabel,wage_unit:body.wageUnit,default_rate:body.defaultRate}};
      }
+     else if(url.startsWith(api+"/v1/attendance/month?month=")&&opts.method==="GET"){
+      const month=url.split("month=")[1],entries=[...window.crewEntries,...window.backfilledEntries];
+      const result=new Map();
+      for(const item of entries){
+       if(!item.work_date.startsWith(month+"-"))continue;
+       const value=result.get(item.work_date)||{date:item.work_date,recordedCount:0,openCount:0};
+       value.recordedCount++;if(!item.finished_at)value.openCount++;
+       result.set(item.work_date,value);
+      }
+      data={month,days:[...result.values()]};
+     }
      else if(url.startsWith(api+"/v1/attendance?date=")&&opts.method==="GET"){
       const selected=url.split("date=")[1];
       data={attendance:[...window.crewEntries,...window.backfilledEntries].filter(x=>x.work_date===selected)};
@@ -206,6 +217,10 @@ try{
   await page.locator("[data-workspace-root] [data-page-body] [data-backfill] button").click();
   await page.getByText("Past attendance saved on server.").waitFor();
   assert.equal(await page.evaluate(()=>window.backfilledEntries.length),1);
+  await page.locator('[data-workspace-root] [data-page-body] [data-calendar-day="'+yesterday+'"][data-recorded="1"]').waitFor();
+  assert.match(await page.locator('[data-workspace-root] [data-page-body] [data-calendar-summary]').innerText(),/days with recorded attendance/);
+  assert.equal(await page.locator('[data-workspace-root] [data-page-body] [data-calendar-day="'+yesterday+'"]').getAttribute("data-open"),null);
+
   const recorded=await page.evaluate(()=>window.backfilledEntries[0]);
   assert.equal(recorded.break_minutes,30);
   assert.equal(recorded.paid_day_portion,0.5);
