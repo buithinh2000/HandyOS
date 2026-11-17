@@ -19,7 +19,7 @@ try{
  browser=await chromium.launch({headless:true});
  for(const width of [390,1280]){
   const page=await browser.newPage({viewport:{width,height:860},serviceWorkers:"block"});
-  const failures=[];page.on("pageerror",e=>failures.push(e.message));
+  const failures=[];page.on("pageerror",e=>failures.push(e.message));page.on("console",msg=>{if(msg.text().includes("HANDYOS_JOBS_DEBUG"))console.log(msg.text())});
   await page.route("**/*",async route=>{
    const url=new URL(route.request().url());
    if(url.origin!==ui)return route.abort();
