@@ -64,7 +64,7 @@ export async function readPayrollWeek(db,tenant,staffId,weekBegin){
   canClose:!closure&&openCount===0&&entries.length+adjustments.rows.length>0&&earned+extras===paid};
 }
 async function isClosed(db,tenant,staffId,weekBegin){
- const r=await db.query("select id from weekly_payroll_closures where tenant_id=$1 and staff_id=$2 and week_begin=$3 for update",[tenant,staffId,weekBegin]);
+ const r=await db.query("select id from weekly_payroll_closures where tenant_id=$1 and staff_id=$2 and week_begin=$3",[tenant,staffId,weekBegin]);
  if(r.rowCount)throw new HttpError(409,"Payroll week already closed");
 }
 export async function dispatchWeeklyPayroll({method,path,query,ctx,db,readBody}){
