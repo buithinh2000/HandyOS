@@ -32,6 +32,14 @@ export async function mountHandyOsJobs({root,api,onJobsChanged}={}){
  .handyos-jobs [data-job-list]{display:grid;gap:7px}
  .handyos-jobs [data-job-list] button{background:#f5f9fb;color:#16476b;text-align:left;border-color:#c9d9e5}
  .handyos-jobs .job-task{padding:9px;border-bottom:1px solid #e2e9ee}
+ .handyos-jobs .job-filters{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:8px}
+ .handyos-jobs .job-detail-nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .handyos-jobs .job-detail-nav button[aria-selected=true]{background:#17699b;color:white}
+ .handyos-jobs .job-detail-nav button[aria-selected=false]{background:#f5f9fb;color:#16476b}
+ .handyos-jobs .job-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+ .handyos-jobs .job-summary div{background:#f5f9fb;padding:12px;border-radius:10px;overflow-wrap:anywhere}
+ .handyos-jobs .job-summary small{display:block;color:#587185;margin-bottom:4px}
+ @media(max-width:580px){.handyos-jobs .job-filters,.handyos-jobs .job-summary{grid-template-columns:1fr}}
  .handyos-jobs .job-task small{color:#587185;display:block}
  </style>
  <h2>Jobs · Công trình</h2>
@@ -42,32 +50,56 @@ export async function mountHandyOsJobs({root,api,onJobsChanged}={}){
    <label>Job reference (optional)<input name="code" maxlength="60"></label>
    <button type="submit">Save job</button>
   </form>
+  <div class="job-filters">
+   <label>Find job<input type="search" data-job-search placeholder="Name or job code"></label>
+   <label>Status<select data-job-filter><option value="all">All statuses</option><option value="active">Active</option><option value="scheduled">Scheduled</option><option value="closed">Closed</option></select></label>
+  </div>
+  <p data-result-count></p>
   <div data-job-list></div>
  </div>
  <section data-detail hidden>
   <button type="button" data-back>All jobs</button>
   <h3 data-job-title></h3>
-  <p data-job-stage></p>
-  <h3>Work items</h3>
-  <div data-tasks></div>
-  <form data-create-task>
-   <label>New task<input name="title" maxlength="200" required placeholder="Install plasterboard"></label>
-   <button type="submit">Add task</button>
-  </form>
+  <nav class="job-detail-nav" aria-label="Job details">
+   <button type="button" data-detail-overview aria-selected="true">Overview</button>
+   <button type="button" data-detail-tasks aria-selected="false">Work items</button>
+  </nav>
+  <section data-job-summary aria-label="Job overview">
+   <div class="job-summary" data-summary-fields></div>
+   <p>Financials, customer contact and documents will appear here when their verified data is available.</p>
+  </section>
+  <section data-job-tasks hidden aria-label="Job work items">
+   <h3>Work items</h3>
+   <div data-tasks></div>
+   <button type="button" data-new-task>+ Add work item</button>
+   <form data-create-task hidden>
+    <label>New task<input name="title" maxlength="200" required placeholder="Install plasterboard"></label>
+    <button type="submit">Save work item</button>
+   </form>
+  </section>
  </section>
  <p data-status role="status" aria-live="polite">Loading jobs…</p>`;
  root.replaceChildren(panel);
  const overview=panel.querySelector("[data-overview]"),detail=panel.querySelector("[data-detail]"),
  list=panel.querySelector("[data-job-list]"),tasks=panel.querySelector("[data-tasks]"),
  status=panel.querySelector("[data-status]"),jobForm=panel.querySelector("[data-create-job]"),
- taskForm=panel.querySelector("[data-create-task]"),jobTitle=panel.querySelector("[data-job-title]");
+ taskForm=panel.querySelector("[data-create-task]"),jobTitle=panel.querySelector("[data-job-title]"),
+ search=panel.querySelector("[data-job-search]"),filter=panel.querySelector("[data-job-filter]"),
+ summary=panel.querySelector("[data-job-summary]"),taskSection=panel.querySelector("[data-job-tasks]"),
+ summaryFields=panel.querySelector("[data-summary-fields]"),
+ overviewTab=panel.querySelector("[data-detail-overview]"),tasksTab=panel.querySelector("[data-detail-tasks]"),
+ newTask=panel.querySelector("[data-new-task]");
  let jobs=[],selected=null,busy=false,disposed=false;
  const message=s=>{if(!disposed)status.textContent=s};
  function drawList(){
   if(disposed)return;
   list.replaceChildren();
-  if(!jobs.length)txt("p","No jobs yet. Add your first project.",list);
-  for(const job of jobs){
+  const term=search.value.trim().toLocaleLowerCase();
+  const found=jobs.filter(j=>(filter.value==="all"||j.stage===filter.value)&&
+   (!term||j.name.toLocaleLowerCase().includes(term)||(j.code||"").toLocaleLowerCase().includes(term)));
+  panel.querySelector("[data-result-count]").textContent=found.length+" of "+jobs.length+" jobs";
+  if(!found.length)txt("p",jobs.length?"No matching jobs. Clear the search or status filter.":"No jobs yet. Add your first project.",list);
+  for(const job of found){
    const b=txt("button",job.name+(job.code?" · "+job.code:"")+" — "+job.stage,list);
    b.type="button";b.addEventListener("click",()=>open(job));
   }
@@ -92,15 +124,34 @@ export async function mountHandyOsJobs({root,api,onJobsChanged}={}){
    txt("small",task.status.replaceAll("_"," "),row);
   }
  }
+ function showDetailTab(which){
+  const inTasks=which==="tasks";
+  summary.hidden=inTasks;taskSection.hidden=!inTasks;
+  overviewTab.setAttribute("aria-selected",String(!inTasks));
+  tasksTab.setAttribute("aria-selected",String(inTasks));
+ }
+ function displaySummary(job){
+  summaryFields.replaceChildren();
+  for(const [label,value] of [["Job name",job.name],["Reference",job.code||"Not set"],
+   ["Status",job.stage],["Notes",job.notes||"No notes recorded"]]){
+   const card=document.createElement("div");txt("small",label,card);
+   txt("strong",value,card);summaryFields.append(card);
+  }
+ }
  async function open(job){
   if(busy||disposed)return;
   selected=job;jobTitle.textContent=job.name;
-  panel.querySelector("[data-job-stage]").textContent="Stage: "+job.stage;
-  overview.hidden=true;detail.hidden=false;message("Loading work items…");
-  try{await loadTasks(job);message("Job details loaded.")}
-  catch{tasks.replaceChildren();message("Could not load work items. Retry from All jobs.")}
+  displaySummary(job);showDetailTab("overview");
+  overview.hidden=true;detail.hidden=false;message("Job details loaded.");
  }
- const onBack=()=>{selected=null;overview.hidden=false;detail.hidden=true;message("Select a job for details.")};
+ const onBack=()=>{selected=null;overview.hidden=false;detail.hidden=true;taskForm.hidden=true;message("Select a job for details.")};
+ const onOverviewTab=()=>showDetailTab("overview");
+ const onTasksTab=async()=>{
+  if(!selected)return;showDetailTab("tasks");message("Loading work items…");
+  try{await loadTasks(selected);message("Work items loaded.")}
+  catch{tasks.replaceChildren();message("Could not load work items. Return to Overview and retry.")}
+ };
+ const onNewTask=()=>{taskForm.hidden=!taskForm.hidden};
  const onNew=()=>{jobForm.hidden=!jobForm.hidden};
  const onJob=async event=>{
   event.preventDefault();if(busy)return;
@@ -122,14 +173,21 @@ export async function mountHandyOsJobs({root,api,onJobsChanged}={}){
   try{
    const result=await api.request({method:"POST",path:"/v1/jobs/"+selected.id+"/tasks",json:{title}});
    if(!result?.task||!UUID.test(result.task.id))throw Error("Task not confirmed");
-   await loadTasks(selected);taskForm.reset();message("Task saved on server.");
+   await loadTasks(selected);taskForm.reset();taskForm.hidden=true;message("Task saved on server.");
   }catch{message("Could not save task. Please retry.")}
   finally{busy=false;b.disabled=false}
  };
  panel.querySelector("[data-back]").addEventListener("click",onBack);
  panel.querySelector("[data-new-job]").addEventListener("click",onNew);
+ overviewTab.addEventListener("click",onOverviewTab);
+ tasksTab.addEventListener("click",onTasksTab);
+ newTask.addEventListener("click",onNewTask);
+ search.addEventListener("input",drawList);filter.addEventListener("change",drawList);
  jobForm.addEventListener("submit",onJob);taskForm.addEventListener("submit",onTask);
  try{await refresh();message("Select a job for details.")}
  catch{message("Could not load jobs. Please retry after sign-in.")}
- return Object.freeze({refresh,destroy(){disposed=true;root.replaceChildren()}});
+ return Object.freeze({refresh,destroy(){disposed=true;
+  overviewTab.removeEventListener("click",onOverviewTab);tasksTab.removeEventListener("click",onTasksTab);
+  newTask.removeEventListener("click",onNewTask);search.removeEventListener("input",drawList);
+  filter.removeEventListener("change",drawList);root.replaceChildren()}});
 }
