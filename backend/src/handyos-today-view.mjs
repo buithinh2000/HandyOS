@@ -33,7 +33,11 @@ export async function mountHandyOsToday({root,api}={}){
  .handyos-today .calendar-toolbar button{background:#edf4f8;color:#183047;min-width:46px}
  .handyos-today .calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
  .handyos-today .calendar-weekday{text-align:center;font-size:12px;color:#50677b;padding:6px 0;font-weight:700}
- .handyos-today .calendar-grid button{min-width:0;min-height:44px;padding:4px;background:#f2f6f9;color:#183047;font-weight:600}
+ .handyos-today .calendar-grid button{min-width:0;min-height:48px;padding:4px;background:#f2f6f9;color:#183047;font-weight:600;display:grid;align-content:center;justify-items:center;gap:2px}
+ .handyos-today .calendar-grid .day-count{font-size:11px;line-height:1.1;font-weight:600;color:#17764c}
+ .handyos-today .calendar-grid .day-open{color:#a46516}
+ .handyos-today .calendar-grid button[data-selected=true] .day-count{color:white}
+ .handyos-today [data-calendar-summary]{font-size:13px;color:#50677b;margin:0}
  .handyos-today .calendar-grid button[data-selected=true]{background:#17699b;color:#fff}
  .handyos-today .calendar-grid button[data-today=true]:not([data-selected=true]){box-shadow:inset 0 0 0 2px #17699b}
  .handyos-today .calendar-grid button:focus-visible,.handyos-today .calendar-toolbar button:focus-visible{outline:3px solid #ffb72b;outline-offset:2px}
@@ -45,6 +49,7 @@ export async function mountHandyOsToday({root,api}={}){
  <div class="calendar" aria-label="Work attendance calendar">
   <div class="calendar-toolbar"><button type="button" data-calendar-prev aria-label="Previous month">‹</button><strong data-calendar-month></strong><button type="button" data-calendar-next aria-label="Next month">›</button></div>
   <div class="calendar-grid" data-calendar-grid role="group" aria-label="Choose workday"></div>
+  <p data-calendar-summary role="status" aria-live="polite">Loading recorded attendance days…</p>
   <label>Selected work date<input type="date" data-work-date required></label>
  </div>
  <p data-day-context></p>
@@ -75,11 +80,13 @@ export async function mountHandyOsToday({root,api}={}){
   inForm=container.querySelector("[data-check-in]"),backfillForm=container.querySelector("[data-backfill]"),
   context=container.querySelector("[data-day-context]"),heading=container.querySelector("[data-attendance-heading]"),
   status=container.querySelector("[data-status]"),calendarGrid=container.querySelector("[data-calendar-grid]"),
-  monthLabel=container.querySelector("[data-calendar-month]"),previous=container.querySelector("[data-calendar-prev]"),next=container.querySelector("[data-calendar-next]");
+  monthLabel=container.querySelector("[data-calendar-month]"),monthSummary=container.querySelector("[data-calendar-summary]"),
+  previous=container.querySelector("[data-calendar-prev]"),next=container.querySelector("[data-calendar-next]");
  date.value=localDay();
  root.replaceChildren(container);
  let disposed=false,busy=false;
  let calendarMonth=new Date(Number(date.value.slice(0,4)),Number(date.value.slice(5,7))-1,1);
+ let loadedMonth="",recordedDays=new Map(),summarySequence=0;
  const pad=n=>String(n).padStart(2,"0");
  const renderCalendar=()=>{
   calendarGrid.replaceChildren();
@@ -90,15 +97,53 @@ export async function mountHandyOsToday({root,api}={}){
   for(let i=0;i<first;i++){const blank=document.createElement("span");calendarGrid.append(blank)}
   for(let n=1;n<=days;n++){
    const day=`${year}-${pad(month+1)}-${pad(n)}`;
-   const button=document.createElement("button");button.type="button";button.textContent=String(n);
+   const button=document.createElement("button");button.type="button";
+   const number=document.createElement("span");number.textContent=String(n);button.append(number);
+   const recorded=loadedMonth===`${year}-${pad(month+1)}`?recordedDays.get(day):null;
+   if(recorded){
+    const count=document.createElement("span");count.className="day-count"+(recorded.openCount?" day-open":"");
+    count.textContent=recorded.openCount?`${recorded.recordedCount} · open`:`${recorded.recordedCount} saved`;
+    button.dataset.recorded=String(recorded.recordedCount);
+    if(recorded.openCount)button.dataset.open=String(recorded.openCount);
+    button.append(count);
+   }
    button.dataset.calendarDay=day;button.dataset.selected=String(day===date.value);
-   button.dataset.today=String(day===localDay());button.setAttribute("aria-label",day);
+   button.dataset.today=String(day===localDay());button.setAttribute("aria-label",day+(recorded?`, ${recorded.recordedCount} recorded, ${recorded.openCount} still checked in`:", no attendance recorded"));
    if(day===date.value)button.setAttribute("aria-pressed","true");
    button.addEventListener("click",()=>{if(busy)return;date.value=day;date.dispatchEvent(new Event("change",{bubbles:true}))});
    calendarGrid.append(button);
   }
  };
  const say=s=>{if(!disposed)status.textContent=s};
+ const monthKey=()=>calendarMonth.getFullYear()+"-"+pad(calendarMonth.getMonth()+1);
+ async function loadMonth({force=false}={}){
+  const month=monthKey();
+  if(!force&&loadedMonth===month)return;
+  const sequence=++summarySequence;
+  loadedMonth="";recordedDays=new Map();
+  monthSummary.textContent="Loading recorded attendance days…";
+  renderCalendar();
+  try{
+   const result=await api.request({path:"/v1/attendance/month?month="+month});
+   if(result?.month!==month||!Array.isArray(result.days)||result.days.length>31)throw Error("Invalid month response");
+   const map=new Map();
+   for(const row of result.days){
+    if(typeof row.date!=="string"||!row.date.startsWith(month+"-")||map.has(row.date)||
+       !Number.isInteger(row.recordedCount)||row.recordedCount<1||
+       !Number.isInteger(row.openCount)||row.openCount<0||row.openCount>row.recordedCount)
+     throw Error("Invalid recorded attendance summary");
+    map.set(row.date,{recordedCount:row.recordedCount,openCount:row.openCount});
+   }
+   if(disposed||sequence!==summarySequence||month!==monthKey())return;
+   recordedDays=map;loadedMonth=month;
+   monthSummary.textContent=map.size+" days with recorded attendance. Blank days mean no record, not confirmed absence.";
+   renderCalendar();
+  }catch{
+   if(disposed||sequence!==summarySequence||month!==monthKey())return;
+   monthSummary.textContent="Monthly attendance could not be loaded. Tap a day to check its records.";
+   renderCalendar();
+  }
+ }
  const setMode=()=>{
   const past=date.value<localDay(),future=date.value>localDay();
   inForm.hidden=past||future;backfillForm.hidden=!past;
@@ -118,6 +163,7 @@ export async function mountHandyOsToday({root,api}={}){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(day))throw Error("Invalid day");
   calendarMonth=new Date(Number(day.slice(0,4)),Number(day.slice(5,7))-1,1);
   renderCalendar();setMode();
+  if(loadedMonth!==monthKey())await loadMonth();
   const result=await api.request({path:"/v1/attendance?date="+day});
   if(!Array.isArray(result.attendance))throw Error("Invalid attendance response");
   if(disposed)return;
@@ -137,7 +183,7 @@ export async function mountHandyOsToday({root,api}={}){
     button.addEventListener("click",async()=>{
      if(busy)return;busy=true;button.disabled=true;say("Saving check-out…");
      try{await api.request({method:"POST",path:"/v1/attendance/"+item.id+"/check-out",json:{}});
-      await refresh();say("Check-out saved on server.");
+      await refresh();await loadMonth({force:true});say("Check-out saved on server.");
      }catch{say("Could not save check-out. Please retry.");button.disabled=false}
      finally{busy=false}
     });
@@ -164,7 +210,7 @@ export async function mountHandyOsToday({root,api}={}){
   try{
    await api.request({method:"POST",path:"/v1/attendance/check-in",
     json:{jobId:jobs.value,staffId:staff.value,workDate:date.value}});
-   await refresh();say("Check-in saved on server.");
+   await refresh();await loadMonth({force:true});say("Check-in saved on server.");
   }catch{say("Could not save check-in. Check for a duplicate date or retry.")}
   finally{busy=false;button.disabled=false}
  }
@@ -190,7 +236,7 @@ export async function mountHandyOsToday({root,api}={}){
     paidDayPortion:Number(container.querySelector("[data-day-portion]").value),
     notes:container.querySelector("[data-backfill-notes]").value
    }});
-   await refresh();say("Past attendance saved on server. Check employee payroll for this week.");
+   await refresh();await loadMonth({force:true});say("Past attendance saved on server. Check employee payroll for this week.");
   }catch{say("Could not save missed workday. Check for an existing day or a closed payroll week.")}
   finally{busy=false;button.disabled=false}
  }
@@ -198,7 +244,7 @@ export async function mountHandyOsToday({root,api}={}){
  backfillForm.addEventListener("submit",saveBackfill);
  const change=async()=>{if(busy)return;try{await refresh();say("Attendance updated.")}catch{say("Unable to load this date.")}};
  date.addEventListener("change",change);
- const shiftMonth=offset=>{if(busy)return;calendarMonth=new Date(calendarMonth.getFullYear(),calendarMonth.getMonth()+offset,1);renderCalendar()};
+ const shiftMonth=offset=>{if(busy)return;calendarMonth=new Date(calendarMonth.getFullYear(),calendarMonth.getMonth()+offset,1);void loadMonth()};
  const prev=()=>shiftMonth(-1),forward=()=>shiftMonth(1);
  previous.addEventListener("click",prev);next.addEventListener("click",forward);
  renderCalendar();
