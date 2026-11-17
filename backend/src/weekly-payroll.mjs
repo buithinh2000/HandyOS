@@ -29,7 +29,7 @@ function cents(value){
 }
 function money(v){return (v/100).toFixed(2)}
 async function scope(db,tenant,staffId,weekBegin){
- const profile=await db.query("select id,display_name from staff_profiles where tenant_id=$1 and id=$2",[tenant,staffId]);
+ const profile=await db.query("select id,display_name,role_label,wage_unit,default_rate,active from staff_profiles where tenant_id=$1 and id=$2",[tenant,staffId]);
  if(profile.rowCount!==1)throw new HttpError(404,"Employee not found");
  const closed=await db.query("select id,earned_total,extras_total,paid_total,closed_at from weekly_payroll_closures where tenant_id=$1 and staff_id=$2 and week_begin=$3",[tenant,staffId,weekBegin]);
  return {profile:profile.rows[0],closure:closed.rows[0]||null};
@@ -52,12 +52,19 @@ export async function readPayrollWeek(db,tenant,staffId,weekBegin){
  const payments=await db.query("select id,job_id,paid_on,amount,reference from staff_wage_payments where tenant_id=$1 and staff_id=$2 and week_begin=$3 order by paid_on,id",[tenant,staffId,weekBegin]);
  const entries=attendance.rows.map(a=>({...a,wage:a.wage===null?null:money(cents(a.wage))}));
  const earned=entries.reduce((sum,a)=>sum+(a.wage===null?0:cents(a.wage)),0);
- const extras=adjustments.rows.reduce((sum,x)=>sum+cents(x.amount),0);
+ const kinds={bonus:0,allowance:0,expense:0};
+ for(const x of adjustments.rows){
+  if(!Object.hasOwn(kinds,x.kind))throw new HttpError(503,"Unexpected payroll adjustment");
+  kinds[x.kind]+=cents(x.amount);
+ }
+ const extras=Object.values(kinds).reduce((sum,x)=>sum+x,0);
  const paid=payments.rows.reduce((sum,x)=>sum+cents(x.amount),0);
  const openCount=entries.filter(a=>!a.finished_at).length;
- return {staff:{id:staffId,name:profile.display_name},weekBegin,
+ return {staff:{id:staffId,name:profile.display_name,roleLabel:profile.role_label,
+   wageUnit:profile.wage_unit,defaultRate:String(profile.default_rate),active:profile.active},weekBegin,
   attendance:entries,adjustments:adjustments.rows,payments:payments.rows,
-  totals:{earned:money(earned),extras:money(extras),due:money(earned+extras),
+  totals:{earned:money(earned),extras:money(extras),bonus:money(kinds.bonus),
+   allowance:money(kinds.allowance),otherExpenses:money(kinds.expense),due:money(earned+extras),
    paid:money(paid),remaining:money(earned+extras-paid),openEntries:openCount},
   closed:closure?{id:closure.id,closedAt:closure.closed_at}:null,
   // Negative balance is overpayment, never silently treated as zero.
@@ -98,7 +105,7 @@ export async function dispatchWeeklyPayroll({method,path,query,ctx,db,readBody})
  const value=amount(data.amount);
  const id=randomUUID();
  if(action==="bonus"){
-  if(!["bonus","allowance"].includes(data.kind)|| (data.notes!==undefined&&(typeof data.notes!=="string"||data.notes.length>500)))
+  if(!["bonus","allowance","expense"].includes(data.kind)|| (data.notes!==undefined&&(typeof data.notes!=="string"||data.notes.length>500)))
    throw new HttpError(400,"Invalid bonus details");
   await db.query("insert into weekly_wage_adjustments(id,tenant_id,job_id,staff_id,week_begin,kind,amount,notes) values($1,$2,$3,$4,$5,$6,$7,$8)",[id,tenant,jobId,staffId,weekBegin,data.kind,value,data.notes||""]);
  }else{
