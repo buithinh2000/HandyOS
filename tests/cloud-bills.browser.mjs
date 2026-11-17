@@ -32,8 +32,9 @@ try{
   });
   assert.equal(await page.locator("img").count(),0,"job names must use textContent");
   assert.equal(await page.locator('select[name="jobId"] option').count(),2);
+  assert.match(await page.locator('[name="boughtOn"]').inputValue(),/^\d{4}-\d{2}-\d{2}$/,"purchase date defaults to local day");
   await page.locator('[type="submit"]').click();
-  assert.match(await page.locator('[role="status"]').innerText(),/Choose a job/);
+  assert.match(await page.locator('[role="status"]').innerText(),/Complete the job/);
   await page.locator('select[name="jobId"]').selectOption("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
   await page.locator('[name="boughtOn"]').fill("2026-11-16");
   assert.equal(await page.locator('[name="storeSelect"]').inputValue(),"Bunnings");
@@ -47,6 +48,7 @@ try{
   await page.locator('[name="file"]').setInputFiles({name:"synthetic.jpg",mimeType:"image/jpeg",buffer:Buffer.alloc(1024,1)});
   await page.locator('[type="submit"]').click();
   assert.match(await page.locator('[role="status"]').innerText(),/Bill saved securely/);
+  assert.match(await page.locator('[name="boughtOn"]').inputValue(),/^\d{4}-\d{2}-\d{2}$/,"date resets to local day after save");
   const records=await page.evaluate(()=>window.record);
   assert.equal(records.length,1);
   assert.equal(records[0].details.amountGross,250.75);
