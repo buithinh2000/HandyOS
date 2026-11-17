@@ -66,7 +66,9 @@ export async function readJobFinancials({db,tenant,jobId}){
  let extras=0;for(const a of adjustments.rows)extras+=moneyToCents(a.amount);
  const general=Object.values(category).reduce((a,b)=>a+b,0);
  const totalCosts=general+wages+extras;
- // Combined tax/reserve is a planning set-aside from the EX-GST contract, not actual tax paid.
+ // LEGACY PARTIAL CLOUD SUBTOTAL ONLY. This reserve base conflicts with the approved
+ // adjusted INC-GST contract rule (Issue #116); profitReady must remain false.
+ // No production data migration or change to this stored setting is authorized here.
  const reserve=Math.round(contract*reservePercent/100);
  const profit=contract-totalCosts-reserve;
  let pendingReimbursement=0,reimbursed=0;
@@ -88,8 +90,10 @@ export async function readJobFinancials({db,tenant,jobId}){
    customerReceiptsReimbursedGross:money(reimbursed),
    includedInProfit:false},
   expenseEntries:expense.rows,
-  warnings:[...(unpaidAttendance?["Open attendance has no final wage amount yet; profit is provisional."]:[]),...(!setting.rowCount?["Contract amount has not been entered yet. Profit is provisional."]:[])],
-  provisional:Boolean(unpaidAttendance||!setting.rowCount)
+  warnings:["Final profit is NOT READY: approved variations, remaining future costs, overhead and the Owner-approved INC-GST tax/reserve basis have not yet been reconciled in the cloud calculation.",...(unpaidAttendance?["Open attendance has no final wage amount yet."]:[]),...(!setting.rowCount?["Contract amount has not been entered yet."]:[])],
+  // Hard safety gate until source-only parity work resolves Issue #116. Never present this partial calculation as final.
+  provisional:true,
+  profitReady:false
  };
 }
 export async function dispatchJobFinancials({method,path,ctx,db,readBody}){
