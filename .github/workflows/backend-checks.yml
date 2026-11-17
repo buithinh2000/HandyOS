@@ -43,6 +43,7 @@ jobs:
           node --check backend/src/handyos-cognito-pkce.mjs
           node --check backend/src/handyos-login-shell.mjs
           node --check backend/src/handyos-today-view.mjs
+          node --check backend/src/handyos-payroll-view.mjs
           node --check backend/test/handyos-company-bootstrap.test.mjs
           node --check backend/test/handyos-cognito-pkce.test.mjs
           node --check backend/src/handyos-cloud-bills-app.mjs
