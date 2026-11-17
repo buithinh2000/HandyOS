@@ -102,7 +102,7 @@ try{
   assert.equal(await page.locator('[data-bills-root] select[name="jobId"] option').count(),2);
   assert.equal(await page.locator("[data-today-root] h2").innerText(),"Today · Crew check-in");
   const loadedJobs=await page.locator("[data-jobs-root] [data-job-list] button").count();
-  if(loadedJobs!==1)console.log("JOBS_DIAGNOSTIC",JSON.stringify(await page.locator("[data-jobs-root]").innerText()),JSON.stringify(await page.evaluate(()=>window.requests.map(x=>x.url))));
+  if(loadedJobs!==1)console.log("JOBS_DIAGNOSTIC",JSON.stringify(await page.locator("[data-jobs-root]").innerText()),JSON.stringify(await page.evaluate(()=>({jobs:window.jobs,requests:window.requests.map(x=>x.url),root:document.querySelector("[data-jobs-root]")?.innerHTML.slice(0,1100)}))));
   assert.equal(loadedJobs,1);
   await page.locator("[data-jobs-root] [data-job-list] button").first().click();
   await page.getByText("Job details loaded.").waitFor();
