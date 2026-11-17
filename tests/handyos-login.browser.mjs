@@ -31,7 +31,7 @@ try{
   const setup=async()=>{
    await page.evaluate(async({ui,api,issuer,tenant,job,receipt,staff,attendance})=>{
     const {mountHandyOsLoginShell}=await import("/handyos-login-shell.mjs");
-    window.requests=[];window.crewEntries=[];window.backfilledEntries=[];window.payrollClosed=false;window.jobs=[{id:job,name:"Renovation sample",stage:"survey"}];window.tasks=[];window.financialExpense=0;
+    window.requests=[];window.crewEntries=[];window.backfilledEntries=[];window.corrections=[];window.payrollClosed=false;window.jobs=[{id:job,name:"Renovation sample",stage:"survey"}];window.tasks=[];window.financialExpense=0;
     const fetcher=async(url,opts)=>{
      window.requests.push({url,method:opts.method,headers:opts.headers});
      let data;
@@ -90,13 +90,22 @@ try{
       const created={id:"99999999-9999-4999-8999-999999999999",staff_id:staff,job_id:job,
        display_name:"Sam",job_name:"Renovation sample",work_date:body.workDate,
        started_at:body.startedAt,finished_at:body.finishedAt,break_minutes:body.breakMinutes,
-       paid_day_portion:body.paidDayPortion,rate_snapshot:"250.00"};
+       paid_day_portion:body.paidDayPortion,rate_snapshot:"250.00",notes:body.notes,updated_at:"2026-11-18T01:00:00.000Z"};
       window.backfilledEntries.push(created);data={entry:created};
+     }
+     else if(url===api+"/v1/attendance/"+attendance+"/correct"&&opts.method==="POST"){
+      const body=JSON.parse(opts.body);
+      window.corrections.push(body);
+      Object.assign(window.crewEntries[0],{started_at:body.startedAt,finished_at:body.finishedAt,
+       break_minutes:body.breakMinutes,paid_day_portion:body.paidDayPortion,
+       notes:body.notes,updated_at:"2026-11-18T02:00:00.000Z"});
+      data={entry:window.crewEntries[0]};
      }
      else if(url===api+"/v1/attendance/check-in"&&opts.method==="POST"){
       const body=JSON.parse(opts.body);
       window.crewEntries.push({id:attendance,staff_id:staff,job_id:job,display_name:"Sam",job_name:"Renovation sample",
-       work_date:body.workDate,finished_at:null,rate_snapshot:"250.00"});
+       work_date:body.workDate,started_at:new Date().toISOString(),finished_at:null,break_minutes:0,
+       paid_day_portion:1,notes:"",updated_at:"2026-11-18T01:00:00.000Z",rate_snapshot:"250.00"});
       data={entry:window.crewEntries[0]};
      }
      else if(url===api+"/v1/attendance/"+attendance+"/check-out"&&opts.method==="POST"){
@@ -202,6 +211,14 @@ try{
   assert.equal(await page.locator("[data-workspace-root] [data-page-body] [data-staff]").inputValue(),"",
    "Check-in form should be ready for the next employee");
   await page.locator('[data-workspace-root] [data-page-body] [data-job-toggle="'+job+'"]').click();
+  await page.locator('[data-workspace-root] [data-page-body] [data-edit-attendance="'+attendance+'"]').click();
+  await page.locator('[data-workspace-root] [data-page-body] [data-correction-form="'+attendance+'"] [name="break"]').fill("15");
+  await page.locator('[data-workspace-root] [data-page-body] [data-correction-form="'+attendance+'"] [name="reason"]').fill("Verified break duration");
+  await page.locator('[data-workspace-root] [data-page-body] [data-correction-form="'+attendance+'"] button[type="submit"]').click();
+  await page.getByText("Shift corrected and saved with audit history.").waitFor();
+  assert.equal(await page.evaluate(()=>window.corrections.length),1);
+  assert.equal(await page.evaluate(()=>window.corrections[0].breakMinutes),15);
+  assert.equal(await page.evaluate(()=>window.corrections[0].reason),"Verified break duration");
   await page.locator("[data-workspace-root] [data-page-body] [data-checkout]").click();
   await page.getByText("Check-out saved on server.").waitFor();
   assert.equal(await page.evaluate(()=>window.crewEntries[0].finished_at!==null),true);

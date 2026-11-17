@@ -46,16 +46,18 @@ test("allow only validated day-scoped attendance and staff API methods",async()=
   json:{staffId:"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",jobId:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",workDate:"2026-11-17"}});
  await transport.request({method:"POST",path:"/v1/attendance/backfill",json:{workDate:"2026-11-16",startedAt:"2026-11-16T08:00:00+11:00",finishedAt:"2026-11-16T16:00:00+11:00"}});
  await transport.request({method:"POST",path:"/v1/attendance/cccccccc-cccc-4ccc-8ccc-cccccccccccc/check-out",json:{}});
- assert.equal(calls.length,7);
+ await transport.request({method:"POST",path:"/v1/attendance/cccccccc-cccc-4ccc-8ccc-cccccccccccc/correct",json:{reason:"Corrected shift"}});
+ assert.equal(calls.length,8);
  for(const args of [{path:"/v1/attendance"},{path:"/v1/attendance?date=2026-11-17&tenant=x"},
   {path:"/v1/attendance?date=2026-11-17%26evil=x"},
   {path:"/v1/attendance/month?month=2026-13"},
   {path:"/v1/attendance/month?month=2026-11&tenant=other"},
   {method:"GET",path:"/v1/attendance/check-in"},
+  {method:"DELETE",path:"/v1/attendance/cccccccc-cccc-4ccc-8ccc-cccccccccccc/correct"},
   {method:"DELETE",path:"/v1/staff"},
   {method:"POST",path:"/v1/attendance?date=2026-11-17"}])
   await assert.rejects(transport.request(args),/unavailable/);
- assert.equal(calls.length,7);
+ assert.equal(calls.length,8);
 });
 test("allow only fixed weekly staff payroll routes with valid identifiers",async()=>{
  const {transport,calls}=setup();
