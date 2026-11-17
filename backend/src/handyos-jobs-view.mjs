@@ -1,5 +1,6 @@
 // HandyOS cloud Jobs: one overview, tap a job for details.
 // Authenticated API only; never read or write the legacy browser demo store.
+import {mountJobFinancials} from "./handyos-financials-view.mjs";
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STAGES=new Set(["survey","scope","estimate","quoted","approved","scheduled","active","handover","closed"]);
 function txt(tag,value,parent,attrs={}){
@@ -33,7 +34,7 @@ export async function mountHandyOsJobs({root,api,onJobsChanged}={}){
  .handyos-jobs [data-job-list] button{background:#f5f9fb;color:#16476b;text-align:left;border-color:#c9d9e5}
  .handyos-jobs .job-task{padding:9px;border-bottom:1px solid #e2e9ee}
  .handyos-jobs .job-filters{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:8px}
- .handyos-jobs .job-detail-nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .handyos-jobs .job-detail-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
  .handyos-jobs .job-detail-nav button[aria-selected=true]{background:#17699b;color:white}
  .handyos-jobs .job-detail-nav button[aria-selected=false]{background:#f5f9fb;color:#16476b}
  .handyos-jobs .job-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
@@ -63,11 +64,13 @@ export async function mountHandyOsJobs({root,api,onJobsChanged}={}){
   <nav class="job-detail-nav" aria-label="Job details">
    <button type="button" data-detail-overview aria-selected="true">Overview</button>
    <button type="button" data-detail-tasks aria-selected="false">Work items</button>
+   <button type="button" data-detail-financials aria-selected="false">Financials</button>
   </nav>
   <section data-job-summary aria-label="Job overview">
    <div class="job-summary" data-summary-fields></div>
    <p>Financials, customer contact and documents will appear here when their verified data is available.</p>
   </section>
+  <section data-job-financials hidden aria-label="Job financials"><div data-financials-root></div></section>
   <section data-job-tasks hidden aria-label="Job work items">
    <h3>Work items</h3>
    <div data-tasks></div>
@@ -88,8 +91,9 @@ export async function mountHandyOsJobs({root,api,onJobsChanged}={}){
  summary=panel.querySelector("[data-job-summary]"),taskSection=panel.querySelector("[data-job-tasks]"),
  summaryFields=panel.querySelector("[data-summary-fields]"),
  overviewTab=panel.querySelector("[data-detail-overview]"),tasksTab=panel.querySelector("[data-detail-tasks]"),
- newTask=panel.querySelector("[data-new-task]");
- let jobs=[],selected=null,busy=false,disposed=false;
+ newTask=panel.querySelector("[data-new-task]"),financialTab=panel.querySelector("[data-detail-financials]"),
+ financialSection=panel.querySelector("[data-job-financials]"),financialRoot=panel.querySelector("[data-financials-root]");
+ let jobs=[],selected=null,busy=false,disposed=false,financialView=null;
  const message=s=>{if(!disposed)status.textContent=s};
  function drawList(){
   if(disposed)return;
@@ -125,10 +129,11 @@ export async function mountHandyOsJobs({root,api,onJobsChanged}={}){
   }
  }
  function showDetailTab(which){
-  const inTasks=which==="tasks";
-  summary.hidden=inTasks;taskSection.hidden=!inTasks;
-  overviewTab.setAttribute("aria-selected",String(!inTasks));
-  tasksTab.setAttribute("aria-selected",String(inTasks));
+  summary.hidden=which!=="overview";taskSection.hidden=which!=="tasks";
+  financialSection.hidden=which!=="financials";
+  overviewTab.setAttribute("aria-selected",String(which==="overview"));
+  tasksTab.setAttribute("aria-selected",String(which==="tasks"));
+  financialTab.setAttribute("aria-selected",String(which==="financials"));
  }
  function displaySummary(job){
   summaryFields.replaceChildren();
@@ -140,12 +145,24 @@ export async function mountHandyOsJobs({root,api,onJobsChanged}={}){
  }
  async function open(job){
   if(busy||disposed)return;
+  financialView?.destroy();financialView=null;
   selected=job;jobTitle.textContent=job.name;
   displaySummary(job);showDetailTab("overview");
   overview.hidden=true;detail.hidden=false;message("Job details loaded.");
  }
- const onBack=()=>{selected=null;overview.hidden=false;detail.hidden=true;taskForm.hidden=true;message("Select a job for details.")};
+ const onBack=()=>{financialView?.destroy();financialView=null;selected=null;overview.hidden=false;detail.hidden=true;taskForm.hidden=true;message("Select a job for details.")};
  const onOverviewTab=()=>showDetailTab("overview");
+ const onFinancialTab=async()=>{
+  if(!selected)return;
+  const opened=selected.id;showDetailTab("financials");
+  if(financialView)return;
+  message("Loading financials…");
+  try{
+   const view=await mountJobFinancials({root:financialRoot,api,jobId:opened});
+   if(disposed||selected?.id!==opened){view.destroy();return}
+   financialView=view;message("Financials loaded.");
+  }catch{message("Financials unavailable. Please retry.");}
+ };
  const onTasksTab=async()=>{
   if(!selected)return;showDetailTab("tasks");message("Loading work items…");
   try{await loadTasks(selected);message("Work items loaded.")}
@@ -181,13 +198,15 @@ export async function mountHandyOsJobs({root,api,onJobsChanged}={}){
  panel.querySelector("[data-new-job]").addEventListener("click",onNew);
  overviewTab.addEventListener("click",onOverviewTab);
  tasksTab.addEventListener("click",onTasksTab);
+ financialTab.addEventListener("click",onFinancialTab);
  newTask.addEventListener("click",onNewTask);
  search.addEventListener("input",drawList);filter.addEventListener("change",drawList);
  jobForm.addEventListener("submit",onJob);taskForm.addEventListener("submit",onTask);
  try{await refresh();message("Select a job for details.")}
  catch{message("Could not load jobs. Please retry after sign-in.")}
  return Object.freeze({refresh,destroy(){disposed=true;
-  overviewTab.removeEventListener("click",onOverviewTab);tasksTab.removeEventListener("click",onTasksTab);
+  financialView?.destroy();overviewTab.removeEventListener("click",onOverviewTab);tasksTab.removeEventListener("click",onTasksTab);
+  financialTab.removeEventListener("click",onFinancialTab);
   newTask.removeEventListener("click",onNewTask);search.removeEventListener("input",drawList);
   filter.removeEventListener("change",drawList);root.replaceChildren()}});
 }

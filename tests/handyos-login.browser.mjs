@@ -11,7 +11,7 @@ const receipt="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const staff="cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const attendance="dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 const ids=["handyos-login-shell","handyos-cognito-pkce","handyos-cloud-api-transport",
- "handyos-cloud-bills-app","handyos-workspace-shell","handyos-today-view","handyos-jobs-view","handyos-payroll-view","receipt-cloud-view","receipt-cloud-controller","receipt-iphone-upload"];
+ "handyos-cloud-bills-app","handyos-workspace-shell","handyos-today-view","handyos-jobs-view","handyos-financials-view","handyos-payroll-view","receipt-cloud-view","receipt-cloud-controller","receipt-iphone-upload"];
 const modules=Object.fromEntries(ids.map(x=>["/"+x+".mjs",readFileSync("backend/src/"+x+".mjs","utf8")]));
 const html='<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><div id="app"></div></body></html>';
 let browser;
@@ -31,7 +31,7 @@ try{
   const setup=async()=>{
    await page.evaluate(async({ui,api,issuer,tenant,job,receipt,staff,attendance})=>{
     const {mountHandyOsLoginShell}=await import("/handyos-login-shell.mjs");
-    window.requests=[];window.crewEntries=[];window.payrollClosed=false;window.jobs=[{id:job,name:"Renovation sample",stage:"survey"}];window.tasks=[];
+    window.requests=[];window.crewEntries=[];window.payrollClosed=false;window.jobs=[{id:job,name:"Renovation sample",stage:"survey"}];window.tasks=[];window.financialExpense=0;
     const fetcher=async(url,opts)=>{
      window.requests.push({url,method:opts.method,headers:opts.headers});
      let data;
@@ -43,6 +43,20 @@ try{
       const body=JSON.parse(opts.body);
       const created={id:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",name:body.name,code:body.code,stage:"survey"};
       window.jobs.unshift(created);data={job:created,categories:0,tasks_created:0};
+     }
+     else if(url.startsWith(api+"/v1/jobs/"+job+"/financials")){
+      if(opts.method==="POST"){
+       const input=JSON.parse(opts.body);
+       if(url.endsWith("/settings"))window.financialSettings={contractExGst:String(input.contractExGst),reservePercent:input.reservePercent};
+       else if(url.endsWith("/expenses"))window.financialExpense=window.financialExpense+input.amountExGst;
+      }
+      const money=v=>Number(v).toFixed(2);
+      data={financials:{settings:window.financialSettings||{contractExGst:"10000.00",reservePercent:15},
+       totals:{contractExGst:money(window.financialSettings?.contractExGst||10000),reserveAllocation:"1500.00",estimatedProfitExGst:"6000.00"},
+       costs:{materials:money(800+window.financialExpense),labourManual:"0.00",subcontractors:"0.00",equipment:"0.00",
+        other:"150.00",attendanceWages:"1250.00",weeklyBonuses:"100.00",totalExGst:"2300.00",openAttendance:0},
+       passThrough:{customerReceiptsPendingGross:"550.00",customerReceiptsReimbursedGross:"110.00",includedInProfit:false},
+       warnings:[],provisional:false}};
      }
      else if(url===api+"/v1/jobs/"+job+"/tasks"&&opts.method==="GET")data={tasks:window.tasks};
      else if(url===api+"/v1/jobs/"+job+"/tasks"&&opts.method==="POST"){
@@ -121,6 +135,16 @@ try{
   assert.equal(await page.locator("[data-workspace-root] [data-page-body] [data-create-task]").isVisible(),false,
    "Task editor cannot be shown on Job Overview");
   assert.match(await page.locator("[data-workspace-root] [data-page-body] [data-job-summary]").innerText(),/survey/);
+  await page.locator("[data-workspace-root] [data-page-body] [data-detail-financials]").click();
+  await page.locator("[data-workspace-root] [data-page-body] [data-financial-summary] strong").first().waitFor();
+  assert.match(await page.locator("[data-workspace-root] [data-page-body] [data-financial-summary]").innerText(),/10,000\.00/);
+  assert.equal(await page.locator("[data-workspace-root] [data-page-body] [data-create-task]").isVisible(),false);
+  await page.locator("[data-workspace-root] [data-page-body] [data-edit-contract]").click();
+  await page.locator("[data-workspace-root] [data-page-body] [data-contract-form] input[name=contract]").fill("12000");
+  await page.locator("[data-workspace-root] [data-page-body] [data-contract-form] input[name=reserve]").fill("17.5");
+  await page.locator("[data-workspace-root] [data-page-body] [data-contract-form] button").click();
+  await page.getByText("Saved on server.").waitFor();
+  assert.equal(await page.evaluate(()=>window.financialSettings.contractExGst),"12000");
   await page.locator("[data-workspace-root] [data-page-body] [data-detail-tasks]").click();
   await page.getByText("Work items loaded.").waitFor();
   await page.locator("[data-workspace-root] [data-page-body] [data-new-task]").click();

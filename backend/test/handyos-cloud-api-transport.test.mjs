@@ -81,6 +81,21 @@ test("Jobs creation and work-item operations use strictly scoped API routes",asy
  await assert.rejects(transport.request({method:"DELETE",path:"/v1/jobs/"+job+"/tasks"}),/unavailable/);
  assert.equal(calls.length,3);
 });
+test("Financials only expose exact tenant-scoped job routes, not arbitrary cost endpoints",async()=>{
+ const {transport,calls}=setup();
+ const id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",base="/v1/jobs/"+id+"/financials";
+ await transport.request({path:base});
+ await transport.request({method:"POST",path:base+"/settings",json:{contractExGst:1000,reservePercent:15}});
+ await transport.request({method:"POST",path:base+"/expenses",json:{kind:"other",description:"Waste",amountExGst:50,gstAmount:5,incurredOn:"2026-11-18"}});
+ assert.equal(calls.length,3);
+ for(const p of [base+"?company=other",base+"/other",base+"/expenses/1","/v1/jobs/bad/financials",
+  base.replace(id,"../../secrets")])
+  await assert.rejects(transport.request({path:p}),/unavailable/);
+ for(const args of [{method:"DELETE",path:base+"/expenses"},{method:"GET",path:base+"/expenses"},
+  {method:"POST",path:base}])
+  await assert.rejects(transport.request(args),/unavailable/);
+ assert.equal(calls.length,3);
+});
 test("forbid external routes, mutations and token storage",async()=>{
  const {transport,calls}=setup();
  const bad=[

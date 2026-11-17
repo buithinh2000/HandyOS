@@ -17,6 +17,10 @@ export function validateHandyOsApiOrigin({apiOrigin,uiOrigin}={}){
  return Object.freeze({apiOrigin:api.origin,uiOrigin:ui.origin});
 }
 function routeAllowed(method,path){
+ if(new RegExp("^/v1/jobs/"+UUID.source.slice(1,-1)+"/financials(?:/(?:settings|expenses))?$","i").test(path)){
+  return method==="GET"&&path.endsWith("/financials")||
+   method==="POST"&&/(?:\/settings|\/expenses)$/.test(path);
+ }
  if(method==="POST"&&path==="/v1/jobs")return true;
  if(new RegExp("^/v1/jobs/"+UUID.source.slice(1,-1)+"/tasks$","i").test(path))
   return method==="GET"||method==="POST";
