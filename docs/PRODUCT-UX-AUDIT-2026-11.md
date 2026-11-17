@@ -101,3 +101,7 @@ Other later screens: **More / Settings** for business details, GST preferences, 
 7. **Commercial acceptance**: field task study, UX metrics and defects; owner signs off business decisions, not every engineering PR.
 
 VIN is responsible for finding gaps proactively, writing tests, implementing improvements and checking against this product flow before merging. Source-only CI PASS is **not** a declaration of commercial usability. No new AWS account, no separate manual installer, no shared resource with BuiTai Core.
+
+## Jobs UX iteration — 18 November 2026
+
+The first Jobs detail improvement introduces search by name/code and a status filter in the Jobs directory, then separates Job **Overview** from **Work items** with an explicit secondary navigation. Work-item creation stays hidden until the user chooses the Tasks tab and explicitly taps Add work item. Overview only renders confirmed fields already present in the job API (name, code, stage, notes), with a clear statement that Financials, customer and documents are pending rather than making up data. Search/filter state remains in the list when returning from details within the same mounted Jobs screen. The implementation is tested via the existing synthetic iPhone/desktop browser journey. It is not yet a real-world usability certification, and production is still not deployed.
