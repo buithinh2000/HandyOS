@@ -36,6 +36,23 @@ test("server-sourced GET jobs and POST upload include only scoped bearer token a
  assert.equal(calls[1].options.cache,"no-store");
  assert.equal(calls[1].options.body,'{"boughtOn":"2026-11-16"}');
 });
+test("allow only validated day-scoped attendance and staff API methods",async()=>{
+ const {transport,calls}=setup();
+ await transport.request({path:"/v1/staff"});
+ await transport.request({method:"POST",path:"/v1/staff",json:{displayName:"Sam",wageUnit:"day",defaultRate:250}});
+ await transport.request({path:"/v1/attendance?date=2026-11-17"});
+ await transport.request({method:"POST",path:"/v1/attendance/check-in",
+  json:{staffId:"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",jobId:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",workDate:"2026-11-17"}});
+ await transport.request({method:"POST",path:"/v1/attendance/cccccccc-cccc-4ccc-8ccc-cccccccccccc/check-out",json:{}});
+ assert.equal(calls.length,5);
+ for(const args of [{path:"/v1/attendance"},{path:"/v1/attendance?date=2026-11-17&tenant=x"},
+  {path:"/v1/attendance?date=2026-11-17%26evil=x"},
+  {method:"GET",path:"/v1/attendance/check-in"},
+  {method:"DELETE",path:"/v1/staff"},
+  {method:"POST",path:"/v1/attendance?date=2026-11-17"}])
+  await assert.rejects(transport.request(args),/unavailable/);
+ assert.equal(calls.length,5);
+});
 test("forbid external routes, mutations and token storage",async()=>{
  const {transport,calls}=setup();
  const bad=[
