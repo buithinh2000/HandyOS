@@ -7,6 +7,7 @@ import {mountAuthenticatedCloudBills} from "./handyos-cloud-bills-app.mjs";
 import {mountHandyOsToday} from "./handyos-today-view.mjs";
 import {mountHandyOsPayroll} from "./handyos-payroll-view.mjs";
 import {mountHandyOsJobs} from "./handyos-jobs-view.mjs";
+import {mountHandyOsWorkspace} from "./handyos-workspace-shell.mjs";
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function denied(){throw Error("HandyOS sign-in shell unavailable")}
 export async function mountHandyOsLoginShell({
@@ -23,7 +24,7 @@ export async function mountHandyOsLoginShell({
  const main=document.createElement("main");
  main.className="handyos-cloud-login";
  main.innerHTML=`<style>
- .handyos-cloud-login{max-width:700px;margin:30px auto;padding:20px;font:inherit;color:#163248}
+ .handyos-cloud-login{max-width:1160px;margin:16px auto;padding:8px;font:inherit;color:#163248;min-width:0}
  .handyos-cloud-login h1{font-size:26px}
  .handyos-cloud-login button,.handyos-cloud-login select{padding:12px;min-height:44px;border-radius:9px;font:inherit}
  .handyos-cloud-login button{background:#125889;color:white;border:0}
@@ -36,16 +37,16 @@ export async function mountHandyOsLoginShell({
  <p>Private company workspace · Staging</p>
  <section data-auth><button type="button" data-login>Sign in securely</button></section>
  <section data-company hidden><label>Choose your company<select data-companies></select></label><button type="button" data-continue>Open HandyOS</button></section>
- <section data-bills hidden><button type="button" data-logout>Sign out</button><div data-today-root></div><div data-jobs-root></div><div data-payroll-root></div><div data-bills-root></div></section>
+ <section data-bills hidden><div data-workspace-root></div></section>
  <p role="status" aria-live="polite">Sign in to access your company.</p>`;
  const login=main.querySelector("[data-login]"),company=main.querySelector("[data-company]");
  const picker=main.querySelector("[data-companies]"),proceed=main.querySelector("[data-continue]");
- const billSection=main.querySelector("[data-bills]"),billRoot=main.querySelector("[data-bills-root]"),todayRoot=main.querySelector("[data-today-root]"),payrollRoot=main.querySelector("[data-payroll-root]"),jobsRoot=main.querySelector("[data-jobs-root]");
+ const billSection=main.querySelector("[data-bills]"),workspaceRoot=main.querySelector("[data-workspace-root]");
  const status=main.querySelector("[role=status]");
  root.replaceChildren(main);
- let mounted=null,mountedToday=null,mountedPayroll=null,mountedJobs=null,eligible=[],busy=false;
+ let mountedWorkspace=null,eligible=[],busy=false;
  const message=s=>{status.textContent=s};
- const reset=()=>{mountedJobs?.destroy();mountedJobs=null;mountedPayroll?.destroy();mountedPayroll=null;mountedToday?.destroy();mountedToday=null;mounted?.destroy();mounted=null;session.logout();eligible=[];picker.replaceChildren();
+ const reset=()=>{mountedWorkspace?.destroy();mountedWorkspace=null;session.logout();eligible=[];picker.replaceChildren();
   login.disabled=false;company.hidden=true;billSection.hidden=true;login.parentElement.hidden=false;
   message("Sign in to access your company.")};
  const onLogin=async()=>{
@@ -60,24 +61,29 @@ export async function mountHandyOsLoginShell({
   busy=true;proceed.disabled=true;message("Checking company access…");
   try{
    session.chooseTenant(picker.value);
-   mounted=await mountAuthenticatedCloudBills({
-    root:billRoot,session,apiOrigin,uiOrigin:config.uiOrigin,
-    locationOrigin:location.origin,fetcher,put
-   });
-   const todayApi=createHandyOsApiTransport({apiOrigin,uiOrigin:config.uiOrigin,
+   // Verify selected company before any business screen is mounted.
+   const api=createHandyOsApiTransport({apiOrigin,uiOrigin:config.uiOrigin,
     locationOrigin:location.origin,session,fetcher});
-   mountedToday=await mountHandyOsToday({root:todayRoot,api:todayApi});
-   mountedJobs=await mountHandyOsJobs({root:jobsRoot,api:todayApi});
-   mountedPayroll=await mountHandyOsPayroll({root:payrollRoot,api:todayApi});
+   const me=await api.request({path:"/v1/me"});
+   if(!me||me.tenant_id!==picker.value||!["owner","manager"].includes(me.role))
+    throw Error("Company verification unavailable");
+   mountedWorkspace=await mountHandyOsWorkspace({
+    root:workspaceRoot,onSignOut:reset,
+    sections:{
+     today:r=>mountHandyOsToday({root:r,api}),
+     jobs:r=>mountHandyOsJobs({root:r,api}),
+     employees:r=>mountHandyOsPayroll({root:r,api}),
+     bills:r=>mountAuthenticatedCloudBills({root:r,session,apiOrigin,
+      uiOrigin:config.uiOrigin,locationOrigin:location.origin,fetcher,put})
+    }
+   });
    company.hidden=true;login.parentElement.hidden=true;billSection.hidden=false;
-   message("Signed in. Today and Bills are private to the selected company.");
+   message("Signed in to your private HandyOS workspace.");
   }catch{reset();message("Company verification failed. Sign in again.")}
   finally{busy=false;proceed.disabled=false}
  };
  login.addEventListener("click",onLogin);
  proceed.addEventListener("click",onContinue);
- const onLogout=()=>reset();
- main.querySelector("[data-logout]").addEventListener("click",onLogout);
  if(location.pathname==="/auth/callback"){
   // Remove the one-time authorization code and state from browser history
   // before exchanging them; never store/log/copy the callback URL.
