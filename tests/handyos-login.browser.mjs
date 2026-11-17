@@ -64,8 +64,8 @@ try{
      }
      else if(url.startsWith(api+"/v1/payroll/"+staff+"/weeks/")){
       if(opts.method==="POST"&&url.endsWith("/close"))window.payrollClosed=true;
-      data={payroll:{staff:{id:staff,name:"Sam"},weekBegin:"2026-11-16",
-       totals:{earned:"1250.00",extras:"100.00",due:"1350.00",paid:"1350.00",remaining:"0.00",openEntries:0},
+      data={payroll:{staff:{id:staff,name:"Sam",roleLabel:"Carpenter",defaultRate:"250.00",wageUnit:"day"},weekBegin:"2026-11-16",
+       totals:{earned:"1250.00",extras:"100.00",bonus:"100.00",allowance:"0.00",otherExpenses:"0.00",due:"1350.00",paid:"1350.00",remaining:"0.00",openEntries:0},
        attendance:[],adjustments:[],payments:[],closed:window.payrollClosed?{id:receipt,closedAt:"2026-11-17"}:null,
        canClose:!window.payrollClosed}};
      }
@@ -125,6 +125,8 @@ try{
   await page.locator("[data-payroll-root] .payroll-list button").first().click();
   await page.getByText("Payroll loaded from server.").waitFor();
   assert.match(await page.locator("[data-payroll-root] [data-totals]").innerText(),/1,350\.00/);
+  assert.match(await page.locator("[data-payroll-root] [data-base-pay]").innerText(),/250\.00 \/ day/);
+  assert.equal(await page.locator("[data-payroll-root] [data-bonus] select[name=kind] option").count(),3);
   await page.locator("[data-payroll-root] [data-close]").click();
   await page.getByText("Payroll week closed and saved.").waitFor();
   assert.equal(await page.evaluate(()=>window.payrollClosed),true);
