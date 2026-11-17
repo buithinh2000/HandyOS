@@ -17,6 +17,11 @@ export function validateHandyOsApiOrigin({apiOrigin,uiOrigin}={}){
  return Object.freeze({apiOrigin:api.origin,uiOrigin:ui.origin});
 }
 function routeAllowed(method,path){
+ if(new RegExp("^/v1/payroll/"+UUID.source.slice(1,-1)+"/weeks/\\d{4}-\\d{2}-\\d{2}(?:/(?:bonus|payment|close))?$","i").test(path)){
+  return method==="GET"&&!/(?:\/bonus|\/payment|\/close)$/.test(path) ||
+   method==="POST"&&/(?:\/bonus|\/payment|\/close)$/.test(path);
+ }
+
  if(method==="GET"&&(path==="/v1/staff"||/^\/v1\/attendance\?date=\d{4}-\d{2}-\d{2}$/.test(path)))return true;
  if(method==="POST"&&(path==="/v1/staff"||path==="/v1/attendance/check-in"))return true;
  if(method==="POST"&&new RegExp("^/v1/attendance/"+UUID.source.slice(1,-1)+"/check-out$","i").test(path))return true;

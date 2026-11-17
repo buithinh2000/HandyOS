@@ -11,7 +11,7 @@ const receipt="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const staff="cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const attendance="dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 const ids=["handyos-login-shell","handyos-cognito-pkce","handyos-cloud-api-transport",
- "handyos-cloud-bills-app","handyos-today-view","receipt-cloud-view","receipt-cloud-controller","receipt-iphone-upload"];
+ "handyos-cloud-bills-app","handyos-today-view","handyos-payroll-view","receipt-cloud-view","receipt-cloud-controller","receipt-iphone-upload"];
 const modules=Object.fromEntries(ids.map(x=>["/"+x+".mjs",readFileSync("backend/src/"+x+".mjs","utf8")]));
 const html='<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><div id="app"></div></body></html>';
 let browser;
@@ -31,7 +31,7 @@ try{
   const setup=async()=>{
    await page.evaluate(async({ui,api,issuer,tenant,job,receipt,staff,attendance})=>{
     const {mountHandyOsLoginShell}=await import("/handyos-login-shell.mjs");
-    window.requests=[];window.crewEntries=[];
+    window.requests=[];window.crewEntries=[];window.payrollClosed=false;
     const fetcher=async(url,opts)=>{
      window.requests.push({url,method:opts.method,headers:opts.headers});
      let data;
@@ -50,6 +50,13 @@ try{
      else if(url===api+"/v1/attendance/"+attendance+"/check-out"&&opts.method==="POST"){
       window.crewEntries[0].finished_at="2026-11-17T07:00:00.000Z";
       data={entry:window.crewEntries[0]};
+     }
+     else if(url.startsWith(api+"/v1/payroll/"+staff+"/weeks/")){
+      if(opts.method==="POST"&&url.endsWith("/close"))window.payrollClosed=true;
+      data={payroll:{staff:{id:staff,name:"Sam"},weekBegin:"2026-11-16",
+       totals:{earned:"1250.00",extras:"100.00",due:"1350.00",paid:"1350.00",remaining:"0.00",openEntries:0},
+       attendance:[],adjustments:[],payments:[],closed:window.payrollClosed?{id:receipt,closedAt:"2026-11-17"}:null,
+       canClose:!window.payrollClosed}};
      }
      else if(url.endsWith("/uploads"))data={receiptId:receipt,uploadUrl:"https://handyos-receipts-staging-916004827349.s3.ap-southeast-1.amazonaws.com/r?X-Amz-Signature=test",
       uploadHeaders:{"content-type":"image/jpeg","content-length":"1024","if-none-match":"*",
@@ -81,7 +88,7 @@ try{
   await setup();
   assert.equal(page.url(),ui+"/","Callback code must be removed from navigation history");
   assert.equal(await page.locator("[data-bills]").isVisible(),true);
-  assert.equal(await page.locator('select[name="jobId"] option').count(),2);
+  assert.equal(await page.locator('[data-bills-root] select[name="jobId"] option').count(),2);
   assert.equal(await page.locator("[data-today-root] h2").innerText(),"Today · Crew check-in");
   await page.locator("[data-today-root] [data-job]").selectOption(job);
   await page.locator("[data-today-root] [data-staff]").selectOption(staff);
@@ -90,6 +97,12 @@ try{
   await page.locator("[data-today-root] [data-checkout]").click();
   await page.getByText("Check-out saved on server.").waitFor();
   assert.equal(await page.evaluate(()=>window.crewEntries[0].finished_at!==null),true);
+  await page.locator("[data-payroll-root] .payroll-list button").first().click();
+  await page.getByText("Payroll loaded from server.").waitFor();
+  assert.match(await page.locator("[data-payroll-root] [data-totals]").innerText(),/1,350\.00/);
+  await page.locator("[data-payroll-root] [data-close]").click();
+  await page.getByText("Payroll week closed and saved.").waitFor();
+  assert.equal(await page.evaluate(()=>window.payrollClosed),true);
   assert.equal(await page.evaluate(()=>sessionStorage.length),0);
   const calls=await page.evaluate(()=>window.requests.map(x=>x.url));
   assert.deepEqual(calls.slice(0,4),[issuer+"/oauth2/token",api+"/v1/companies",api+"/v1/me",api+"/v1/jobs"]);

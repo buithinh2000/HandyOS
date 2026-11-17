@@ -53,6 +53,20 @@ test("allow only validated day-scoped attendance and staff API methods",async()=
   await assert.rejects(transport.request(args),/unavailable/);
  assert.equal(calls.length,5);
 });
+test("allow only fixed weekly staff payroll routes with valid identifiers",async()=>{
+ const {transport,calls}=setup();
+ const id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+ const root="/v1/payroll/"+id+"/weeks/2026-11-16";
+ await transport.request({path:root});
+ for(const action of ["bonus","payment","close"])
+  await transport.request({method:"POST",path:root+"/"+action,json:{}});
+ assert.equal(calls.length,4);
+ for(const p of [root+"?tenant=other",root+"/delete",root+"/payment/1",
+  "/v1/payroll/../../secret",root.replace(id,"nope")])
+  await assert.rejects(transport.request({path:p}),/unavailable/);
+ await assert.rejects(transport.request({method:"DELETE",path:root+"/close"}),/unavailable/);
+ assert.equal(calls.length,4);
+});
 test("forbid external routes, mutations and token storage",async()=>{
  const {transport,calls}=setup();
  const bad=[

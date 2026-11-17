@@ -7,7 +7,17 @@ const entry="cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const ctx={tenant_id:tenant,role:"owner",actorSub:"synthetic-owner-cognito-sub"};
 const stamp=new Date("2026-11-17T08:00:00+11:00");
 function setup(response=()=>({rowCount:1,rows:[{id:entry,staff_id:staff,job_id:job,rate_unit:"day",rate_snapshot:"250.00"}]})){
- const calls=[];return {calls,db:{query:async(text,values)=>{calls.push({text,values});return response(text,values)}}};
+ const calls=[];return {calls,db:{query:async(text,values)=>{
+  // Existing tests remain scoped to crew business queries; settlement gate
+  // is separately tested below, and uses the same atomic PostgreSQL tx.
+  if(text.includes("pg_advisory_xact_lock"))return {rowCount:1,rows:[{}]};
+  if(text.includes("from weekly_payroll_closures"))return {rowCount:0,rows:[]};
+  if(text.includes("select staff_id,work_date from attendance_entries"))
+   return response(text,values).rowCount===0?{rowCount:0,rows:[]}:
+    {rowCount:1,rows:[{staff_id:staff,work_date:"2026-11-17"}]};
+  calls.push({text,values});
+  return response(text,values);
+ }}};
 }
 async function route(db,path,method="GET",data,role="owner"){
  return dispatchDailyCrew({db,method,path,query:new URLSearchParams("date=2026-11-17"),ctx:{...ctx,role},
@@ -87,7 +97,21 @@ test("check out only an existing unclosed entry and records audit once",async()=
  assert.ok(calls[1].text.includes("'checked_out'"));
  const failed=setup(()=>({rowCount:0,rows:[]}));
  await assert.rejects(route(failed.db,"/v1/attendance/"+entry+"/check-out","POST",{}),e=>e.status===409);
- assert.equal(failed.calls.length,1);
+ assert.equal(failed.calls.length,0); // guarded lookup is intentionally hidden from legacy call list
+});
+test("closed payroll week blocks both additional check-in and late check-out",async()=>{
+ const requests=[];const db={query:async(text,values)=>{
+  requests.push({text,values});
+  if(text.includes("pg_advisory_xact_lock"))return {rowCount:1,rows:[{}]};
+  if(text.includes("weekly_payroll_closures"))return {rowCount:1,rows:[{id:entry}]};
+  if(text.includes("select staff_id,work_date from attendance_entries"))return {rowCount:1,rows:[{staff_id:staff,work_date:"2026-11-17"}]};
+  throw Error("No attendance mutation allowed after closure");
+ }};
+ await assert.rejects(route(db,"/v1/attendance/check-in","POST",
+  {jobId:job,staffId:staff,workDate:"2026-11-17"}),e=>e.status===409);
+ await assert.rejects(route(db,"/v1/attendance/"+entry+"/check-out","POST",{}),e=>e.status===409);
+ assert.equal(requests.some(c=>c.text.includes("insert into attendance_entries")),false);
+ assert.equal(requests.some(c=>c.text.includes("update attendance_entries")),false);
 });
 test("reject foreign tenant and malformed job/staff/body before SQL",async()=>{
  const {db,calls}=setup();
