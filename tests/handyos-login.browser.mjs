@@ -8,8 +8,10 @@ const issuer="https://handyos-staging.auth.ap-southeast-1.amazoncognito.com";
 const tenant="11111111-1111-4111-8111-111111111111";
 const job="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const receipt="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const staff="cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+const attendance="dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 const ids=["handyos-login-shell","handyos-cognito-pkce","handyos-cloud-api-transport",
- "handyos-cloud-bills-app","receipt-cloud-view","receipt-cloud-controller","receipt-iphone-upload"];
+ "handyos-cloud-bills-app","handyos-today-view","receipt-cloud-view","receipt-cloud-controller","receipt-iphone-upload"];
 const modules=Object.fromEntries(ids.map(x=>["/"+x+".mjs",readFileSync("backend/src/"+x+".mjs","utf8")]));
 const html='<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><div id="app"></div></body></html>';
 let browser;
@@ -27,9 +29,9 @@ try{
   });
   await page.goto(ui+"/");
   const setup=async()=>{
-   await page.evaluate(async({ui,api,issuer,tenant,job,receipt})=>{
+   await page.evaluate(async({ui,api,issuer,tenant,job,receipt,staff,attendance})=>{
     const {mountHandyOsLoginShell}=await import("/handyos-login-shell.mjs");
-    window.requests=[];
+    window.requests=[];window.crewEntries=[];
     const fetcher=async(url,opts)=>{
      window.requests.push({url,method:opts.method,headers:opts.headers});
      let data;
@@ -37,6 +39,18 @@ try{
      else if(url===api+"/v1/companies")data={companies:[{tenant_id:tenant,role:"owner"}]};
      else if(url===api+"/v1/me")data={tenant_id:tenant,role:"owner"};
      else if(url===api+"/v1/jobs")data={jobs:[{id:job,name:"Renovation sample"}]};
+     else if(url===api+"/v1/staff"&&opts.method==="GET")data={staff:[{id:staff,display_name:"Sam",active:true,wage_unit:"day",default_rate:"250.00"}]};
+     else if(url.startsWith(api+"/v1/attendance?date=")&&opts.method==="GET")data={attendance:window.crewEntries};
+     else if(url===api+"/v1/attendance/check-in"&&opts.method==="POST"){
+      const body=JSON.parse(opts.body);
+      window.crewEntries.push({id:attendance,staff_id:staff,job_id:job,display_name:"Sam",job_name:"Renovation sample",
+       work_date:body.workDate,finished_at:null,rate_snapshot:"250.00"});
+      data={entry:window.crewEntries[0]};
+     }
+     else if(url===api+"/v1/attendance/"+attendance+"/check-out"&&opts.method==="POST"){
+      window.crewEntries[0].finished_at="2026-11-17T07:00:00.000Z";
+      data={entry:window.crewEntries[0]};
+     }
      else if(url.endsWith("/uploads"))data={receiptId:receipt,uploadUrl:"https://handyos-receipts-staging-916004827349.s3.ap-southeast-1.amazonaws.com/r?X-Amz-Signature=test",
       uploadHeaders:{"content-type":"image/jpeg","content-length":"1024","if-none-match":"*",
        "x-amz-server-side-encryption":"aws:kms","x-amz-server-side-encryption-aws-kms-key-id":"arn:aws:kms:ap-southeast-1:916004827349:key/11111111-1111-4111-8111-111111111111"},
@@ -52,7 +66,7 @@ try{
      historyReplace:url=>history.replaceState(null,"",url),
      navigate:url=>{window.redirectTarget=url}
     });
-   },{ui,api,issuer,tenant,job,receipt});
+   },{ui,api,issuer,tenant,job,receipt,staff,attendance});
   };
   await setup();
   assert.equal(await page.locator("[data-bills]").isVisible(),false);
@@ -68,6 +82,14 @@ try{
   assert.equal(page.url(),ui+"/","Callback code must be removed from navigation history");
   assert.equal(await page.locator("[data-bills]").isVisible(),true);
   assert.equal(await page.locator('select[name="jobId"] option').count(),2);
+  assert.equal(await page.locator("[data-today-root] h2").innerText(),"Today · Crew check-in");
+  await page.locator("[data-today-root] [data-job]").selectOption(job);
+  await page.locator("[data-today-root] [data-staff]").selectOption(staff);
+  await page.locator("[data-today-root] [data-check-in] button").click();
+  await page.getByText("Check-in saved on server.").waitFor();
+  await page.locator("[data-today-root] [data-checkout]").click();
+  await page.getByText("Check-out saved on server.").waitFor();
+  assert.equal(await page.evaluate(()=>window.crewEntries[0].finished_at!==null),true);
   assert.equal(await page.evaluate(()=>sessionStorage.length),0);
   const calls=await page.evaluate(()=>window.requests.map(x=>x.url));
   assert.deepEqual(calls.slice(0,4),[issuer+"/oauth2/token",api+"/v1/companies",api+"/v1/me",api+"/v1/jobs"]);
