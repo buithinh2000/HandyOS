@@ -87,7 +87,7 @@ test("forbid external routes, mutations and token storage",async()=>{
  {path:"https://evil.com"},{path:"//other-host/v1/jobs"},
  {path:"/v1/tenants"},{path:"/v1/jobs/../../secrets"},
  {path:"/v1/jobs%2Fsecret"},{method:"DELETE",path:"/v1/jobs"},
- {method:"POST",path:"/v1/jobs"},{method:"GET",path:"/v1/me",json:{}},
+ {method:"PATCH",path:"/v1/jobs"},{method:"GET",path:"/v1/me",json:{}},
  {method:"POST",path:`/v1/jobs/${job}/receipts/${receipt}/media`},
  {method:"GET",path:`/v1/jobs/${job}/receipts/uploads`}
  ];
