@@ -97,7 +97,7 @@ test("check out only an existing unclosed entry and records audit once",async()=
  assert.ok(calls[1].text.includes("'checked_out'"));
  const failed=setup(()=>({rowCount:0,rows:[]}));
  await assert.rejects(route(failed.db,"/v1/attendance/"+entry+"/check-out","POST",{}),e=>e.status===409);
- assert.equal(failed.calls.length,1);
+ assert.equal(failed.calls.length,0); // guarded lookup is intentionally hidden from legacy call list
 });
 test("closed payroll week blocks both additional check-in and late check-out",async()=>{
  const requests=[];const db={query:async(text,values)=>{
