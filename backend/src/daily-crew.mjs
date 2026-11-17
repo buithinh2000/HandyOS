@@ -62,6 +62,30 @@ export async function dispatchDailyCrew({method,path,query,ctx,db,readBody,now=(
   await db.query("insert into audit_events(tenant_id,actor_sub,action,entity_type,entity_id) values($1,$2,'created','staff',$3)",[tenant,ctx.actorSub,id]);
   return {staff:{id,display_name:name,role_label:roleLabel,wage_unit:d.wageUnit,default_rate:d.defaultRate,active:true}};
  }
+ if(method==="GET"&&path==="/v1/attendance/month"){
+  const month=query?.get("month");
+  if(typeof month!=="string"||!/^(?:19|20|21)\d{2}-(?:0[1-9]|1[0-2])$/.test(month))
+   throw new HttpError(400,"Invalid attendance month");
+  // Only dates actually recorded: an empty day is UNKNOWN, not an absence.
+  const start=month+"-01";
+  const year=Number(month.slice(0,4)),number=Number(month.slice(5,7));
+  const next=number===12?(year+1)+"-01-01":year+"-"+String(number+1).padStart(2,"0")+"-01";
+  const result=await db.query(`select to_char(work_date,'YYYY-MM-DD') as work_date,
+   count(*)::integer as recorded_count,
+   count(*) filter (where finished_at is null)::integer as open_count
+   from attendance_entries
+   where tenant_id=$1 and work_date >= $2::date and work_date < $3::date
+   group by work_date order by work_date`,[tenant,start,next]);
+  if(!Array.isArray(result.rows)||result.rows.length>31)throw new HttpError(503,"Invalid month summary");
+  const days=result.rows.map(r=>{
+   const day=isoDay(r.work_date),recorded=Number(r.recorded_count),open=Number(r.open_count);
+   if(!day.startsWith(month)||!Number.isSafeInteger(recorded)||recorded<1||
+      !Number.isSafeInteger(open)||open<0||open>recorded)
+    throw new HttpError(503,"Invalid month summary");
+   return {date:day,recordedCount:recorded,openCount:open};
+  });
+  return {month,days};
+ }
  if(method==="GET"&&path==="/v1/attendance"){
   const date=isoDay(query.get("date"));
   const result=await db.query("select a.id,a.job_id,a.staff_id,a.work_date,a.started_at,a.finished_at,a.break_minutes,a.paid_day_portion,a.rate_unit,a.rate_snapshot,s.display_name,j.name as job_name from attendance_entries a join staff_profiles s on s.id=a.staff_id and s.tenant_id=a.tenant_id join jobs j on j.id=a.job_id and j.tenant_id=a.tenant_id where a.tenant_id=$1 and a.work_date=$2 order by a.started_at,a.id limit 200",[tenant,date]);
