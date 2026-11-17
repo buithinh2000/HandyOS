@@ -17,6 +17,9 @@ export function validateHandyOsApiOrigin({apiOrigin,uiOrigin}={}){
  return Object.freeze({apiOrigin:api.origin,uiOrigin:ui.origin});
 }
 function routeAllowed(method,path){
+ if(method==="GET"&&(path==="/v1/staff"||/^\/v1\/attendance\?date=\d{4}-\d{2}-\d{2}$/.test(path)))return true;
+ if(method==="POST"&&(path==="/v1/staff"||path==="/v1/attendance/check-in"))return true;
+ if(method==="POST"&&new RegExp("^/v1/attendance/"+UUID.source.slice(1,-1)+"/check-out$","i").test(path))return true;
  if(method==="GET"&&(path==="/v1/me"||path==="/v1/jobs"))return true;
  const m=JOB_ROUTE.exec(path);
  if(!m)return false;
