@@ -28,11 +28,25 @@ export async function mountHandyOsToday({root,api}={}){
  .handyos-today .crew-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
  .handyos-today .crew-record{border:1px solid #e3ebf0;border-radius:9px;padding:12px;display:grid;gap:6px}
  .handyos-today small{color:#50677b}
+ .handyos-today .calendar{border:1px solid #d9e4ee;border-radius:12px;padding:12px;display:grid;gap:10px}
+ .handyos-today .calendar-toolbar{display:flex;justify-content:space-between;align-items:center;gap:8px}
+ .handyos-today .calendar-toolbar button{background:#edf4f8;color:#183047;min-width:46px}
+ .handyos-today .calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+ .handyos-today .calendar-weekday{text-align:center;font-size:12px;color:#50677b;padding:6px 0;font-weight:700}
+ .handyos-today .calendar-grid button{min-width:0;min-height:44px;padding:4px;background:#f2f6f9;color:#183047;font-weight:600}
+ .handyos-today .calendar-grid button[data-selected=true]{background:#17699b;color:#fff}
+ .handyos-today .calendar-grid button[data-today=true]:not([data-selected=true]){box-shadow:inset 0 0 0 2px #17699b}
+ .handyos-today .calendar-grid button:focus-visible,.handyos-today .calendar-toolbar button:focus-visible{outline:3px solid #ffb72b;outline-offset:2px}
+ .handyos-today .calendar-grid button:disabled{background:transparent;visibility:hidden}
  @media(max-width:600px){.handyos-today .crew-grid{grid-template-columns:1fr}}
  </style>
  <h2>Today · Crew check-in</h2>
  <p>Record work at the job site. Payroll remains private to management.</p>
- <label>Work date · choose a day to view or record missed attendance<input type="date" data-work-date required></label>
+ <div class="calendar" aria-label="Work attendance calendar">
+  <div class="calendar-toolbar"><button type="button" data-calendar-prev aria-label="Previous month">‹</button><strong data-calendar-month></strong><button type="button" data-calendar-next aria-label="Next month">›</button></div>
+  <div class="calendar-grid" data-calendar-grid role="group" aria-label="Choose workday"></div>
+  <label>Selected work date<input type="date" data-work-date required></label>
+ </div>
  <p data-day-context></p>
  <form data-check-in>
  <div class="crew-grid">
@@ -60,10 +74,30 @@ export async function mountHandyOsToday({root,api}={}){
   staff=container.querySelector("[data-staff]"),records=container.querySelector("[data-attendance]"),
   inForm=container.querySelector("[data-check-in]"),backfillForm=container.querySelector("[data-backfill]"),
   context=container.querySelector("[data-day-context]"),heading=container.querySelector("[data-attendance-heading]"),
-  status=container.querySelector("[data-status]");
+  status=container.querySelector("[data-status]"),calendarGrid=container.querySelector("[data-calendar-grid]"),
+  monthLabel=container.querySelector("[data-calendar-month]"),previous=container.querySelector("[data-calendar-prev]"),next=container.querySelector("[data-calendar-next]");
  date.value=localDay();
  root.replaceChildren(container);
  let disposed=false,busy=false;
+ let calendarMonth=new Date(Number(date.value.slice(0,4)),Number(date.value.slice(5,7))-1,1);
+ const pad=n=>String(n).padStart(2,"0");
+ const renderCalendar=()=>{
+  calendarGrid.replaceChildren();
+  monthLabel.textContent=new Intl.DateTimeFormat("en-AU",{month:"long",year:"numeric"}).format(calendarMonth);
+  for(const name of ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]){const day=document.createElement("span");day.className="calendar-weekday";day.textContent=name;calendarGrid.append(day)}
+  const year=calendarMonth.getFullYear(),month=calendarMonth.getMonth(),days=new Date(year,month+1,0).getDate();
+  const first=(new Date(year,month,1).getDay()+6)%7;
+  for(let i=0;i<first;i++){const blank=document.createElement("span");calendarGrid.append(blank)}
+  for(let n=1;n<=days;n++){
+   const day=`${year}-${pad(month+1)}-${pad(n)}`;
+   const button=document.createElement("button");button.type="button";button.textContent=String(n);
+   button.dataset.calendarDay=day;button.dataset.selected=String(day===date.value);
+   button.dataset.today=String(day===localDay());button.setAttribute("aria-label",day);
+   if(day===date.value)button.setAttribute("aria-pressed","true");
+   button.addEventListener("click",()=>{if(busy)return;date.value=day;date.dispatchEvent(new Event("change",{bubbles:true}))});
+   calendarGrid.append(button);
+  }
+ };
  const say=s=>{if(!disposed)status.textContent=s};
  const setMode=()=>{
   const past=date.value<localDay(),future=date.value>localDay();
@@ -82,7 +116,8 @@ export async function mountHandyOsToday({root,api}={}){
  async function refresh(){
   const day=date.value;
   if(!/^\d{4}-\d{2}-\d{2}$/.test(day))throw Error("Invalid day");
-  setMode();
+  calendarMonth=new Date(Number(day.slice(0,4)),Number(day.slice(5,7))-1,1);
+  renderCalendar();setMode();
   const result=await api.request({path:"/v1/attendance?date="+day});
   if(!Array.isArray(result.attendance))throw Error("Invalid attendance response");
   if(disposed)return;
@@ -163,7 +198,11 @@ export async function mountHandyOsToday({root,api}={}){
  backfillForm.addEventListener("submit",saveBackfill);
  const change=async()=>{if(busy)return;try{await refresh();say("Attendance updated.")}catch{say("Unable to load this date.")}};
  date.addEventListener("change",change);
+ const shiftMonth=offset=>{if(busy)return;calendarMonth=new Date(calendarMonth.getFullYear(),calendarMonth.getMonth()+offset,1);renderCalendar()};
+ const prev=()=>shiftMonth(-1),forward=()=>shiftMonth(1);
+ previous.addEventListener("click",prev);next.addEventListener("click",forward);
+ renderCalendar();
  try{await prepare()}catch{say("Today is unavailable. Try refreshing after signing in.")}
  return Object.freeze({destroy(){disposed=true;inForm.removeEventListener("submit",saveCheckIn);
-  date.removeEventListener("change",change);backfillForm.removeEventListener("submit",saveBackfill);if(root.contains(container))root.removeChild(container)}});
+  date.removeEventListener("change",change);backfillForm.removeEventListener("submit",saveBackfill);previous.removeEventListener("click",prev);next.removeEventListener("click",forward);if(root.contains(container))root.removeChild(container)}});
 }

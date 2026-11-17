@@ -186,12 +186,19 @@ try{
   await page.locator("[data-workspace-root] [data-page-body] [data-checkout]").click();
   await page.getByText("Check-out saved on server.").waitFor();
   assert.equal(await page.evaluate(()=>window.crewEntries[0].finished_at!==null),true);
-  await page.locator("[data-workspace-root] [data-page-body] [data-work-date]").evaluate(input=>{
+  const yesterday=await page.evaluate(()=>{
    const date=new Date();date.setDate(date.getDate()-1);
    const pad=n=>String(n).padStart(2,"0");
-   input.value=[date.getFullYear(),pad(date.getMonth()+1),pad(date.getDate())].join("-");
-   input.dispatchEvent(new Event("change",{bubbles:true}));
+   return [date.getFullYear(),pad(date.getMonth()+1),pad(date.getDate())].join("-");
   });
+  assert.equal(await page.locator("[data-workspace-root] [data-page-body] [data-calendar-grid] button").count()>=28,true);
+  const calendarDay=page.locator('[data-workspace-root] [data-page-body] [data-calendar-day="'+yesterday+'"]');
+  if(await calendarDay.count()===0){
+   await page.locator("[data-workspace-root] [data-page-body] [data-calendar-prev]").click();
+  }
+  await page.locator('[data-workspace-root] [data-page-body] [data-calendar-day="'+yesterday+'"]').click();
+  assert.equal(await page.locator("[data-workspace-root] [data-page-body] [data-work-date]").inputValue(),yesterday);
+  assert.equal(await page.locator('[data-workspace-root] [data-page-body] [data-calendar-day="'+yesterday+'"]').getAttribute("aria-pressed"),"true");
   assert.equal(await page.locator("[data-workspace-root] [data-page-body] [data-backfill]").isVisible(),true);
   assert.equal(await page.locator("[data-workspace-root] [data-page-body] [data-check-in]").isVisible(),false);
   await page.locator("[data-workspace-root] [data-page-body] [data-backfill] [data-break-minutes]").fill("30");
