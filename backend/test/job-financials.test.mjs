@@ -72,7 +72,7 @@ test("reject bad cost input, reserve percent, and cross-role requests without a 
   assert.ok(!s.queries.some(q=>q.sql.includes("insert into cost_entries")));
  }
  for(const pct of [-1,101,0.001,"15"]){
-  const s=setup();await assert.rejects(s.call("POST","/settings",{contractExGst:100,pct,reservePercent:pct}),e=>e.status===400);
+  const s=setup();await assert.rejects(s.call("POST","/settings",{contractExGst:100,reservePercent:pct}),e=>e.status===400);
  }
  const s=setup();
  await assert.rejects(dispatchJobFinancials({method:"GET",path:"/v1/jobs/"+job+"/financials",
