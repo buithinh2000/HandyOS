@@ -28,19 +28,20 @@ export function mountCloudBills({root,controller,jobs=[]}={}){
  .handyos-cloud-bills .hint{color:#536777;font-size:13px}
  @media(max-width:620px){.handyos-cloud-bills .fields{grid-template-columns:1fr}}
  </style>
- <h2>New material bill</h2>
+ <h2>Capture material bill</h2>
  <p class="hint">For purchases to be reimbursed by a homeowner. Not a contract expense or customer payment.</p>
  <form novalidate>
   <div class="fields">
    <label>Job<select name="jobId" required><option value="">Choose job</option></select></label>
    <label>Purchase date<input name="boughtOn" type="date" required></label>
-   <label>Store<select name="storeSelect"><option value="Bunnings">Bunnings</option><option value="Mitre 10">Mitre 10</option><option value="Bowens">Bowens</option><option value="Reece">Reece</option><option value="other">Other — enter store name</option></select></label>\n   <label data-custom-store hidden>Other store name<input name="storeReference" maxlength="160" autocomplete="off" placeholder="Enter store name"></label>
+   <label>Store<select name="storeSelect"><option value="Bunnings">Bunnings</option><option value="Mitre 10">Mitre 10</option><option value="Bowens">Bowens</option><option value="Reece">Reece</option><option value="other">Other — enter store name</option></select></label>
+   <label data-custom-store hidden>Other store name<input name="storeReference" maxlength="160" autocomplete="off" placeholder="Enter store name"></label>
    <label>Amount paid (AUD)<input name="amountGross" type="number" min="0.01" step="0.01" inputmode="decimal" required></label>
    <label>GST<select name="gstBasis"><option value="inc">Includes GST</option><option value="ex">Excludes GST</option><option value="no_gst">No GST</option></select></label>
    <label>Receipt photo or PDF<input name="file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required></label>
    <label class="full">Notes (optional)<textarea name="notes" maxlength="500" rows="2"></textarea></label>
   </div>
-  <p class="hint">Camera or Photo Library on iPhone. JPEG, PNG, WebP up to 12 MB, PDF up to 15 MB. HEIC must be converted to JPEG first.</p>
+  <p class="hint">Take a photo or select from your iPhone library. JPEG, PNG, WebP up to 12 MB, PDF up to 15 MB. Convert HEIC to JPEG before uploading.</p>
   <p role="status" aria-live="polite">Choose a job and receipt to begin.</p>
   <button type="submit">Save bill securely</button>
  </form>`;
@@ -51,6 +52,10 @@ export function mountCloudBills({root,controller,jobs=[]}={}){
  }
  const form=element(section,"form"),status=element(section,"[role=status]"),submit=element(section,'[type="submit"]');
  const storeSelect=element(form,'[name="storeSelect"]'),customStore=element(form,"[data-custom-store]");
+ const dateField=element(form,'[name="boughtOn"]');
+ // Local workday is the default; UTC dates can be wrong around midnight in Australia.
+ const todayLocal=()=>{const d=new Date(),pad=n=>String(n).padStart(2,"0");return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
+ dateField.value=todayLocal();
  const updateStore=()=>{customStore.hidden=storeSelect.value!=="other";element(form,'[name="storeReference"]').required=!customStore.hidden};
  storeSelect.addEventListener("change",updateStore);
  updateStore();
@@ -69,8 +74,8 @@ export function mountCloudBills({root,controller,jobs=[]}={}){
   if(submit.disabled)return;
   const file=element(form,'[name="file"]').files?.[0],jobId=select.value;
   const amount=Number(element(form,'[name="amountGross"]').value);
-  if(!file||!jobId||!Number.isFinite(amount)||amount<=0){
-   message("Choose a job, amount and receipt file.");return
+  if(!form.reportValidity()||!file||!jobId||!Number.isFinite(amount)||amount<=0){
+   message("Complete the job, date, store, amount and receipt before saving.");return
   }
   submit.disabled=true;
   message("Preparing secure upload…");
@@ -83,7 +88,7 @@ export function mountCloudBills({root,controller,jobs=[]}={}){
     notes:element(form,'[name="notes"]').value
    }});
    if(!result?.mediaReady||result.status!=="draft")throw Error("Not verified");
-   form.reset();updateStore();message(steps.saved);
+   form.reset();dateField.value=todayLocal();updateStore();message(steps.saved);
   }catch{
    message(steps["retry-needed"]);
   }finally{submit.disabled=false}
