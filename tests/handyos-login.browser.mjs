@@ -18,7 +18,7 @@ let browser;
 try{
  browser=await chromium.launch({headless:true});
  for(const width of [390,1280]){
-  const page=await browser.newPage({viewport:{width,height:860},serviceWorkers:"block"});
+  const page=await browser.newPage({viewport:{width,height:860},serviceWorkers:"block",timezoneId:"Australia/Melbourne"});
   const failures=[];page.on("pageerror",e=>failures.push(e.message));
   await page.route("**/*",async route=>{
    const url=new URL(route.request().url());
@@ -31,7 +31,7 @@ try{
   const setup=async()=>{
    await page.evaluate(async({ui,api,issuer,tenant,job,receipt,staff,attendance})=>{
     const {mountHandyOsLoginShell}=await import("/handyos-login-shell.mjs");
-    window.requests=[];window.crewEntries=[];window.payrollClosed=false;window.jobs=[{id:job,name:"Renovation sample",stage:"survey"}];window.tasks=[];window.financialExpense=0;
+    window.requests=[];window.crewEntries=[];window.backfilledEntries=[];window.payrollClosed=false;window.jobs=[{id:job,name:"Renovation sample",stage:"survey"}];window.tasks=[];window.financialExpense=0;
     const fetcher=async(url,opts)=>{
      window.requests.push({url,method:opts.method,headers:opts.headers});
      let data;
@@ -70,7 +70,18 @@ try{
       data={staff:{id:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",display_name:body.displayName,active:true,
        role_label:body.roleLabel,wage_unit:body.wageUnit,default_rate:body.defaultRate}};
      }
-     else if(url.startsWith(api+"/v1/attendance?date=")&&opts.method==="GET")data={attendance:window.crewEntries};
+     else if(url.startsWith(api+"/v1/attendance?date=")&&opts.method==="GET"){
+      const selected=url.split("date=")[1];
+      data={attendance:[...window.crewEntries,...window.backfilledEntries].filter(x=>x.work_date===selected)};
+     }
+     else if(url===api+"/v1/attendance/backfill"&&opts.method==="POST"){
+      const body=JSON.parse(opts.body);
+      const created={id:"99999999-9999-4999-8999-999999999999",staff_id:staff,job_id:job,
+       display_name:"Sam",job_name:"Renovation sample",work_date:body.workDate,
+       started_at:body.startedAt,finished_at:body.finishedAt,break_minutes:body.breakMinutes,
+       paid_day_portion:body.paidDayPortion,rate_snapshot:"250.00"};
+      window.backfilledEntries.push(created);data={entry:created};
+     }
      else if(url===api+"/v1/attendance/check-in"&&opts.method==="POST"){
       const body=JSON.parse(opts.body);
       window.crewEntries.push({id:attendance,staff_id:staff,job_id:job,display_name:"Sam",job_name:"Renovation sample",
@@ -175,6 +186,24 @@ try{
   await page.locator("[data-workspace-root] [data-page-body] [data-checkout]").click();
   await page.getByText("Check-out saved on server.").waitFor();
   assert.equal(await page.evaluate(()=>window.crewEntries[0].finished_at!==null),true);
+  await page.locator("[data-workspace-root] [data-page-body] [data-work-date]").evaluate(input=>{
+   const date=new Date();date.setDate(date.getDate()-1);
+   const pad=n=>String(n).padStart(2,"0");
+   input.value=[date.getFullYear(),pad(date.getMonth()+1),pad(date.getDate())].join("-");
+   input.dispatchEvent(new Event("change",{bubbles:true}));
+  });
+  assert.equal(await page.locator("[data-workspace-root] [data-page-body] [data-backfill]").isVisible(),true);
+  assert.equal(await page.locator("[data-workspace-root] [data-page-body] [data-check-in]").isVisible(),false);
+  await page.locator("[data-workspace-root] [data-page-body] [data-backfill] [data-break-minutes]").fill("30");
+  await page.locator("[data-workspace-root] [data-page-body] [data-backfill] [data-day-portion]").selectOption("0.5");
+  await page.locator("[data-workspace-root] [data-page-body] [data-backfill] button").click();
+  await page.getByText("Past attendance saved on server.").waitFor();
+  assert.equal(await page.evaluate(()=>window.backfilledEntries.length),1);
+  const recorded=await page.evaluate(()=>window.backfilledEntries[0]);
+  assert.equal(recorded.break_minutes,30);
+  assert.equal(recorded.paid_day_portion,0.5);
+  assert.ok(recorded.finished_at);
+
   await page.locator('[data-workspace-root] [data-section=employees]').click();
   await page.locator("[data-workspace-root] [data-page-body] .payroll-list button").first().waitFor();
   assert.equal(await page.locator('[data-workspace-root] [data-page-body] [data-check-in]').count(),0,
