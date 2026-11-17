@@ -210,3 +210,60 @@ test("month summary denies malformed dates and unauthorised roles before SQL",as
   query:new URLSearchParams("month=2026-11"),ctx:{...ctx,role:"worker"}}),e=>e.status===403);
  assert.equal(calls.length,0);
 });
+
+test("attendance correction changes one existing shift and writes immutable before/after evidence",async()=>{
+ const calls=[];
+ const old={id:entry,job_id:job,staff_id:staff,work_date:"2026-11-17",
+  started_at:"2026-11-16T21:00:00.000Z",finished_at:"2026-11-17T05:00:00.000Z",
+  break_minutes:0,paid_day_portion:"1.00",notes:"",rate_unit:"day",rate_snapshot:"250.00",
+  updated_at:"2026-11-17T06:00:00.000Z"};
+ const db={query:async(sql,values=[])=>{
+  calls.push({sql,values});
+  if(sql.includes("pg_advisory_xact_lock"))return{rowCount:1,rows:[{}]};
+  if(sql.includes("weekly_payroll_closures"))return{rowCount:0,rows:[]};
+  if(sql.includes("select staff_id,work_date from attendance_entries"))return{rowCount:1,rows:[{staff_id:staff,work_date:old.work_date}]};
+  if(sql.includes("for update"))return{rowCount:1,rows:[old]};
+  if(sql.includes("update attendance_entries"))return{rowCount:1,rows:[{...old,break_minutes:20}]};
+  return{rowCount:1,rows:[]};
+ }};
+ const value=await dispatchDailyCrew({db,method:"POST",path:"/v1/attendance/"+entry+"/correct",
+  query:new URLSearchParams(),ctx,readBody:async()=>({
+   startedAt:"2026-11-17T08:00:00+11:00",finishedAt:"2026-11-17T16:00:00+11:00",
+   breakMinutes:20,paidDayPortion:1,notes:"Updated",reason:"Incorrect break",
+   expectedUpdatedAt:old.updated_at
+  })});
+ assert.equal(value.entry.break_minutes,20);
+ const update=calls.find(x=>x.sql.includes("update attendance_entries"));
+ assert.deepEqual(update.values.slice(0,2),[tenant,entry]);
+ assert.equal(update.values[4],20);
+ assert.equal(update.values[7],old.updated_at);
+ assert.doesNotMatch(update.sql,/rate_snapshot|job_id\s*=/);
+ const audit=calls.find(x=>x.sql.includes("insert into attendance_corrections"));
+ assert.ok(audit);
+ assert.equal(audit.values[0],tenant);
+ assert.equal(audit.values[6],"Incorrect break");
+ assert.equal(JSON.parse(audit.values[7]).breakMinutes,0);
+ assert.equal(JSON.parse(audit.values[8]).breakMinutes,20);
+ assert.ok(calls.some(x=>x.sql.includes("'corrected'")));
+});
+test("attendance correction refuses stale version, closed payroll and unprivileged role",async()=>{
+ const body={startedAt:"2026-11-17T08:00:00+11:00",finishedAt:"2026-11-17T16:00:00+11:00",
+  breakMinutes:15,paidDayPortion:1,notes:"",reason:"Actual break",
+  expectedUpdatedAt:"2026-11-17T06:00:00.000Z"};
+ const attempt=async({closed=false,role="owner",stale=false}={})=>{
+  const calls=[],db={query:async(sql,values)=>{
+   calls.push(sql);
+   if(sql.includes("pg_advisory_xact_lock"))return{rowCount:1,rows:[{}]};
+   if(sql.includes("weekly_payroll_closures"))return{rowCount:closed?1:0,rows:closed?[{id:entry}]:[]};
+   if(sql.includes("select staff_id,work_date"))return{rowCount:1,rows:[{staff_id:staff,work_date:"2026-11-17"}]};
+   if(sql.includes("for update"))return{rowCount:1,rows:[{id:entry,job_id:job,staff_id:staff,
+    work_date:"2026-11-17",updated_at:stale?"2026-11-17T07:00:00Z":body.expectedUpdatedAt}]};
+   throw Error("No correction write permitted");
+  }};
+  await assert.rejects(dispatchDailyCrew({db,method:"POST",path:"/v1/attendance/"+entry+"/correct",
+   ctx:{...ctx,role},query:new URLSearchParams(),readBody:async()=>body}),
+   e=>e.status===(role!=="owner"?403:409));
+  assert.ok(!calls.some(x=>x.includes("update attendance_entries")||x.includes("insert into attendance_corrections")));
+ };
+ await attempt({closed:true});await attempt({stale:true});await attempt({role:"worker"});
+});
