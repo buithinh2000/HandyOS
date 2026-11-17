@@ -1,3 +1,14 @@
+# Current verified continuation — 2026-11-18 (Australia/Melbourne)
+
+> This section supersedes stale 2026-11-15 HEAD / next-action statements below. Preserve historical records for audit; NEVER treat the old SHA as current.
+> **Repository:** `buithinh2000/HandyOS`, branch `main`. Verified merge of #115: `1d48c49b3fda0bbb8f2938c803e849f06042b028` after 5/5 PR-head workflows succeeded. PRs #111 (one-screen navigation), #112 (Employees add form), #113 (Jobs search/overview/tasks), #114 (Job Financials) and #115 (mobile receipt capture form hardening) have been merged. This is **source-only**: no verified AWS live authentication, PostgreSQL, S3 media or actual customer data sync.
+> **Critical accounting BLOCKER:** [Issue #116](https://github.com/buithinh2000/HandyOS/issues/116). Old approved owner ledger (PR #28/#30 and `docs/DECISION-LEDGER.md`) calculates combined Tax & Reserve as a percentage of adjusted contract **INCLUDING GST**, after approved variations. Cloud `backend/src/job-financials.mjs` merged in #114 currently uses contract **EX GST** and excludes forecast remaining costs / unbooked overhead / approved variations. Do not claim cloud profit final or silently replace the owner's rule. Write parity tests and reconcile before live financial use; missing data should be clearly provisional/not ready.
+> **Mobile Bills:** #115 fixed default Australian local purchase date, field validation, store form rendering and reset after server-confirmed save. A full authenticated Bills queue, customer sending and reimbursement reconciliation are **not implemented/verified**. Don't claim paid/sent status without backend evidence.
+> **Next engineering order:** (1) resolve #116 using canonical owner-ledger parity and safe financial readiness semantics; (2) Bills queue/list with backend status and authenticated tenant scope; (3) Employee detail hierarchy and company-level Money reconciliation; (4) real isolated AWS staging, restore and iPhone cross-device validation under explicit resource approval. Source-only delegation allows VIN to self-review & merge routine PRs after exact-head tests, not bypass protected branch or mutate real AWS.
+> **Continuity:** Read `PROJECT-BRAIN.md`, `docs/DECISION-LEDGER.md`, `docs/COMMERCIAL-PRODUCT-BLUEPRINT.md`, and the latest source/CI/PRs. Never revive the old demo as if it is the live cloud app, and do not create a new AWS account, share other ventures' DB/identity or manually burden the Owner with each routine review.
+
+---
+
 # HandyOS cross-chat handoff — 2026-11-15 Australia/Melbourne
 
 > **Verified current status (GitHub source, 2026-11-15; check again next session):**
