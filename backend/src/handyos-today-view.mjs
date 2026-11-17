@@ -27,6 +27,14 @@ export async function mountHandyOsToday({root,api}={}){
  .handyos-today [hidden]{display:none!important}
  .handyos-today .crew-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
  .handyos-today .crew-record{border:1px solid #e3ebf0;border-radius:9px;padding:12px;display:grid;gap:6px}
+ .handyos-today .job-session{border:1px solid #d9e4ee;border-radius:12px;overflow:hidden;background:#fff}
+ .handyos-today .job-session summary{cursor:pointer;list-style:none;padding:14px;min-height:52px;display:flex;justify-content:space-between;gap:8px;align-items:center;font-weight:700}
+ .handyos-today .job-session summary::-webkit-details-marker{display:none}
+ .handyos-today .job-session summary::after{content:"⌄";color:#17699b;font-size:20px}
+ .handyos-today .job-session[open] summary::after{content:"⌃"}
+ .handyos-today .job-session summary:focus-visible{outline:3px solid #ffb72b;outline-offset:-3px}
+ .handyos-today .job-session-content{padding:0 12px 12px;display:grid;gap:8px}
+ .handyos-today .job-session small{font-weight:400}
  .handyos-today small{color:#50677b}
  .handyos-today .calendar{border:1px solid #d9e4ee;border-radius:12px;padding:12px;display:grid;gap:10px}
  .handyos-today .calendar-toolbar{display:flex;justify-content:space-between;align-items:center;gap:8px}
@@ -72,7 +80,8 @@ export async function mountHandyOsToday({root,api}={}){
   <label>Notes (optional)<input data-backfill-notes maxlength="500"></label>
   <button type="submit">Save missed workday</button>
  </form>
- <h3 data-attendance-heading>Attendance for selected date</h3>
+ <h3 data-attendance-heading>Jobs · attendance for selected date</h3>
+ <p>Tap a job to view its crew or check out. Check-in never opens a check-out screen automatically.</p>
  <div data-attendance></div>
  <p role="status" data-status aria-live="polite">Loading today…</p>`;
  const date=container.querySelector("[data-work-date]"),jobs=container.querySelector("[data-job]"),
@@ -85,6 +94,7 @@ export async function mountHandyOsToday({root,api}={}){
  date.value=localDay();
  root.replaceChildren(container);
  let disposed=false,busy=false;
+ const expandedJobs=new Set();
  let calendarMonth=new Date(Number(date.value.slice(0,4)),Number(date.value.slice(5,7))-1,1);
  let loadedMonth="",recordedDays=new Map(),summarySequence=0;
  const pad=n=>String(n).padStart(2,"0");
@@ -167,29 +177,58 @@ export async function mountHandyOsToday({root,api}={}){
   const result=await api.request({path:"/v1/attendance?date="+day});
   if(!Array.isArray(result.attendance))throw Error("Invalid attendance response");
   if(disposed)return;
+  // Keep sessions collapsed after every new check-in. Expand only by deliberate tap.
   records.replaceChildren();
-  if(!result.attendance.length)paragraph(records,"No employee checked in for this date.");
+  if(!result.attendance.length){
+   paragraph(records,"No attendance recorded for this date.");
+   return;
+  }
+  const grouped=new Map();
   for(const item of result.attendance){
-   if(!item||!UUID.test(item.id)||typeof item.display_name!=="string")throw Error("Invalid attendance entry");
-   const card=document.createElement("div");card.className="crew-record";
-   const name=document.createElement("strong");name.textContent=item.display_name;
-   const job=document.createElement("small");job.textContent=String(item.job_name??"");
-   const detail=document.createElement("small");
-   detail.textContent=item.finished_at?"Checked out":"Checked in";
-   card.append(name,job,detail);
-   if(!item.finished_at&&day===localDay()){
-    const button=document.createElement("button");
-    button.type="button";button.textContent="Check out";button.dataset.checkout=item.id;
-    button.addEventListener("click",async()=>{
-     if(busy)return;busy=true;button.disabled=true;say("Saving check-out…");
-     try{await api.request({method:"POST",path:"/v1/attendance/"+item.id+"/check-out",json:{}});
-      await refresh();await loadMonth({force:true});say("Check-out saved on server.");
-     }catch{say("Could not save check-out. Please retry.");button.disabled=false}
-     finally{busy=false}
-    });
-    card.append(button);
+   if(!item||!UUID.test(item.id)||!UUID.test(item.job_id)||typeof item.display_name!=="string")
+    throw Error("Invalid attendance entry");
+   const current=grouped.get(item.job_id)||{name:String(item.job_name??"Job"),entries:[]};
+   current.entries.push(item);grouped.set(item.job_id,current);
+  }
+  for(const [jobId,group] of grouped){
+   const openCount=group.entries.filter(x=>!x.finished_at).length;
+   const details=document.createElement("details");
+   details.className="job-session";details.dataset.jobSession=jobId;
+   details.open=expandedJobs.has(jobId);
+   details.addEventListener("toggle",()=>{
+    if(details.open)expandedJobs.add(jobId);
+    else expandedJobs.delete(jobId);
+   });
+   const summary=document.createElement("summary");
+   summary.dataset.jobToggle=jobId;
+   const label=document.createElement("span");label.textContent=group.name;
+   const count=document.createElement("small");
+   count.textContent=openCount?openCount+" checked in · "+group.entries.length+" recorded":
+    group.entries.length+" checked out";
+   summary.append(label,count);details.append(summary);
+   const body=document.createElement("div");body.className="job-session-content";
+   for(const item of group.entries){
+    const card=document.createElement("div");card.className="crew-record";
+    const name=document.createElement("strong");name.textContent=item.display_name;
+    const detail=document.createElement("small");
+    detail.textContent=item.finished_at?"Checked out":"Checked in — waiting for check-out";
+    card.append(name,detail);
+    if(!item.finished_at&&day===localDay()){
+     const button=document.createElement("button");
+     button.type="button";button.textContent="Check out";button.dataset.checkout=item.id;
+     button.addEventListener("click",async()=>{
+      if(busy)return;busy=true;button.disabled=true;say("Saving check-out…");
+      try{
+       await api.request({method:"POST",path:"/v1/attendance/"+item.id+"/check-out",json:{}});
+       await refresh();await loadMonth({force:true});say("Check-out saved on server.");
+      }catch{say("Could not save check-out. Please retry.");button.disabled=false}
+      finally{busy=false}
+     });
+     card.append(button);
+    }
+    body.append(card);
    }
-   records.append(card);
+   details.append(body);records.append(details);
   }
  }
  async function prepare(){
@@ -210,7 +249,9 @@ export async function mountHandyOsToday({root,api}={}){
   try{
    await api.request({method:"POST",path:"/v1/attendance/check-in",
     json:{jobId:jobs.value,staffId:staff.value,workDate:date.value}});
-   await refresh();await loadMonth({force:true});say("Check-in saved on server.");
+   expandedJobs.clear();
+   await refresh();await loadMonth({force:true});
+   staff.value="";say("Check-in saved. Open the job below when you need to check out.");
   }catch{say("Could not save check-in. Check for a duplicate date or retry.")}
   finally{busy=false;button.disabled=false}
  }
