@@ -41,7 +41,7 @@ export async function readJobFinancials({db,tenant,jobId}){
  const contract=moneyToCents(setting.rows[0]?.contract_ex_gst??"0");
  const reservePercent=Number(setting.rows[0]?.reserve_percent??15);
  if(!Number.isFinite(reservePercent)||reservePercent<0||reservePercent>100)throw new HttpError(503,"Invalid reserve");
- const expense=await db.query("select id,kind,description,amount_ex_gst,gst_amount,incurred_on from cost_entries where tenant_id=$1 and job_id=$2 order by incurred_on desc,id limit 1000",[tenant,jobId]);
+ const expense=await db.query("select id,kind,description,amount_ex_gst,gst_amount,incurred_on from cost_entries where tenant_id=$1 and job_id=$2 order by incurred_on desc,id limit 1001",[tenant,jobId]);
  const attendance=await db.query(`select a.id,a.finished_at,
   case when a.finished_at is null then null
    when a.rate_unit='day' then round(a.rate_snapshot*a.paid_day_portion,2)
