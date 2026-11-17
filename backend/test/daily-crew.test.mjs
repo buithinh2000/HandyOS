@@ -176,3 +176,37 @@ test("closed payroll week blocks historical attendance before any new entry",asy
    startedAt:"2026-11-17T08:00:00+11:00",finishedAt:"2026-11-17T16:00:00+11:00"})}),e=>e.status===409);
  assert.equal(calls.some(x=>x.includes("insert into attendance_entries")),false);
 });
+
+test("month summary counts only recorded shifts, preserves open counts, scoped to tenant",async()=>{
+ const {db,calls}=setup((sql)=>({rowCount:2,rows:[
+  {work_date:"2026-11-16",recorded_count:3,open_count:1},
+  {work_date:"2026-11-17",recorded_count:2,open_count:0}
+ ]}));
+ const result=await dispatchDailyCrew({db,method:"GET",path:"/v1/attendance/month",
+  query:new URLSearchParams("month=2026-11"),ctx});
+ assert.deepEqual(result,{month:"2026-11",days:[
+  {date:"2026-11-16",recordedCount:3,openCount:1},
+  {date:"2026-11-17",recordedCount:2,openCount:0}]});
+ assert.deepEqual(calls[0].values,[tenant,"2026-11-01","2026-12-01"]);
+ assert.match(calls[0].text,/where tenant_id=\$1/);
+ assert.match(calls[0].text,/finished_at is null/);
+});
+test("December month summary rolls into next year and empty days are not invented",async()=>{
+ const {db,calls}=setup(()=>({rowCount:0,rows:[]}));
+ const result=await dispatchDailyCrew({db,method:"GET",path:"/v1/attendance/month",
+  query:new URLSearchParams("month=2026-12"),ctx});
+ assert.deepEqual(result.days,[]);
+ assert.deepEqual(calls[0].values,[tenant,"2026-12-01","2027-01-01"]);
+});
+test("month summary denies malformed dates and unauthorised roles before SQL",async()=>{
+ for(const month of ["2026-00","2026-13","2026-1","2026-11&tenant=other","garbage"]){
+  const {db,calls}=setup();
+  await assert.rejects(dispatchDailyCrew({db,method:"GET",path:"/v1/attendance/month",
+   query:new URLSearchParams({month}),ctx}),e=>e.status===400);
+  assert.equal(calls.length,0);
+ }
+ const {db,calls}=setup();
+ await assert.rejects(dispatchDailyCrew({db,method:"GET",path:"/v1/attendance/month",
+  query:new URLSearchParams("month=2026-11"),ctx:{...ctx,role:"worker"}}),e=>e.status===403);
+ assert.equal(calls.length,0);
+});
