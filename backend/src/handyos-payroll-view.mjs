@@ -46,16 +46,18 @@ export async function mountHandyOsPayroll({root,api}={}){
  <section data-staff-detail hidden>
   <button type="button" data-back>All employees</button>
   <h3 data-worker></h3>
+  <p data-base-pay></p>
   <label>Week starting Monday<input type="date" data-week required></label>
   <button type="button" data-refresh>View weekly payroll</button>
   <div class="payroll-total" data-totals></div>
   <div data-work-summary></div>
   <form data-bonus>
-   <h3>Bonus / Allowance</h3>
+   <h3>Bonus / Allowance / Other expense</h3>
    <label>Job<select name="jobId" required></select></label>
-   <label>Type<select name="kind"><option value="bonus">Bonus</option><option value="allowance">Allowance</option></select></label>
+   <label>Type<select name="kind"><option value="bonus">Bonus</option><option value="allowance">Allowance</option><option value="expense">Other expense / reimbursement</option></select></label>
    <label>Amount (AUD)<input type="number" name="amount" min="0.01" step="0.01" required></label>
-   <button type="submit">Add bonus / allowance</button>
+   <label>Details (optional)<input type="text" name="notes" maxlength="500" placeholder="Travel, tools, meal allowance…"></label>
+   <button type="submit">Add bonus / allowance / expense</button>
   </form>
   <form data-payment>
    <h3>Record actual wage payment</h3>
@@ -90,7 +92,13 @@ export async function mountHandyOsPayroll({root,api}={}){
    if(!data?.payroll?.totals)throw Error("Invalid payroll result");
    report=data.payroll;
    totals.replaceChildren();work.replaceChildren();
-   for(const [label,key] of [["Earned","earned"],["Bonus / extras","extras"],["Total due","due"],["Already paid","paid"],["Remaining","remaining"]]){
+   const profile=report.staff;
+   panel.querySelector("[data-base-pay]").textContent=
+    "Base pay: "+money(profile.defaultRate)+" / "+(profile.wageUnit==="hour"?"hour":"day")+
+    (profile.roleLabel?" · "+profile.roleLabel:"");
+   for(const [label,key] of [["Base wages","earned"],["Bonus","bonus"],["Allowance","allowance"],
+    ["Other employee expense","otherExpenses"],["Total extras","extras"],
+    ["Total due","due"],["Already paid","paid"],["Remaining","remaining"]]){
     const cell=element("div",undefined,totals);element("small",label,cell);
     element("strong",money(report.totals[key]),cell);
    }
@@ -125,7 +133,7 @@ export async function mountHandyOsPayroll({root,api}={}){
   say(action==="bonus"?"Saving bonus…":"Saving payment…");
   try{
    const body=action==="bonus"?
-    {jobId,amount,kind:form.elements.kind.value}:
+    {jobId,amount,kind:form.elements.kind.value,notes:form.elements.notes.value}:
     {jobId,amount,paidOn:form.elements.paidOn.value,reference:form.elements.reference.value};
    const result=await api.request({method:"POST",path:"/v1/payroll/"+selected.id+"/weeks/"+weeklyDate.value+"/"+action,json:body});
    if(!result?.payroll)throw Error("Server did not confirm");
