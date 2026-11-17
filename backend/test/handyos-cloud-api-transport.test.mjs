@@ -52,7 +52,7 @@ test("allow only validated day-scoped attendance and staff API methods",async()=
   {method:"DELETE",path:"/v1/staff"},
   {method:"POST",path:"/v1/attendance?date=2026-11-17"}])
   await assert.rejects(transport.request(args),/unavailable/);
- assert.equal(calls.length,5);
+ assert.equal(calls.length,6);
 });
 test("allow only fixed weekly staff payroll routes with valid identifiers",async()=>{
  const {transport,calls}=setup();
