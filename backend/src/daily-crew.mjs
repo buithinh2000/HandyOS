@@ -80,7 +80,6 @@ export async function dispatchDailyCrew({method,path,query,ctx,db,readBody,now=(
     (portion!==0.5&&portion!==1))throw new HttpError(400,"Invalid break or paid day portion");
   const notes=d.notes===undefined?"":typeof d.notes==="string"&&d.notes.length<=500?d.notes.trim():null;
   if(notes===null)throw new HttpError(400,"Invalid shift notes");
-  if(date!==melbourneDay(now()))throw new HttpError(400,"Use backfill for previous dates; current check-in requires today");
   await openPayrollWeek(db,tenant,staff,date);
   const person=await db.query("select id,wage_unit,default_rate from staff_profiles where tenant_id=$1 and id=$2 and active=true",[tenant,staff]);
   if(person.rowCount!==1)throw new HttpError(404,"Active employee not found");
@@ -100,6 +99,7 @@ export async function dispatchDailyCrew({method,path,query,ctx,db,readBody,now=(
  if(method==="POST"&&path==="/v1/attendance/check-in"){
   const d=payload(await readBody(),["jobId","staffId","workDate"]);
   const job=ensureUuid(d.jobId),staff=ensureUuid(d.staffId),date=isoDay(d.workDate);
+  if(date!==melbourneDay(now()))throw new HttpError(400,"Use backfill for previous dates; current check-in requires today");
   await openPayrollWeek(db,tenant,staff,date);
   const person=await db.query("select id,wage_unit,default_rate from staff_profiles where tenant_id=$1 and id=$2 and active=true",[tenant,staff]);
   if(person.rowCount!==1)throw new HttpError(404,"Active employee not found");
