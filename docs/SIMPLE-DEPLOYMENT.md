@@ -74,3 +74,7 @@ Migration `005_payroll_week_closures.sql` is **not applied in production** by th
 ## Employee profile: extras and other expenses
 
 Employees → select employee shows the base daily/hourly wage rate. Its weekly payroll includes separate **Bonus**, **Allowance** and **Other expense / reimbursement** fields, notes, attached job and selected workweek. These are **one-off week-specific additions**, not an automatic wage-rate change and not customer material reimbursement bills. The underlying adjustments table remains tenant-scoped under FORCE RLS; after settlement the employee's week is immutable. Weekly due = wages earned from completed attendance + bonus + allowance + employee expenses. Paid is recorded separately. Source-only until private HandyOS production migrations are approved and deployed.
+
+## Commercial UI architecture (navigation overhaul)
+
+HandyOS no longer renders Today, Jobs, Employees/Payroll and Bills as one long page after login. A single navigation shell displays **one primary workflow at a time**; opening a different section destroys its old UI and mounts the selected module on demand. On iPhone, the navigation sits at the bottom with safe-area support; on desktop it sits near the top. Today is the signed-in default. Cross-screen navigation does not reload the Cognito PKCE page or store access tokens in localStorage. Detailed product requirements and user-story acceptance checks live in `docs/PRODUCT-UX-AUDIT-2026-11.md`.
