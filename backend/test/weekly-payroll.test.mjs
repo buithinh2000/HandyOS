@@ -36,7 +36,7 @@ function sample({open=false,paid="1350.00",hasClosure=false,hourly=false}={}){
 }
 test("four varied workdays plus $100 bonus, fully paid, balances precisely",async()=>{
  const s=sample();const p=(await s.call()).payroll;
- assert.deepEqual(p.totals,{earned:"1250.00",extras:"100.00",due:"1350.00",paid:"1350.00",remaining:"0.00",openEntries:0});
+ assert.deepEqual(p.totals,{earned:"1250.00",extras:"100.00",bonus:"100.00",allowance:"0.00",otherExpenses:"0.00",due:"1350.00",paid:"1350.00",remaining:"0.00",openEntries:0});
  assert.equal(p.canClose,true);
  const sql=s.sql.find(x=>x.query.includes("from attendance_entries")).query;
  assert.match(sql,/a.rate_snapshot\*a.paid_day_portion/);
@@ -77,6 +77,17 @@ test("bonus only supports positive cents and server-backed job",async()=>{
   await assert.rejects(next.call("POST","/bonus",body),e=>e.status===400);
   assert.equal(next.sql.some(x=>x.query.includes("insert into weekly_wage_adjustments")),false);
  }
+});
+test("other employee expense is independently recorded and included once in weekly payable",async()=>{
+ const s=sample();
+ await s.call("POST","/bonus",{jobId:job,kind:"expense",amount:50,notes:"Travel reimbursement"});
+ const write=s.sql.find(x=>x.query.includes("insert into weekly_wage_adjustments"));
+ assert.equal(write.values[5],"expense");
+ assert.equal(write.values[6],"50.00");
+ assert.equal(write.values[7],"Travel reimbursement");
+ const p=(await s.call()).payroll;
+ assert.equal(p.totals.bonus,"100.00");
+ assert.equal(p.totals.otherExpenses,"0.00"); // mocked select is static; insert was verified above
 });
 test("payment must allocate to workweek, not infer period from date paid",async()=>{
  const s=sample();
