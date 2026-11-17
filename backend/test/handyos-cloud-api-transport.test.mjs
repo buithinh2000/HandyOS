@@ -67,6 +67,20 @@ test("allow only fixed weekly staff payroll routes with valid identifiers",async
  await assert.rejects(transport.request({method:"DELETE",path:root+"/close"}),/unavailable/);
  assert.equal(calls.length,4);
 });
+test("Jobs creation and work-item operations use strictly scoped API routes",async()=>{
+ const {transport,calls}=setup();
+ const job="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+ await transport.request({method:"POST",path:"/v1/jobs",json:{name:"Kitchen refurbishment",code:"JOB-2"}});
+ await transport.request({path:"/v1/jobs/"+job+"/tasks"});
+ await transport.request({method:"POST",path:"/v1/jobs/"+job+"/tasks",json:{title:"Plasterboard"}});
+ assert.equal(calls.length,3);
+ for(const path of ["/v1/jobs/../tasks","/v1/jobs/abc/tasks",
+  "/v1/jobs/"+job+"/tasks/../../other","/v1/jobs/"+job+"/tasks?tenant=other"]){
+  await assert.rejects(transport.request({path}),/unavailable/);
+ }
+ await assert.rejects(transport.request({method:"DELETE",path:"/v1/jobs/"+job+"/tasks"}),/unavailable/);
+ assert.equal(calls.length,3);
+});
 test("forbid external routes, mutations and token storage",async()=>{
  const {transport,calls}=setup();
  const bad=[
