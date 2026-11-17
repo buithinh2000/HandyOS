@@ -10,6 +10,15 @@ function isoDay(v){
   throw new HttpError(400,"Invalid work date");
  return v;
 }
+async function openPayrollWeek(db,tenant,staff,date){
+ const day=new Date(date+"T00:00:00Z"),dayOfWeek=day.getUTCDay();
+ day.setUTCDate(day.getUTCDate()-((dayOfWeek+6)%7));
+ const monday=day.toISOString().slice(0,10);
+ // Serialize crew mutations with payroll close/adjustments in same DB tx.
+ await db.query("select pg_advisory_xact_lock(hashtextextended($1,0))",[tenant+":"+staff+":"+monday]);
+ const closure=await db.query("select id from weekly_payroll_closures where tenant_id=$1 and staff_id=$2 and week_begin=$3",[tenant,staff,monday]);
+ if(closure.rowCount)throw new HttpError(409,"Payroll week already closed");
+}
 function owner(ctx){
  if(!["owner","manager"].includes(ctx?.role))throw new HttpError(403,"Crew payroll is restricted to management");
 }
@@ -47,6 +56,7 @@ export async function dispatchDailyCrew({method,path,query,ctx,db,readBody,now=(
  if(method==="POST"&&path==="/v1/attendance/check-in"){
   const d=payload(await readBody(),["jobId","staffId","workDate"]);
   const job=ensureUuid(d.jobId),staff=ensureUuid(d.staffId),date=isoDay(d.workDate);
+  await openPayrollWeek(db,tenant,staff,date);
   const person=await db.query("select id,wage_unit,default_rate from staff_profiles where tenant_id=$1 and id=$2 and active=true",[tenant,staff]);
   if(person.rowCount!==1)throw new HttpError(404,"Active employee not found");
   const j=await db.query("select id from jobs where tenant_id=$1 and id=$2 and stage not in ('closed','handover')",[tenant,job]);
@@ -66,6 +76,11 @@ export async function dispatchDailyCrew({method,path,query,ctx,db,readBody,now=(
  if(method==="POST"&&m){
   const id=ensureUuid(m[1]);
   payload(await readBody(),[]);
+  const current=await db.query("select staff_id,work_date from attendance_entries where tenant_id=$1 and id=$2 and finished_at is null",[tenant,id]);
+  if(current.rowCount!==1)throw new HttpError(409,"No open attendance entry to check out");
+  const workDate=current.rows[0].work_date instanceof Date?
+   current.rows[0].work_date.toISOString().slice(0,10):String(current.rows[0].work_date).slice(0,10);
+  await openPayrollWeek(db,tenant,ensureUuid(current.rows[0].staff_id),workDate);
   const finished=now();
   if(!(finished instanceof Date)||Number.isNaN(finished.getTime()))throw new HttpError(503,"Clock unavailable");
   const result=await db.query("update attendance_entries set finished_at=$1,updated_at=now() where tenant_id=$2 and id=$3 and finished_at is null and started_at<$1 returning id,job_id,staff_id,work_date,started_at,finished_at,rate_unit,rate_snapshot",
