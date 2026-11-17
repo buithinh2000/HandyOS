@@ -130,6 +130,6 @@ export async function mountHandyOsJobs({root,api,onJobsChanged}={}){
  panel.querySelector("[data-new-job]").addEventListener("click",onNew);
  jobForm.addEventListener("submit",onJob);taskForm.addEventListener("submit",onTask);
  try{await refresh();message("Select a job for details.")}
- catch{message("Could not load jobs. Please retry after sign-in.")}
+ catch(error){console.warn("HANDYOS_JOBS_DEBUG",error?.name,error?.message);message("Could not load jobs. Please retry after sign-in.")}
  return Object.freeze({refresh,destroy(){disposed=true;root.replaceChildren()}});
 }
