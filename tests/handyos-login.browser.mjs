@@ -51,6 +51,11 @@ try{
       window.tasks.push(task);data={task};
      }
      else if(url===api+"/v1/staff"&&opts.method==="GET")data={staff:[{id:staff,display_name:"Sam",active:true,wage_unit:"day",default_rate:"250.00"}]};
+     else if(url===api+"/v1/staff"&&opts.method==="POST"){
+      const body=JSON.parse(opts.body);
+      data={staff:{id:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",display_name:body.displayName,active:true,
+       role_label:body.roleLabel,wage_unit:body.wageUnit,default_rate:body.defaultRate}};
+     }
      else if(url.startsWith(api+"/v1/attendance?date=")&&opts.method==="GET")data={attendance:window.crewEntries};
      else if(url===api+"/v1/attendance/check-in"&&opts.method==="POST"){
       const body=JSON.parse(opts.body);
@@ -124,6 +129,8 @@ try{
   await page.locator('[data-workspace-root] [data-page-body] [data-job]').waitFor();
   assert.equal(await page.locator('[data-workspace-root] [data-page-body] [data-create-job]').count(),0,
    "Job editor must not render on Today");
+  assert.equal(await page.locator('[data-workspace-root] [data-page-body] [data-employee-form]').count(),0,
+   "Staff admin form must not render on Today");
   await page.locator("[data-workspace-root] [data-page-body] [data-job]").selectOption(job);
   await page.locator("[data-workspace-root] [data-page-body] [data-staff]").selectOption(staff);
   await page.locator("[data-workspace-root] [data-page-body] [data-check-in] button").click();
@@ -135,6 +142,13 @@ try{
   await page.locator("[data-workspace-root] [data-page-body] .payroll-list button").first().waitFor();
   assert.equal(await page.locator('[data-workspace-root] [data-page-body] [data-check-in]').count(),0,
    "Attendance editor must not render in Employees");
+  await page.locator('[data-workspace-root] [data-page-body] [data-create-employee]').click();
+  await page.locator('[data-workspace-root] [data-page-body] [data-employee-form] input[name=displayName]').fill("Alex");
+  await page.locator('[data-workspace-root] [data-page-body] [data-employee-form] input[name=roleLabel]').fill("Painter");
+  await page.locator('[data-workspace-root] [data-page-body] [data-employee-form] input[name=defaultRate]').fill("275");
+  await page.locator('[data-workspace-root] [data-page-body] [data-employee-form] button').click();
+  await page.getByText("Employee saved on server.").waitFor();
+  assert.equal(await page.locator('[data-workspace-root] [data-page-body] .payroll-list button').count(),2);
   await page.locator("[data-workspace-root] [data-page-body] .payroll-list button").first().click();
   await page.getByText("Payroll loaded from server.").waitFor();
   assert.match(await page.locator("[data-workspace-root] [data-page-body] [data-totals]").innerText(),/1,350\.00/);
