@@ -101,7 +101,9 @@ try{
   assert.equal(await page.locator("[data-bills]").isVisible(),true);
   assert.equal(await page.locator('[data-bills-root] select[name="jobId"] option').count(),2);
   assert.equal(await page.locator("[data-today-root] h2").innerText(),"Today · Crew check-in");
-  assert.equal(await page.locator("[data-jobs-root] [data-job-list] button").count(),1);
+  const loadedJobs=await page.locator("[data-jobs-root] [data-job-list] button").count();
+  if(loadedJobs!==1)console.log("JOBS_DIAGNOSTIC",JSON.stringify(await page.locator("[data-jobs-root]").innerText()),JSON.stringify(await page.evaluate(()=>window.requests.map(x=>x.url))));
+  assert.equal(loadedJobs,1);
   await page.locator("[data-jobs-root] [data-job-list] button").first().click();
   await page.getByText("Job details loaded.").waitFor();
   await page.locator("[data-jobs-root] [data-create-task] input").fill("Install plasterboard");
