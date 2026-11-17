@@ -4,6 +4,7 @@
 import {createHandyOsPkceSession} from "./handyos-cognito-pkce.mjs";
 import {createHandyOsApiTransport} from "./handyos-cloud-api-transport.mjs";
 import {mountAuthenticatedCloudBills} from "./handyos-cloud-bills-app.mjs";
+import {mountHandyOsToday} from "./handyos-today-view.mjs";
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function denied(){throw Error("HandyOS sign-in shell unavailable")}
 export async function mountHandyOsLoginShell({
@@ -32,17 +33,17 @@ export async function mountHandyOsLoginShell({
  <h1>HandyOS</h1>
  <p>Private company workspace · Staging</p>
  <section data-auth><button type="button" data-login>Sign in securely</button></section>
- <section data-company hidden><label>Choose your company<select data-companies></select></label><button type="button" data-continue>Continue to Bills</button></section>
- <section data-bills hidden><button type="button" data-logout>Sign out</button><div data-bills-root></div></section>
+ <section data-company hidden><label>Choose your company<select data-companies></select></label><button type="button" data-continue>Open HandyOS</button></section>
+ <section data-bills hidden><button type="button" data-logout>Sign out</button><div data-today-root></div><div data-bills-root></div></section>
  <p role="status" aria-live="polite">Sign in to access your company.</p>`;
  const login=main.querySelector("[data-login]"),company=main.querySelector("[data-company]");
  const picker=main.querySelector("[data-companies]"),proceed=main.querySelector("[data-continue]");
- const billSection=main.querySelector("[data-bills]"),billRoot=main.querySelector("[data-bills-root]");
+ const billSection=main.querySelector("[data-bills]"),billRoot=main.querySelector("[data-bills-root]"),todayRoot=main.querySelector("[data-today-root]");
  const status=main.querySelector("[role=status]");
  root.replaceChildren(main);
- let mounted=null,eligible=[],busy=false;
+ let mounted=null,mountedToday=null,eligible=[],busy=false;
  const message=s=>{status.textContent=s};
- const reset=()=>{mounted?.destroy();mounted=null;session.logout();eligible=[];picker.replaceChildren();
+ const reset=()=>{mountedToday?.destroy();mountedToday=null;mounted?.destroy();mounted=null;session.logout();eligible=[];picker.replaceChildren();
   login.disabled=false;company.hidden=true;billSection.hidden=true;login.parentElement.hidden=false;
   message("Sign in to access your company.")};
  const onLogin=async()=>{
@@ -61,8 +62,11 @@ export async function mountHandyOsLoginShell({
     root:billRoot,session,apiOrigin,uiOrigin:config.uiOrigin,
     locationOrigin:location.origin,fetcher,put
    });
+   const todayApi=createHandyOsApiTransport({apiOrigin,uiOrigin:config.uiOrigin,
+    locationOrigin:location.origin,session,fetcher});
+   mountedToday=await mountHandyOsToday({root:todayRoot,api:todayApi});
    company.hidden=true;login.parentElement.hidden=true;billSection.hidden=false;
-   message("Signed in. Bills remain private to the selected company.");
+   message("Signed in. Today and Bills are private to the selected company.");
   }catch{reset();message("Company verification failed. Sign in again.")}
   finally{busy=false;proceed.disabled=false}
  };
