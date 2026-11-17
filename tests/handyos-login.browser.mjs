@@ -112,13 +112,26 @@ try{
   await page.locator('[data-workspace-root] [data-section=jobs]').click();
   await page.locator('[data-workspace-root] [data-job-list] button').first().waitFor();
   assert.equal(await page.locator("[data-workspace-root] [data-page-body] [data-job-list] button").count(),1);
+  await page.locator("[data-workspace-root] [data-page-body] [data-job-search]").fill("nomatch");
+  assert.equal(await page.locator("[data-workspace-root] [data-page-body] [data-job-list] button").count(),0);
+  await page.locator("[data-workspace-root] [data-page-body] [data-job-search]").fill("renovation");
+  assert.equal(await page.locator("[data-workspace-root] [data-page-body] [data-job-list] button").count(),1);
   await page.locator("[data-workspace-root] [data-page-body] [data-job-list] button").first().click();
   await page.getByText("Job details loaded.").waitFor();
+  assert.equal(await page.locator("[data-workspace-root] [data-page-body] [data-create-task]").isVisible(),false,
+   "Task editor cannot be shown on Job Overview");
+  assert.match(await page.locator("[data-workspace-root] [data-page-body] [data-job-summary]").innerText(),/survey/);
+  await page.locator("[data-workspace-root] [data-page-body] [data-detail-tasks]").click();
+  await page.getByText("Work items loaded.").waitFor();
+  await page.locator("[data-workspace-root] [data-page-body] [data-new-task]").click();
   await page.locator("[data-workspace-root] [data-page-body] [data-create-task] input").fill("Install plasterboard");
   await page.locator("[data-workspace-root] [data-page-body] [data-create-task] button").click();
   await page.getByText("Task saved on server.").waitFor();
   assert.equal(await page.evaluate(()=>window.tasks.length),1);
+  await page.locator("[data-workspace-root] [data-page-body] [data-detail-overview]").click();
+  assert.equal(await page.locator("[data-workspace-root] [data-page-body] [data-create-task]").isVisible(),false);
   await page.locator("[data-workspace-root] [data-page-body] [data-back]").click();
+  await page.locator("[data-workspace-root] [data-page-body] [data-job-search]").fill("");
   await page.locator("[data-workspace-root] [data-page-body] [data-new-job]").click();
   await page.locator("[data-workspace-root] [data-page-body] [data-create-job] input[name=name]").fill("Kitchen extension");
   await page.locator("[data-workspace-root] [data-page-body] [data-create-job] input[name=code]").fill("JOB-24");
