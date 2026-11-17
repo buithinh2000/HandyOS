@@ -226,6 +226,51 @@ export async function mountHandyOsToday({root,api}={}){
      });
      card.append(button);
     }
+    // Correct the existing shift in place; never create a second paid attendance row.
+    if(typeof item.updated_at==="string"&&item.started_at){
+     const edit=document.createElement("button");edit.type="button";
+     edit.textContent="Edit shift";edit.dataset.editAttendance=item.id;
+     const form=document.createElement("form");
+     form.hidden=true;form.dataset.correctionForm=item.id;
+     form.innerHTML=`<label>Actual start<input name="start" type="time" required></label>
+      <label>Actual finish (leave blank only if still checked in)<input name="finish" type="time"></label>
+      <label>Unpaid break (minutes)<input name="break" type="number" min="0" max="600" step="1" required></label>
+      <label>Paid day<select name="portion"><option value="1">Full day</option><option value="0.5">Half day</option></select></label>
+      <label>Notes<input name="notes" maxlength="500"></label>
+      <label>Reason for change<input name="reason" maxlength="500" minlength="3" required placeholder="e.g. Actual hours corrected"></label>
+      <button type="submit">Save corrected shift</button>`;
+     const time=v=>new Date(v).toTimeString().slice(0,5);
+     form.elements.start.value=time(item.started_at);
+     if(item.finished_at)form.elements.finish.value=time(item.finished_at);
+     form.elements.break.value=String(item.break_minutes??0);
+     form.elements.portion.value=String(item.paid_day_portion??1);
+     form.elements.notes.value=String(item.notes??"");
+     edit.addEventListener("click",()=>{form.hidden=!form.hidden});
+     form.addEventListener("submit",async e=>{
+      e.preventDefault();if(busy||!form.reportValidity())return;
+      const finishTime=form.elements.finish.value;
+      if(item.finished_at&&!finishTime){say("A completed shift must have a finish time.");return}
+      if(finishTime&&finishTime<=form.elements.start.value){
+       say("Finish time must be after start time.");return;
+      }
+      busy=true;const submit=form.querySelector('[type="submit"]');
+      submit.disabled=true;say("Saving audited shift correction…");
+      try{
+       await api.request({method:"POST",path:"/v1/attendance/"+item.id+"/correct",
+        json:{startedAt:dateTimeISO(day,form.elements.start.value),
+         finishedAt:finishTime?dateTimeISO(day,finishTime):null,
+         breakMinutes:Number(form.elements.break.value),
+         paidDayPortion:Number(form.elements.portion.value),
+         notes:form.elements.notes.value,
+         reason:form.elements.reason.value.trim(),
+         expectedUpdatedAt:item.updated_at}});
+       await refresh();await loadMonth({force:true});
+       say("Shift corrected and saved with audit history.");
+      }catch{say("Correction not saved. It may be an unchanged shift, stale version or closed payroll week. Refresh and review.")}
+      finally{busy=false;submit.disabled=false}
+     });
+     card.append(edit,form);
+    }
     body.append(card);
    }
    details.append(body);records.append(details);
