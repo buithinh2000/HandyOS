@@ -28,6 +28,12 @@ Issue [#116](https://github.com/buithinh2000/HandyOS/issues/116) records a verif
 
 Safety follow-up: cloud Financials now returns `profitReady:false`, `provisional:true`, and an explicit warning; the authenticated UI shows `NOT READY` rather than treating the raw subtotal as final profit. This is a *source-only safety block*, not an accounting fix, data migration or AWS deployment. A later parity PR must cover stored assumptions, future costs, variations, GST/no-GST, employee extras and customer pass-through with cents-accurate tests before enabling final profit.
 
+## 2026-11-18 — Pure forecast parity kernel (source-only; not active cloud Financials)
+
+`backend/src/approved-job-forecast.mjs` implements the approved formula below using explicit currency cents. It requires each material assumption to be supplied, including contract INC GST, approved positive/negative variations INC GST, expenses EX GST, accrued wages, weekly extras, remaining future costs, unbooked overhead, combined tax/reserve percentage and actual customer receipts INC GST. Missing or invalid assumptions return `profitReady:false` instead of silently guessing zero. Owner pass-through reimbursement receipts and wage settlements are excluded from this profit calculation. Tests cover exact adjusted-contract and reserve basis, money precision, incomplete assumptions and customer receipt isolation.
+
+**This module is deliberately NOT connected to `backend/src/job-financials.mjs` or marked production ready.** Cloud DB settings currently only have `contract_ex_gst` and `reserve_percent`; the app still needs a separately reviewed migration and actual input UI for signed contract INC GST, variations, remaining costs, overhead and reconciled customer payments. Issue #116 remains open. Do not enable `profitReady:true` on a cloud response until stored fields and appropriate API reconciliation are complete, and do not migrate an existing EX-GST contract as INC-GST without explicit owner confirmation.
+
 ## Current mathematical decision contract (from main owner-ledger-core.mjs)
 ```text
 adjusted_contract_inc = base_contract_inc + approved_variation_inc
