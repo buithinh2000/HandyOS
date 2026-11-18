@@ -35,7 +35,7 @@ export function isSafeReceiptView(value,jobId,billId){
 export function customerBillMessage(b){
  if(!b||typeof b.jobName!=="string"||typeof b.storeReference!=="string"||
     typeof b.boughtOn!=="string")throw Error("Invalid bill message");
- const safe=s=>s.replace(/[\\r\\n\\t]+/g," ").trim().slice(0,160);
+ const safe=s=>s.replace(/[\r\n\t]+/g," ").trim().slice(0,160);
  const money=v=>{
   const n=Number(v);
   if(!Number.isFinite(n)||n<0||n>1000000000)throw Error("Invalid bill amount");
