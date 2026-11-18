@@ -33,12 +33,21 @@ try{
    const begin={receiptId:receipt,uploadUrl:"https://handyos-receipts-staging-916004827349.s3.ap-southeast-1.amazonaws.com/photo?X-Amz-Signature=offline",
     requiredMethod:"PUT",requiredEncryption:"aws:kms",contentType:"image/jpeg",expiresInSeconds:180,uploadHeaders:headers};
    window.calls=[];window.billRecords=[];
+   window.privateOpened=null;window.privateTab=null;
+   // Synthetic new-tab spy: no real S3 or external navigation in CI.
+   window.open=()=>{const tab={closed:false,opener:window,location:{replace:url=>{window.privateOpened=url}},
+    close(){tab.closed=true}};window.privateTab=tab;return tab};
+   const signedPrivate="https://handyos-receipts-staging-916004827349.s3.ap-southeast-1.amazonaws.com/"+
+    "tenants/"+tenant+"/jobs/"+job+"/receipts/"+receipt+"/cccccccc-cccc-4ccc-8ccc-cccccccccccc.jpg"+
+    "?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=test%2F20261118%2Fap-southeast-1%2Fs3%2Faws4_request"+
+    "&X-Amz-Date=20261118T010000Z&X-Amz-Expires=180&X-Amz-Signature=synthetic";
    const fetcher=async(url,options)=>{
     window.calls.push({kind:"api",url,method:options.method,auth:options.headers.authorization,tenant:options.headers["x-handyos-tenant"]});
     let answer;
     if(url===api+"/v1/me")answer={tenant_id:tenant,role:"owner"};
     else if(url===api+"/v1/jobs")answer={jobs:[{id:job,name:"Bathroom & kitchen"}]};
     else if(url===api+"/v1/bills")answer={bills:window.billRecords,limit:200,hasMore:false};
+    else if(url===api+"/v1/jobs/"+job+"/receipts/"+receipt+"/media")answer={id:receipt,viewUrl:signedPrivate,expiresInSeconds:180};
     else if(url.endsWith("/mark-sent")){
      const info=JSON.parse(options.body),bill=window.billRecords[0];
      if(bill.status!=="draft")throw Error("Must send once");
@@ -80,18 +89,25 @@ try{
   await page.locator('form [role="status"]').getByText("Bill saved securely. Not sent to customer.").waitFor();
   await page.locator('[data-bill-id="'+receipt+'"]').waitFor();
   assert.match(await page.locator('[data-bill-id="'+receipt+'"]').innerText(),/Not sent/);
+  await page.locator('[data-bill-preview="'+receipt+'"]').click();
+  await page.waitForFunction(()=>typeof window.privateOpened==="string");
+  const opened=await page.evaluate(()=>window.privateOpened);
+  assert.match(opened,/X-Amz-Signature=synthetic/);
+  assert.equal(await page.evaluate(()=>window.privateTab.opener),null);
+  assert.equal(await page.evaluate(()=>localStorage.length),0);
   await page.locator('[data-bill-filter-status]').selectOption("reimbursed");
   assert.equal(await page.locator('[data-bill-id="'+receipt+'"]').count(),0);
   await page.locator('[data-bill-filter-status]').selectOption("draft");
   assert.equal(await page.locator('[data-bill-id="'+receipt+'"]').count(),1);
   const calls=await page.evaluate(()=>window.calls);
-  assert.deepEqual(calls.map(x=>x.kind),["api","api","api","api","s3","api","api"]);
+  assert.deepEqual(calls.map(x=>x.kind),["api","api","api","api","s3","api","api","api"]);
   assert.equal(calls[0].url,api+"/v1/me");
   assert.equal(calls[1].url,api+"/v1/jobs");
   assert.equal(calls[2].url,api+"/v1/bills");
   assert.equal(calls[3].url,api+`/v1/jobs/${job}/receipts/uploads`);
   assert.equal(calls[5].url,api+`/v1/jobs/${job}/receipts/${receipt}/confirm`);
   assert.equal(calls[6].url,api+"/v1/bills");
+  assert.equal(calls[7].url,api+`/v1/jobs/${job}/receipts/${receipt}/media`);
   assert.equal(calls[4].headers["content-length"],undefined);
   assert.equal(await page.evaluate(()=>localStorage.length),0);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);

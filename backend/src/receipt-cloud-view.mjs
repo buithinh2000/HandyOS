@@ -8,7 +8,29 @@ function element(root,selector){
  if(!result)throw Error("HandyOS bills UI incomplete");
  return result;
 }
-export function mountCloudBills({root,controller,jobs=[],listBills,updateBill}={}){
+// Presigned GET links are sensitive bearer URLs, never customer links or durable metadata.
+export function isSafeReceiptView(value,jobId,billId){
+ try{
+  if(typeof value!=="string"||value.length>4096||!UUID.test(jobId)||!UUID.test(billId))return false;
+  const url=new URL(value);
+  const suffix=".s3.ap-southeast-1.amazonaws.com";
+  if(url.protocol!=="https:"||url.port||url.username||url.password||url.hash||
+     !url.hostname.endsWith(suffix))return false;
+  const bucket=url.hostname.slice(0,-suffix.length);
+  if(!/^handyos-[a-z0-9.-]{3,62}$/.test(bucket))return false;
+  const segments=url.pathname.split("/");
+  if(segments.length!==8||segments[0]!==""||segments[1]!=="tenants"||!UUID.test(segments[2])||
+     segments[3]!=="jobs"||segments[4].toLowerCase()!==jobId.toLowerCase()||
+     segments[5]!=="receipts"||segments[6].toLowerCase()!==billId.toLowerCase()||
+     !/^[0-9a-f-]{36}\.(jpg|png|webp|pdf)$/i.test(segments[7]))return false;
+  const expires=Number(url.searchParams.get("X-Amz-Expires"));
+  return url.searchParams.get("X-Amz-Algorithm")==="AWS4-HMAC-SHA256"&&
+   !!url.searchParams.get("X-Amz-Signature")&&
+   !!url.searchParams.get("X-Amz-Credential")&&
+   Number.isInteger(expires)&&expires>0&&expires<=180;
+ }catch{return false}
+}
+export function mountCloudBills({root,controller,jobs=[],listBills,updateBill,viewReceipt}={}){
  if(!root||typeof root.replaceChildren!=="function"||
   typeof controller?.save!=="function"||!Array.isArray(jobs))
   throw Error("Authenticated HandyOS Bills application required");
@@ -96,6 +118,35 @@ export function mountCloudBills({root,controller,jobs=[],listBills,updateBill}={
    const balance=document.createElement("small");
    balance.textContent="Received "+aud(b.amountReceived??"0")+" · Outstanding "+aud(b.remaining??b.amountGross);
    card.append(head,details,badge,balance);
+   if(typeof viewReceipt==="function"){
+    const preview=document.createElement("button");
+    preview.type="button";preview.textContent="View private receipt";
+    preview.dataset.billPreview=b.id;
+    preview.addEventListener("click",async()=>{
+     if(preview.disabled)return;
+     // Open a blank browser tab within the user gesture; delayed popups are blocked on iPhone.
+     // Never send the Cognito token to S3, and never treat this temporary Owner URL as a customer share.
+     const tab=window.open("about:blank","_blank");
+     if(tab)tab.opener=null;
+     preview.disabled=true;queueStatus.textContent="Checking private receipt access…";
+     try{
+      const response=await viewReceipt({jobId:b.jobId,billId:b.id});
+      if(response?.id!==b.id||!isSafeReceiptView(response.viewUrl,b.jobId,b.id)||!Number.isInteger(response.expiresInSeconds)||
+         response.expiresInSeconds<1||response.expiresInSeconds>900)
+       throw Error("Unsafe or expired receipt preview");
+      if(tab&&!tab.closed){
+       tab.location.replace(response.viewUrl);
+       queueStatus.textContent="Private receipt opened in a new tab. Do not share this temporary link.";
+      }else{
+       queueStatus.textContent="Your browser blocked the new tab. Enable popups for HandyOS to view this private receipt.";
+      }
+     }catch{
+      if(tab&&!tab.closed)tab.close();
+      queueStatus.textContent="Unable to open private receipt. Check your login, job access and storage configuration.";
+     }finally{preview.disabled=false}
+    });
+    card.append(preview);
+   }
    if(typeof updateBill==="function"&&b.status!=="reimbursed"){
     const action=document.createElement("button");action.type="button";
     action.textContent=b.status==="draft"?"Confirm already sent":"Record repayment";
