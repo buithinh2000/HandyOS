@@ -1,0 +1,5 @@
+# HandyOS local runtime passwords, env values and backup files: NEVER commit.
+deploy/internal/private/
+deploy/internal/backups/
+deploy/internal/.env
+deploy/internal/*.local
