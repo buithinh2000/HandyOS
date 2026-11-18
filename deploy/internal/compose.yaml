@@ -1,0 +1,68 @@
+# Internal-only single VM deployment candidate; DO NOT run before approved resource scope.
+# Internet -> Caddy TLS -> the ONE HandyOS API/frontend image. PostgreSQL is private.
+services:
+  gateway:
+    image: caddy:2.9-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      HANDYOS_UI_HOST: ${HANDYOS_UI_HOST:?Required verified HandyOS host}
+      HANDYOS_API_HOST: ${HANDYOS_API_HOST:?Required verified API host}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [front]
+    depends_on: [app]
+  app:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./private/app.env
+    environment:
+      HANDYOS_DB_MODE: docker-private
+      PORT: "8080"
+      NODE_ENV: production
+    networks: [front, private_db]
+    depends_on:
+      db:
+        condition: service_healthy
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: handyos
+      POSTGRES_USER: handyos_admin
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_admin_password
+    secrets: [db_admin_password]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [private_db]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U handyos_admin -d handyos"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+    security_opt:
+      - no-new-privileges:true
+secrets:
+  db_admin_password:
+    file: ./private/db_admin_password
+networks:
+  front: {}
+  private_db:
+    internal: true
+volumes:
+  pgdata: {}
+  caddy_data: {}
+  caddy_config: {}
