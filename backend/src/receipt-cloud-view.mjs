@@ -22,7 +22,7 @@ export function isSafeReceiptView(value,jobId,billId){
   if(segments.length!==8||segments[0]!==""||segments[1]!=="tenants"||!UUID.test(segments[2])||
      segments[3]!=="jobs"||segments[4].toLowerCase()!==jobId.toLowerCase()||
      segments[5]!=="receipts"||segments[6].toLowerCase()!==billId.toLowerCase()||
-     !/^[0-9a-f-]{36}\\.(jpg|png|webp|pdf)$/i.test(segments[7]))return false;
+     !/^[0-9a-f-]{36}\.(jpg|png|webp|pdf)$/i.test(segments[7]))return false;
   const expires=Number(url.searchParams.get("X-Amz-Expires"));
   return url.searchParams.get("X-Amz-Algorithm")==="AWS4-HMAC-SHA256"&&
    !!url.searchParams.get("X-Amz-Signature")&&
