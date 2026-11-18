@@ -10,6 +10,7 @@ import {createHandyOsReceiptRuntime} from "./receipt-runtime.mjs";
 import {dispatchDailyCrew} from "./daily-crew.mjs";
 import {dispatchWeeklyPayroll} from "./weekly-payroll.mjs";
 import {dispatchJobFinancials} from "./job-financials.mjs";
+import {dispatchJobForecastInputs} from "./job-forecast-inputs.mjs";
 import {listBillsQueue} from "./bills-queue.mjs";
 import {dispatchBillsOperation} from "./bills-operations.mjs";
 
@@ -90,6 +91,10 @@ async function dispatch(req,{receiptWorkflow=null}={}){
   }
   if(/^\/v1\/payroll(?:\/|$)/.test(url.pathname)){
    return dispatchWeeklyPayroll({method:req.method,path:url.pathname,query:url.searchParams,
+    ctx:{...ctx,actorSub:sub},db:client,readBody:()=>body(req)});
+  }
+  if(/^\/v1\/jobs\/[^/]+\/financials\/forecast-inputs$/.test(url.pathname)){
+   return dispatchJobForecastInputs({method:req.method,path:url.pathname,
     ctx:{...ctx,actorSub:sub},db:client,readBody:()=>body(req)});
   }
   if(/^\/v1\/jobs\/[^/]+\/financials(?:\/|$)/.test(url.pathname)){
