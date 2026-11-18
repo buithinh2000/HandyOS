@@ -80,6 +80,13 @@ export async function dispatchContractReceipts({method,path,ctx,db,readBody}={})
  if(method!=="GET"&&method!=="POST")throw new HttpError(404,"Contract receipt action unavailable");
  await jobLock(db,tenant,jobId);
  if(method==="GET")return {contractReceipts:await listReceipts(db,tenant,jobId)};
+ // Do not allow manual re-entry where legacy claim payments already exist.
+ // A future explicit migration/reconciliation must identify legacy payment IDs.
+ const legacy=await db.query(`select count(p.id)::integer as legacy_count from payments p
+  join progress_claims c on c.id=p.claim_id and c.tenant_id=p.tenant_id
+  where p.tenant_id=$1 and c.job_id=$2`,[tenant,jobId]);
+ if(Number(legacy.rows[0]?.legacy_count)>0)
+  throw new HttpError(409,"Legacy claim payments exist. Reconcile existing receipts before recording new ones");
  const d=normalized(await readBody());
  const old=await db.query(`select id,job_id,received_on,input_basis,entered_amount,
    received_inc_gst,gst_component,reference
