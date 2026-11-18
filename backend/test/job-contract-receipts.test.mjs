@@ -15,6 +15,12 @@ function mock({records=[],legacy=0,previous=null}={}){
   if(sql.includes("from job_contract_receipts"))
    return{rowCount:records.length,rows:records};
   if(sql.includes("count(p.id)"))return{rowCount:1,rows:[{legacy_count:legacy}]};
+  if(sql.includes("from payments p")&&sql.includes("order by p.paid_on"))
+   return{rowCount:legacy,rows:Array.from({length:legacy},(_,i)=>({
+    id:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",claim_id:job,
+    paid_on:"2026-11-17",amount:"125.50",claim_reference:"Progress claim "+(i+1),
+    claim_ex_gst:"100.00",claim_gst:"10.00",claim_status:"part_paid"
+   }))};
   if(sql.includes("insert into job_contract_receipts"))return{rowCount:1,rows:[{id:requestId}]};
   if(sql.includes("insert into audit_events"))return{rowCount:1,rows:[]};
   throw Error("Unexpected SQL: "+sql);
@@ -48,9 +54,14 @@ test("reading saved payments shows actual gross received and warns if legacy cla
  const result=(await s.run("GET")).contractReceipts;
  assert.equal(result.receivedIncGst,"125.50");
  assert.equal(result.legacyPaymentsPresent,true);
+ assert.equal(result.legacyPayments.length,1);
+ assert.equal(result.legacyPayments[0].enteredAmount,"125.50");
+ assert.equal(result.legacyPayments[0].gstBasisVerified,false);
+ assert.equal(result.receivedIncGst,"125.50",
+  "Unverified legacy payments must not be silently included in new contract cash received");
  assert.match(result.note,/do not double count/i);
  assert.equal(result.profitReady,false);
- const sql=s.calls.find(x=>x.sql.includes("count(p.id)"));
+ const sql=s.calls.find(x=>x.sql.includes("order by p.paid_on"));
  assert.deepEqual(sql.args,[tenant,job]);
 });
 test("existing legacy progress-claim payment blocks new cash capture, protecting against double count",async()=>{
