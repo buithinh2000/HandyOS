@@ -1,0 +1,10 @@
+# TLS terminates here. Only two exact HandyOS hosts.
+# Caddy obtains certificates after DNS and firewall are verified.
+{$HANDYOS_UI_HOST} {
+  encode zstd gzip
+  reverse_proxy app:8080
+}
+{$HANDYOS_API_HOST} {
+  encode zstd gzip
+  reverse_proxy app:8080
+}
