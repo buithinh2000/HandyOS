@@ -32,7 +32,7 @@ function routeAllowed(method,path){
  if(method==="GET"&&(path==="/v1/staff"||/^\/v1\/attendance\?date=\d{4}-\d{2}-\d{2}$/.test(path)||/^\/v1\/attendance\/month\?month=\d{4}-(?:0[1-9]|1[0-2])$/.test(path)))return true;
  if(method==="POST"&&(path==="/v1/staff"||path==="/v1/attendance/check-in"||path==="/v1/attendance/backfill"))return true;
  if(method==="POST"&&new RegExp("^/v1/attendance/"+UUID.source.slice(1,-1)+"/(?:check-out|correct)$","i").test(path))return true;
- if(method==="GET"&&(path==="/v1/me"||path==="/v1/jobs"))return true;
+ if(method==="GET"&&(path==="/v1/me"||path==="/v1/jobs"||path==="/v1/bills"))return true;
  const m=JOB_ROUTE.exec(path);
  if(!m)return false;
  return method==="POST"&&(m[2]==="uploads"||m[4]==="confirm")||
