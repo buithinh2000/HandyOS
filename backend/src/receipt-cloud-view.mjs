@@ -107,7 +107,7 @@ export function mountCloudBills({root,controller,jobs=[],listBills}={}){
    const bills=result.bills.map(b=>{
     if(!b||!UUID.test(b.id)||!UUID.test(b.jobId)||typeof b.jobName!=="string"||
        typeof b.storeReference!=="string"||typeof b.boughtOn!=="string"||
-       !/^\\d{4}-\\d{2}-\\d{2}$/.test(b.boughtOn)||!Object.hasOwn(stateLabel,b.status)||
+       !/^\d{4}-\d{2}-\d{2}$/.test(b.boughtOn)||!Object.hasOwn(stateLabel,b.status)||
        seen.has(b.id)||!Number.isFinite(Number(b.amountGross))||Number(b.amountGross)<=0)
      throw Error("Invalid bill");
     seen.add(b.id);return b;
