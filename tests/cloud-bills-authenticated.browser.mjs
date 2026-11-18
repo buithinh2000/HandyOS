@@ -39,11 +39,25 @@ try{
     if(url===api+"/v1/me")answer={tenant_id:tenant,role:"owner"};
     else if(url===api+"/v1/jobs")answer={jobs:[{id:job,name:"Bathroom & kitchen"}]};
     else if(url===api+"/v1/bills")answer={bills:window.billRecords,limit:200,hasMore:false};
+    else if(url.endsWith("/mark-sent")){
+     const info=JSON.parse(options.body),bill=window.billRecords[0];
+     if(bill.status!=="draft")throw Error("Must send once");
+     bill.status="sent";bill.sentOn=info.date;
+     answer={id:bill.id,status:"sent",amountReceived:"0.00",remaining:"250.75"};
+    }
+    else if(url.endsWith("/payment")){
+     const info=JSON.parse(options.body),bill=window.billRecords[0];
+     if(bill.status!=="sent")throw Error("Not sent");
+     const sum=Math.round((Number(bill.amountReceived)+info.amount)*100);
+     bill.amountReceived=(sum/100).toFixed(2);bill.remaining=((25075-sum)/100).toFixed(2);
+     if(sum===25075){bill.status="reimbursed";bill.reimbursedOn=info.date}
+     answer={id:bill.id,status:bill.status,amountReceived:bill.amountReceived,remaining:bill.remaining};
+    }
     else if(url.endsWith("/uploads"))answer=begin;
     else if(url.endsWith("/confirm")){
      window.billRecords.push({id:receipt,jobId:job,jobName:"Bathroom & kitchen",
       boughtOn:"2026-11-16",storeReference:"Reece",amountGross:"250.75",gstBasis:"inc",
-      status:"draft",sentOn:null,reimbursedOn:null});
+      status:"draft",amountReceived:"0.00",remaining:"250.75",sentOn:null,reimbursedOn:null});
      answer={id:receipt,status:"draft",mediaReady:true};
     }
     else throw Error("Unexpected route");
@@ -81,6 +95,25 @@ try{
   assert.equal(calls[4].headers["content-length"],undefined);
   assert.equal(await page.evaluate(()=>localStorage.length),0);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);
+  // Returning to All is intentional: a bill vanishes from Not sent once marked Sent.
+  await page.locator('[data-bill-filter-status]').selectOption("");
+  await page.locator('[data-bill-action="'+receipt+'"]').click();
+  await page.locator('[data-bill-action-form="'+receipt+'"] [name="reference"]').fill("Sent by SMS to owner");
+  await page.locator('[data-bill-action-form="'+receipt+'"] button[type="submit"]').click();
+  await page.locator('[data-bill-id="'+receipt+'"]').getByText("Sent to client").waitFor();
+  await page.locator('[data-bill-action="'+receipt+'"]').click();
+  await page.locator('[data-bill-action-form="'+receipt+'"] [name="amount"]').fill("100.25");
+  await page.locator('[data-bill-action-form="'+receipt+'"] [name="reference"]').fill("Bank receipt ref A");
+  await page.locator('[data-bill-action-form="'+receipt+'"] button[type="submit"]').click();
+  await page.locator('[data-bill-id="'+receipt+'"]').getByText(/Outstanding.*150\.50/).waitFor();
+  assert.equal(await page.evaluate(()=>window.billRecords[0].status),"sent");
+  await page.locator('[data-bill-action="'+receipt+'"]').click();
+  await page.locator('[data-bill-action-form="'+receipt+'"] [name="amount"]').fill("150.50");
+  await page.locator('[data-bill-action-form="'+receipt+'"] [name="reference"]').fill("Bank receipt ref B");
+  await page.locator('[data-bill-action-form="'+receipt+'"] button[type="submit"]').click();
+  await page.locator('[data-bill-id="'+receipt+'"]').getByText("Reimbursed").waitFor();
+  assert.equal(await page.locator('[data-bill-action="'+receipt+'"]').count(),0);
+  assert.equal(await page.evaluate(()=>window.billRecords[0].remaining),"0.00");
   assert.deepEqual(failures,[]);
   await page.close();
  }

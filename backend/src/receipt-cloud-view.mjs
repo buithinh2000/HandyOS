@@ -8,7 +8,7 @@ function element(root,selector){
  if(!result)throw Error("HandyOS bills UI incomplete");
  return result;
 }
-export function mountCloudBills({root,controller,jobs=[],listBills}={}){
+export function mountCloudBills({root,controller,jobs=[],listBills,updateBill}={}){
  if(!root||typeof root.replaceChildren!=="function"||
   typeof controller?.save!=="function"||!Array.isArray(jobs))
   throw Error("Authenticated HandyOS Bills application required");
@@ -93,7 +93,53 @@ export function mountCloudBills({root,controller,jobs=[],listBills}={}){
    const head=document.createElement("strong");head.textContent=b.storeReference+" · "+aud(b.amountGross);
    const details=document.createElement("small");details.textContent=b.jobName+" · "+b.boughtOn;
    const badge=document.createElement("small");badge.textContent=stateLabel[b.status];
-   card.append(head,details,badge);queue.append(card);
+   const balance=document.createElement("small");
+   balance.textContent="Received "+aud(b.amountReceived??"0")+" · Outstanding "+aud(b.remaining??b.amountGross);
+   card.append(head,details,badge,balance);
+   if(typeof updateBill==="function"&&b.status!=="reimbursed"){
+    const action=document.createElement("button");action.type="button";
+    action.textContent=b.status==="draft"?"Confirm already sent":"Record repayment";
+    action.dataset.billAction=b.id;
+    const form=document.createElement("form");form.hidden=true;
+    form.dataset.billActionForm=b.id;
+    form.innerHTML=b.status==="draft"?
+     `<label>Actually sent on<input name="date" type="date" required></label>
+       <label>How it was sent<select name="channel"><option value="message">Message</option><option value="email">Email</option><option value="in_person">In person</option><option value="other">Other</option></select></label>
+       <label>Recipient / delivery reference<input name="reference" required minlength="3" maxlength="250" placeholder="e.g. Sent to client via SMS"></label>
+       <button type="submit">Confirm sent (no message will be sent)</button>`:
+     `<label>Payment received on<input name="date" type="date" required></label>
+       <label>Amount received (AUD)<input name="amount" type="number" min="0.01" step="0.01" required></label>
+       <label>Payment reference<input name="reference" required minlength="3" maxlength="250" placeholder="e.g. Bank transfer"></label>
+       <button type="submit">Record payment received</button>`;
+    const d=new Date(),pad=n=>String(n).padStart(2,"0");
+    form.elements.date.value=[d.getFullYear(),pad(d.getMonth()+1),pad(d.getDate())].join("-");
+    let pendingRequestId=null;
+    action.addEventListener("click",()=>{form.hidden=!form.hidden});
+    form.addEventListener("submit",async event=>{
+     event.preventDefault();if(!form.reportValidity())return;
+     const submit=form.querySelector('[type="submit"]');submit.disabled=true;
+     queueStatus.textContent="Saving verified bill status…";
+     const kind=b.status==="draft"?"mark-sent":"payment";
+     pendingRequestId??=crypto.randomUUID();
+     const json={requestId:pendingRequestId,date:form.elements.date.value,
+      reference:form.elements.reference.value.trim()};
+     if(kind==="mark-sent")json.channel=form.elements.channel.value;
+     else json.amount=Number(form.elements.amount.value);
+     try{
+      const result=await updateBill({billId:b.id,kind,json});
+      if(!result||result.id!==b.id||!["sent","reimbursed"].includes(result.status))
+       throw Error("Server did not confirm bill status");
+      pendingRequestId=null;
+      await loadBills();
+      queueStatus.textContent="Bill update saved. Remaining balance: "+aud(result.remaining);
+     }catch{
+      queueStatus.textContent="Could not verify the update. Refresh the bill list before attempting another payment.";
+      submit.disabled=false;
+     }
+    });
+    card.append(action,form);
+   }
+   queue.append(card);
   }
  };
  const loadBills=async()=>{
