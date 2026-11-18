@@ -10,9 +10,11 @@ export async function listBillsQueue({db,ctx}={}){
   m.store_reference,m.amount_gross,m.gst_basis,m.customer_status,
   to_char(m.sent_on,'YYYY-MM-DD') as sent_on,
   to_char(m.reimbursed_on,'YYYY-MM-DD') as reimbursed_on,
-  m.created_at
+  m.created_at,coalesce(p.amount_received,0) as amount_received
   from material_reimbursements m
   join jobs j on j.tenant_id=m.tenant_id and j.id=m.job_id
+  left join lateral (select sum(e.amount_received) as amount_received from material_reimbursement_events e
+    where e.tenant_id=m.tenant_id and e.bill_id=m.id and e.event_kind='payment_received') p on true
   where m.tenant_id=$1
   order by m.bought_on desc,m.created_at desc,m.id desc limit 200`,[tenant]);
  if(!Array.isArray(result.rows)||result.rows.length>200)throw new HttpError(503,"Bills queue unavailable");
@@ -20,7 +22,8 @@ export async function listBillsQueue({db,ctx}={}){
   if(!STATES.has(row.customer_status))throw new HttpError(503,"Invalid bill state");
   return {id:row.id,jobId:row.job_id,jobName:row.job_name,
    boughtOn:row.bought_on,storeReference:row.store_reference,
-   amountGross:String(row.amount_gross),gstBasis:row.gst_basis,
+   amountGross:String(row.amount_gross),amountReceived:String(row.amount_received),
+   remaining:(Number(row.amount_gross)-Number(row.amount_received)).toFixed(2),gstBasis:row.gst_basis,
    status:row.customer_status,sentOn:row.sent_on,reimbursedOn:row.reimbursed_on};
  });
  return {bills,limit:200,hasMore:result.rows.length===200,
