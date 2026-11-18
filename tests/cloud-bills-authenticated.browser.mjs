@@ -32,6 +32,10 @@ try{
     "x-amz-server-side-encryption-aws-kms-key-id":"arn:aws:kms:ap-southeast-1:916004827349:key/11111111-1111-4111-8111-111111111111"};
    const begin={receiptId:receipt,uploadUrl:"https://handyos-receipts-staging-916004827349.s3.ap-southeast-1.amazonaws.com/photo?X-Amz-Signature=offline",
     requiredMethod:"PUT",requiredEncryption:"aws:kms",contentType:"image/jpeg",expiresInSeconds:180,uploadHeaders:headers};
+   window.copiedBillMessage=null;
+   Object.defineProperty(navigator,"clipboard",{configurable:true,value:{
+    writeText:async value=>{window.copiedBillMessage=value}
+   }});
    window.calls=[];window.billRecords=[];
    window.privateOpened=null;window.privateTab=null;
    // Synthetic new-tab spy: no real S3 or external navigation in CI.
@@ -89,6 +93,15 @@ try{
   await page.locator('form [role="status"]').getByText("Bill saved securely. Not sent to customer.").waitFor();
   await page.locator('[data-bill-id="'+receipt+'"]').waitFor();
   assert.match(await page.locator('[data-bill-id="'+receipt+'"]').innerText(),/Not sent/);
+  await page.locator('[data-bill-copy="'+receipt+'"]').click();
+  await page.waitForFunction(()=>typeof window.copiedBillMessage==="string");
+  const copied=await page.evaluate(()=>window.copiedBillMessage);
+  assert.match(copied,/Bathroom & kitchen/);
+  assert.match(copied,/Reece/);
+  assert.match(copied,/Outstanding reimbursement: AUD \$250\.75/);
+  assert.doesNotMatch(copied,/X-Amz|synthetic-token|presign|amazonaws/);
+  assert.equal(await page.evaluate(()=>window.billRecords[0].status),"draft",
+   "Copying a draft message must not mark any bill as sent");
   await page.locator('[data-bill-preview="'+receipt+'"]').click();
   await page.waitForFunction(()=>typeof window.privateOpened==="string");
   const opened=await page.evaluate(()=>window.privateOpened);
