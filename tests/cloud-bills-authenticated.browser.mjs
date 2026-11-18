@@ -32,14 +32,20 @@ try{
     "x-amz-server-side-encryption-aws-kms-key-id":"arn:aws:kms:ap-southeast-1:916004827349:key/11111111-1111-4111-8111-111111111111"};
    const begin={receiptId:receipt,uploadUrl:"https://handyos-receipts-staging-916004827349.s3.ap-southeast-1.amazonaws.com/photo?X-Amz-Signature=offline",
     requiredMethod:"PUT",requiredEncryption:"aws:kms",contentType:"image/jpeg",expiresInSeconds:180,uploadHeaders:headers};
-   window.calls=[];
+   window.calls=[];window.billRecords=[];
    const fetcher=async(url,options)=>{
     window.calls.push({kind:"api",url,method:options.method,auth:options.headers.authorization,tenant:options.headers["x-handyos-tenant"]});
     let answer;
     if(url===api+"/v1/me")answer={tenant_id:tenant,role:"owner"};
     else if(url===api+"/v1/jobs")answer={jobs:[{id:job,name:"Bathroom & kitchen"}]};
+    else if(url===api+"/v1/bills")answer={bills:window.billRecords,limit:200,hasMore:false};
     else if(url.endsWith("/uploads"))answer=begin;
-    else if(url.endsWith("/confirm"))answer={id:receipt,status:"draft",mediaReady:true};
+    else if(url.endsWith("/confirm")){
+     window.billRecords.push({id:receipt,jobId:job,jobName:"Bathroom & kitchen",
+      boughtOn:"2026-11-16",storeReference:"Reece",amountGross:"250.75",gstBasis:"inc",
+      status:"draft",sentOn:null,reimbursedOn:null});
+     answer={id:receipt,status:"draft",mediaReady:true};
+    }
     else throw Error("Unexpected route");
     return {ok:true,status:200,json:async()=>answer};
    };
@@ -57,14 +63,22 @@ try{
   await page.locator('[name="amountGross"]').fill("250.75");
   await page.locator('[name="file"]').setInputFiles({name:"receipt.jpg",mimeType:"image/jpeg",buffer:Buffer.alloc(1024,1)});
   await page.locator('button[type="submit"]').click();
-  assert.match(await page.locator('[role="status"]').innerText(),/Bill saved securely/);
+  await page.locator('form [role="status"]').getByText("Bill saved securely. Not sent to customer.").waitFor();
+  await page.locator('[data-bill-id="'+receipt+'"]').waitFor();
+  assert.match(await page.locator('[data-bill-id="'+receipt+'"]').innerText(),/Not sent/);
+  await page.locator('[data-bill-filter-status]').selectOption("reimbursed");
+  assert.equal(await page.locator('[data-bill-id="'+receipt+'"]').count(),0);
+  await page.locator('[data-bill-filter-status]').selectOption("draft");
+  assert.equal(await page.locator('[data-bill-id="'+receipt+'"]').count(),1);
   const calls=await page.evaluate(()=>window.calls);
-  assert.deepEqual(calls.map(x=>x.kind),["api","api","api","s3","api"]);
+  assert.deepEqual(calls.map(x=>x.kind),["api","api","api","api","s3","api","api"]);
   assert.equal(calls[0].url,api+"/v1/me");
   assert.equal(calls[1].url,api+"/v1/jobs");
-  assert.equal(calls[2].url,api+`/v1/jobs/${job}/receipts/uploads`);
-  assert.equal(calls[4].url,api+`/v1/jobs/${job}/receipts/${receipt}/confirm`);
-  assert.equal(calls[3].headers["content-length"],undefined);
+  assert.equal(calls[2].url,api+"/v1/bills");
+  assert.equal(calls[3].url,api+`/v1/jobs/${job}/receipts/uploads`);
+  assert.equal(calls[5].url,api+`/v1/jobs/${job}/receipts/${receipt}/confirm`);
+  assert.equal(calls[6].url,api+"/v1/bills");
+  assert.equal(calls[4].headers["content-length"],undefined);
   assert.equal(await page.evaluate(()=>localStorage.length),0);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);
   assert.deepEqual(failures,[]);
