@@ -56,7 +56,7 @@ try{
       }
       data={contractReceipts:{jobId:job,receipts:window.contractCashReceipts,
        receivedIncGst:window.contractCashReceipts.reduce((v,x)=>v+Number(x.receivedIncGst),0).toFixed(2),
-       legacyPaymentsPresent:false,profitReady:false,reconciled:false,
+       legacyPayments:[],legacyPaymentsPresent:false,profitReady:false,reconciled:false,
        note:"Cash ledger saved; final profit NOT READY."}};
      }
      else if(url===api+"/v1/jobs/"+job+"/financials/forecast-inputs"){
@@ -222,6 +222,8 @@ try{
   await page.getByText("Contract payment recorded. Final profit still requires reconciliation.").waitFor();
   assert.equal(await page.evaluate(()=>window.contractCashReceipts.length),1);
   assert.match(await page.locator("[data-workspace-root] [data-page-body] [data-contract-receipt-summary]").innerText(),/250\.00/);
+  await page.locator("[data-workspace-root] [data-page-body] [data-legacy-payment-review]").evaluate(el=>el.open=true);
+  await page.getByText("No old progress-claim payments found.").waitFor();
   assert.match(await page.locator("[data-workspace-root] [data-page-body] [data-financial-summary]").innerText(),/NOT READY/);
   await page.locator("[data-workspace-root] [data-page-body] [data-edit-contract]").click();
   await page.locator("[data-workspace-root] [data-page-body] [data-contract-form] input[name=contract]").fill("12000");

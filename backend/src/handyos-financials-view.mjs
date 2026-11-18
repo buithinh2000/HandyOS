@@ -53,6 +53,11 @@ export async function mountJobFinancials({root,api,jobId}={}){
  <div class="financials-grid" data-contract-receipt-summary></div>
  <p data-contract-receipt-status role="status">Loading contract payments…</p>
  <div data-contract-receipt-list></div>
+ <details data-legacy-payment-review>
+  <summary>Review older progress-claim payments</summary>
+  <p>Read-only evidence. Previous payment GST basis has not been verified, so these amounts are NOT added to the new cash total. If records exist, new payment entry remains locked.</p>
+  <div data-legacy-payment-list></div>
+ </details>
  <button type="button" data-contract-receipt-toggle>Add received payment</button>
  <form data-contract-receipt-form hidden>
   <label>Money received on<input name="receivedOn" type="date" required></label>
@@ -88,6 +93,7 @@ export async function mountJobFinancials({root,api,jobId}={}){
   receiptSummary=panel.querySelector("[data-contract-receipt-summary]"),
   receiptStatus=panel.querySelector("[data-contract-receipt-status]"),
   receiptList=panel.querySelector("[data-contract-receipt-list]"),
+  legacyList=panel.querySelector("[data-legacy-payment-list]"),
   receiptForm=panel.querySelector("[data-contract-receipt-form]"),
   receiptToggle=panel.querySelector("[data-contract-receipt-toggle]");
  for(const [value,label] of KINDS){const option=document.createElement("option");option.value=value;option.textContent=label;expense.elements.kind.append(option)}
@@ -99,9 +105,10 @@ export async function mountJobFinancials({root,api,jobId}={}){
   try{
    const response=await api.request({path:"/v1/jobs/"+jobId+"/financials/contract-receipts"});
    const r=response?.contractReceipts;
-   if(!r||r.jobId!==jobId||!Array.isArray(r.receipts)||typeof r.legacyPaymentsPresent!=="boolean")throw Error("Invalid payment register");
+   if(!r||r.jobId!==jobId||!Array.isArray(r.receipts)||!Array.isArray(r.legacyPayments)||
+      typeof r.legacyPaymentsPresent!=="boolean")throw Error("Invalid payment register");
    if(disposed)return;
-   receiptSummary.replaceChildren();receiptList.replaceChildren();
+   receiptSummary.replaceChildren();receiptList.replaceChildren();legacyList.replaceChildren();
    field(receiptSummary,"Recorded contract cash received (INC GST)",money(r.receivedIncGst));
    field(receiptSummary,"Final profit","NOT READY — payment reconciliation required");
    receiptStatus.textContent=r.note;
@@ -113,6 +120,20 @@ export async function mountJobFinancials({root,api,jobId}={}){
     receiptList.append(line);
    }
    if(r.legacyPaymentsPresent)receiptForm.hidden=true;
+   if(r.legacyPayments.length!==0){
+    const note=document.createElement("p");
+    note.textContent=r.legacyPayments.length+" earlier payments need manual verification before any new cash entries.";
+    legacyList.append(note);
+   }else{
+    const note=document.createElement("p");note.textContent="No old progress-claim payments found.";
+    legacyList.append(note);
+   }
+   for(const old of r.legacyPayments){
+    const line=document.createElement("p");
+    line.textContent=old.paidOn+" · Claim "+old.claimReference+
+     " · recorded "+money(old.enteredAmount)+" (GST basis unverified; not added)";
+    legacyList.append(line);
+   }
   }catch{if(!disposed)receiptStatus.textContent="Contract payment ledger unavailable. No payment changes made."}
  }
  async function refreshForecast(){
