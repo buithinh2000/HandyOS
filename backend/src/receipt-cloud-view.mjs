@@ -30,6 +30,24 @@ export function isSafeReceiptView(value,jobId,billId){
    Number.isInteger(expires)&&expires>0&&expires<=180;
  }catch{return false}
 }
+// Text-only customer message: deliberately excludes tokens, private receipt URLs and personal data.
+// The Owner must attach the receipt and manually send through their chosen app.
+export function customerBillMessage(b){
+ if(!b||typeof b.jobName!=="string"||typeof b.storeReference!=="string"||
+    typeof b.boughtOn!=="string")throw Error("Invalid bill message");
+ const safe=s=>s.replace(/[\\r\\n\\t]+/g," ").trim().slice(0,160);
+ const money=v=>{
+  const n=Number(v);
+  if(!Number.isFinite(n)||n<0||n>1000000000)throw Error("Invalid bill amount");
+  return n.toFixed(2);
+ };
+ const gross=money(b.amountGross),remaining=money(b.remaining??b.amountGross);
+ return "Hi, regarding "+safe(b.jobName)+": I paid for materials from "+
+  safe(b.storeReference)+" on "+safe(b.boughtOn)+".\n"+
+  "Bill total: AUD $"+gross+".\n"+
+  "Outstanding reimbursement: AUD $"+remaining+".\n"+
+  "Please reimburse the outstanding amount. I will attach the original receipt separately. Thank you.";
+}
 export function mountCloudBills({root,controller,jobs=[],listBills,updateBill,viewReceipt}={}){
  if(!root||typeof root.replaceChildren!=="function"||
   typeof controller?.save!=="function"||!Array.isArray(jobs))
@@ -146,6 +164,23 @@ export function mountCloudBills({root,controller,jobs=[],listBills,updateBill,vi
      }finally{preview.disabled=false}
     });
     card.append(preview);
+   }
+   if(b.status!=="reimbursed"){
+    const copy=document.createElement("button");copy.type="button";
+    copy.textContent="Copy customer message";
+    copy.dataset.billCopy=b.id;
+    copy.addEventListener("click",async()=>{
+     if(copy.disabled)return;
+     copy.disabled=true;
+     try{
+      if(typeof navigator.clipboard?.writeText!=="function")throw Error("Clipboard unavailable");
+      await navigator.clipboard.writeText(customerBillMessage(b));
+      queueStatus.textContent="Bill message copied. Attach the receipt and send it yourself; status is unchanged.";
+     }catch{
+      queueStatus.textContent="Clipboard unavailable. No bill status changed.";
+     }finally{copy.disabled=false}
+    });
+    card.append(copy);
    }
    if(typeof updateBill==="function"&&b.status!=="reimbursed"){
     const action=document.createElement("button");action.type="button";
