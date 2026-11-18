@@ -165,8 +165,10 @@ export async function dispatchDailyCrew({method,path,query,ctx,db,readBody,now=(
    breakMinutes:breaks,paidDayPortion:portion,notes:d.notes.trim()};
   if(JSON.stringify(before)===JSON.stringify(after))throw new HttpError(400,"No changes to save");
   const saved=await db.query(`update attendance_entries set started_at=$3,finished_at=$4,
-    break_minutes=$5,paid_day_portion=$6,notes=$7,updated_at=clock_timestamp()
-    where tenant_id=$1 and id=$2 and updated_at=$8
+    break_minutes=$5,paid_day_portion=$6,notes=$7,
+    updated_at=greatest(date_trunc('milliseconds',clock_timestamp()),
+      date_trunc('milliseconds',updated_at)+interval '1 millisecond')
+    where tenant_id=$1 and id=$2 and date_trunc('milliseconds',updated_at)=$8::timestamptz
     returning id,job_id,staff_id,work_date,started_at,finished_at,break_minutes,paid_day_portion,notes,updated_at`,
    [tenant,id,after.startedAt,after.finishedAt,breaks,portion,after.notes,old.updated_at]);
   if(saved.rowCount!==1)throw new HttpError(409,"Attendance changed; refresh before editing");
