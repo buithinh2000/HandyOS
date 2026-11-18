@@ -48,6 +48,7 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f backend/migrations/008_attendance_corrections.sql
           psql -X -v ON_ERROR_STOP=1 -f backend/migrations/009_material_reimbursement_events.sql
           psql -X -v ON_ERROR_STOP=1 -f backend/migrations/010_job_forecast_inputs.sql
+          psql -X -v ON_ERROR_STOP=1 -f backend/migrations/011_job_contract_receipts.sql
       - name: Verify tenant isolation and job/task insert
         run: psql -X -v ON_ERROR_STOP=1 -f backend/test/postgres-smoke.sql
       - name: Verify owner-only payroll, receipts and tenant RLS
