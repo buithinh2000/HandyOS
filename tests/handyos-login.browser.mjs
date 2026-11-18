@@ -45,6 +45,20 @@ try{
       const created={id:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",name:body.name,code:body.code,stage:"survey"};
       window.jobs.unshift(created);data={job:created,categories:0,tasks_created:0};
      }
+     else if(url===api+"/v1/jobs/"+job+"/financials/contract-receipts"){
+      window.contractCashReceipts??=[];
+      if(opts.method==="POST"){
+       const x=JSON.parse(opts.body),gross=x.basis==="ex_gst"?Math.round(x.amount*110)/100:x.amount;
+       window.contractCashReceipts.push({
+        id:"cccccccc-cccc-4ccc-8ccc-cccccccccccc",receivedOn:x.receivedOn,
+        reference:x.reference,basis:x.basis,receivedIncGst:gross.toFixed(2)
+       });
+      }
+      data={contractReceipts:{jobId:job,receipts:window.contractCashReceipts,
+       receivedIncGst:window.contractCashReceipts.reduce((v,x)=>v+Number(x.receivedIncGst),0).toFixed(2),
+       legacyPaymentsPresent:false,profitReady:false,reconciled:false,
+       note:"Cash ledger saved; final profit NOT READY."}};
+     }
      else if(url===api+"/v1/jobs/"+job+"/financials/forecast-inputs"){
       if(opts.method==="POST"){
        const incoming=JSON.parse(opts.body);
@@ -199,6 +213,16 @@ try{
   assert.equal(await page.evaluate(()=>window.forecastData.approvedVariationInc),"880.00");
   assert.match(await page.locator("[data-workspace-root] [data-page-body] [data-financial-summary]").innerText(),/NOT READY/,
    "Confirming assumptions must not claim a ready final forecast");
+  await page.locator("[data-workspace-root] [data-page-body] [data-contract-receipt-toggle]").click();
+  await page.locator("[data-workspace-root] [data-page-body] [data-contract-receipt-form] [name=receivedOn]").fill("2026-11-18");
+  await page.locator("[data-workspace-root] [data-page-body] [data-contract-receipt-form] [name=basis]").selectOption("no_gst");
+  await page.locator("[data-workspace-root] [data-page-body] [data-contract-receipt-form] [name=amount]").fill("250");
+  await page.locator("[data-workspace-root] [data-page-body] [data-contract-receipt-form] [name=reference]").fill("Bank payment 1234");
+  await page.locator("[data-workspace-root] [data-page-body] [data-contract-receipt-form] button[type=submit]").click();
+  await page.getByText("Contract payment recorded. Final profit still requires reconciliation.").waitFor();
+  assert.equal(await page.evaluate(()=>window.contractCashReceipts.length),1);
+  assert.match(await page.locator("[data-workspace-root] [data-page-body] [data-contract-receipt-summary]").innerText(),/250\.00/);
+  assert.match(await page.locator("[data-workspace-root] [data-page-body] [data-financial-summary]").innerText(),/NOT READY/);
   await page.locator("[data-workspace-root] [data-page-body] [data-edit-contract]").click();
   await page.locator("[data-workspace-root] [data-page-body] [data-contract-form] input[name=contract]").fill("12000");
   await page.locator("[data-workspace-root] [data-page-body] [data-contract-form] input[name=reserve]").fill("17.5");
