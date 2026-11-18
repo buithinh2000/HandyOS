@@ -48,6 +48,23 @@ export async function mountJobFinancials({root,api,jobId}={}){
   <p>Use 0 only when you have actually confirmed there is no variation, remaining cost or overhead. This form never records customer cash payments.</p>
   <button type="submit">Save confirmed forecast inputs</button>
  </form>
+ <h3>Customer contract payments</h3>
+ <p>Record money actually received for the job. This is not the separate customer material reimbursement ledger. Existing progress-claim payments must be reconciled first.</p>
+ <div class="financials-grid" data-contract-receipt-summary></div>
+ <p data-contract-receipt-status role="status">Loading contract payments…</p>
+ <div data-contract-receipt-list></div>
+ <button type="button" data-contract-receipt-toggle>Add received payment</button>
+ <form data-contract-receipt-form hidden>
+  <label>Money received on<input name="receivedOn" type="date" required></label>
+  <label>Amount basis<select name="basis" required>
+   <option value="inc_gst">Amount includes GST</option>
+   <option value="ex_gst">Amount excludes GST (GST added for cash total)</option>
+   <option value="no_gst">No GST</option>
+  </select></label>
+  <label>Amount (AUD)<input name="amount" type="number" min="0.01" step="0.01" required></label>
+  <label>Bank or payment reference<input name="reference" maxlength="250" minlength="3" required></label>
+  <button type="submit">Record actual received payment</button>
+ </form>
  <h3>Company expenses</h3>
  <div class="financials-grid" data-expense-summary></div>
  <button type="button" data-add-cost>Add company expense</button>
@@ -67,11 +84,37 @@ export async function mountJobFinancials({root,api,jobId}={}){
   reimbursements=panel.querySelector("[data-reimbursements]"),warning=panel.querySelector("[data-financial-warning]"),
   status=panel.querySelector("[data-financial-status]"),contract=panel.querySelector("[data-contract-form]"),
   expense=panel.querySelector("[data-expense-form]"),forecast=panel.querySelector("[data-forecast-form]"),
-  forecastReadiness=panel.querySelector("[data-forecast-readiness]");
+  forecastReadiness=panel.querySelector("[data-forecast-readiness]"),
+  receiptSummary=panel.querySelector("[data-contract-receipt-summary]"),
+  receiptStatus=panel.querySelector("[data-contract-receipt-status]"),
+  receiptList=panel.querySelector("[data-contract-receipt-list]"),
+  receiptForm=panel.querySelector("[data-contract-receipt-form]"),
+  receiptToggle=panel.querySelector("[data-contract-receipt-toggle]");
  for(const [value,label] of KINDS){const option=document.createElement("option");option.value=value;option.textContent=label;expense.elements.kind.append(option)}
  expense.elements.date.value=localDate();
- let disposed=false,busy=false,forecastVersion=null;
+ receiptForm.elements.receivedOn.value=localDate();
+ let disposed=false,busy=false,forecastVersion=null,pendingReceiptId=null;
  const say=v=>{if(!disposed)status.textContent=v};
+ async function refreshContractReceipts(){
+  try{
+   const response=await api.request({path:"/v1/jobs/"+jobId+"/financials/contract-receipts"});
+   const r=response?.contractReceipts;
+   if(!r||r.jobId!==jobId||!Array.isArray(r.receipts)||typeof r.legacyPaymentsPresent!=="boolean")throw Error("Invalid payment register");
+   if(disposed)return;
+   receiptSummary.replaceChildren();receiptList.replaceChildren();
+   field(receiptSummary,"Recorded contract cash received (INC GST)",money(r.receivedIncGst));
+   field(receiptSummary,"Final profit","NOT READY — payment reconciliation required");
+   receiptStatus.textContent=r.note;
+   receiptToggle.disabled=r.legacyPaymentsPresent;
+   for(const item of r.receipts){
+    const line=document.createElement("p");
+    line.textContent=item.receivedOn+" · "+item.reference+" · "+money(item.receivedIncGst)+
+     " received (basis: "+item.basis+")";
+    receiptList.append(line);
+   }
+   if(r.legacyPaymentsPresent)receiptForm.hidden=true;
+  }catch{if(!disposed)receiptStatus.textContent="Contract payment ledger unavailable. No payment changes made."}
+ }
  async function refreshForecast(){
   try{
    const r=(await api.request({path:"/v1/jobs/"+jobId+"/financials/forecast-inputs"}))?.forecastInputs;
@@ -111,6 +154,24 @@ export async function mountJobFinancials({root,api,jobId}={}){
   contract.elements.reserve.value=r.settings.reservePercent;
   say("Financials loaded from server.");
   await refreshForecast();
+  await refreshContractReceipts();
+ }
+ async function submitContractReceipt(event){
+  event.preventDefault();if(disposed||busy||!receiptForm.reportValidity())return;
+  const button=receiptForm.querySelector('[type="submit"]');
+  busy=true;button.disabled=true;say("Recording actual customer payment…");
+  try{
+   pendingReceiptId??=crypto.randomUUID();
+   const d=receiptForm.elements;
+   const response=await api.request({method:"POST",path:"/v1/jobs/"+jobId+"/financials/contract-receipts",
+    json:{requestId:pendingReceiptId,receivedOn:d.receivedOn.value,basis:d.basis.value,
+     amount:Number(d.amount.value),reference:d.reference.value.trim()}});
+   if(!response?.contractReceipts||response.contractReceipts.jobId!==jobId)throw Error("Payment save not confirmed");
+   pendingReceiptId=null;receiptForm.reset();receiptForm.elements.receivedOn.value=localDate();receiptForm.hidden=true;
+   await refreshContractReceipts();
+   say("Contract payment recorded. Final profit still requires reconciliation.");
+  }catch{say("Could not confirm payment. Check the payment register before retrying; no double entry assumed.")}
+  finally{busy=false;button.disabled=false}
  }
  async function submitForecast(event){
   event.preventDefault();if(disposed||busy||!forecast.reportValidity())return;
@@ -154,11 +215,14 @@ export async function mountJobFinancials({root,api,jobId}={}){
  }
  const edit=()=>{contract.hidden=!contract.hidden},add=()=>{expense.hidden=!expense.hidden};
  const toggleForecast=()=>{forecast.hidden=!forecast.hidden};
+ const toggleReceipt=()=>{if(!receiptToggle.disabled)receiptForm.hidden=!receiptForm.hidden};
  const onContract=e=>submit(e,"contract"),onExpense=e=>submit(e,"expense");
  panel.querySelector("[data-edit-contract]").addEventListener("click",edit);
  panel.querySelector("[data-add-cost]").addEventListener("click",add);
  panel.querySelector("[data-forecast-toggle]").addEventListener("click",toggleForecast);
  forecast.addEventListener("submit",submitForecast);
+ receiptToggle.addEventListener("click",toggleReceipt);
+ receiptForm.addEventListener("submit",submitContractReceipt);
  contract.addEventListener("submit",onContract);expense.addEventListener("submit",onExpense);
  try{await refresh()}catch{say("Financials are unavailable. Please retry when your company is connected.")}
  return Object.freeze({destroy(){disposed=true;root.replaceChildren()}});
