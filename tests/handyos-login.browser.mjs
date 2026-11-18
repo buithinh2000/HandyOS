@@ -39,6 +39,7 @@ try{
      else if(url===api+"/v1/companies")data={companies:[{tenant_id:tenant,role:"owner"}]};
      else if(url===api+"/v1/me")data={tenant_id:tenant,role:"owner"};
      else if(url===api+"/v1/jobs"&&opts.method==="GET")data={jobs:window.jobs};
+     else if(url===api+"/v1/bills"&&opts.method==="GET")data={bills:[],limit:200,hasMore:false};
      else if(url===api+"/v1/jobs"&&opts.method==="POST"){
       const body=JSON.parse(opts.body);
       const created={id:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",name:body.name,code:body.code,stage:"survey"};

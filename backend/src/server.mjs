@@ -10,6 +10,7 @@ import {createHandyOsReceiptRuntime} from "./receipt-runtime.mjs";
 import {dispatchDailyCrew} from "./daily-crew.mjs";
 import {dispatchWeeklyPayroll} from "./weekly-payroll.mjs";
 import {dispatchJobFinancials} from "./job-financials.mjs";
+import {listBillsQueue} from "./bills-queue.mjs";
 
 const { Pool } = pg;
 const renovationCatalog = JSON.parse(readFileSync(new URL("../../shared/renovation-catalog.json",import.meta.url),"utf8"));
@@ -94,6 +95,7 @@ async function dispatch(req,{receiptWorkflow=null}={}){
    return dispatchJobFinancials({method:req.method,path:url.pathname,
     ctx:{...ctx,actorSub:sub},db:client,readBody:()=>body(req)});
   }
+  if(req.method==="GET"&&url.pathname==="/v1/bills")return listBillsQueue({db:client,ctx});
   if(req.method==="GET"&&url.pathname==="/v1/me")return{tenant_id:ctx.tenant_id,role:ctx.role,actor_id:sub};
   if(req.method==="GET"&&url.pathname==="/v1/renovation-catalog")return renovationCatalog;
   if(req.method==="GET"&&url.pathname==="/v1/jobs"){

@@ -33,6 +33,6 @@ export async function mountAuthenticatedCloudBills({
  }
  let view;
  const controller=createCloudBillController({authApi,put,notify:event=>view?.setStatus(event.status)});
- view=mountCloudBills({root,controller,jobs});
+ view=mountCloudBills({root,controller,jobs,listBills:()=>authApi.request({path:"/v1/bills"})});
  return Object.freeze({destroy:()=>view.destroy(),get status(){return controller.status}});
 }
