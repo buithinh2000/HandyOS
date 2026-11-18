@@ -106,7 +106,7 @@ test("Financials only expose exact tenant-scoped job routes, not arbitrary cost 
  for(const args of [{method:"DELETE",path:base+"/expenses"},{method:"GET",path:base+"/expenses"},
   {method:"POST",path:base},{method:"DELETE",path:base+"/forecast-inputs"}])
   await assert.rejects(transport.request(args),/unavailable/);
- assert.equal(calls.length,3);
+ assert.equal(calls.length,5);
 });
 test("forbid external routes, mutations and token storage",async()=>{
  const {transport,calls}=setup();
