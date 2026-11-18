@@ -9,15 +9,25 @@ function element(root,selector){
  return result;
 }
 // Presigned GET links are sensitive bearer URLs, never customer links or durable metadata.
-export function isSafeReceiptView(value){
+export function isSafeReceiptView(value,jobId,billId){
  try{
-  if(typeof value!=="string"||value.length>4096)return false;
+  if(typeof value!=="string"||value.length>4096||!UUID.test(jobId)||!UUID.test(billId))return false;
   const url=new URL(value);
-  return url.protocol==="https:"&&!url.username&&!url.password&&!url.hash&&
-   /^handyos-[a-z0-9.-]{3,62}\\.s3\\.ap-southeast-1\\.amazonaws\\.com$/i.test(url.hostname)&&
-   url.pathname.startsWith("/tenants/")&&
-   url.searchParams.has("X-Amz-Signature")&&url.searchParams.has("X-Amz-Expires")&&
-   !url.searchParams.has("X-Amz-Credential")===false;
+  const suffix=".s3.ap-southeast-1.amazonaws.com";
+  if(url.protocol!=="https:"||url.port||url.username||url.password||url.hash||
+     !url.hostname.endsWith(suffix))return false;
+  const bucket=url.hostname.slice(0,-suffix.length);
+  if(!/^handyos-[a-z0-9.-]{3,62}$/.test(bucket))return false;
+  const segments=url.pathname.split("/");
+  if(segments.length!==8||segments[0]!==""||segments[1]!=="tenants"||!UUID.test(segments[2])||
+     segments[3]!=="jobs"||segments[4].toLowerCase()!==jobId.toLowerCase()||
+     segments[5]!=="receipts"||segments[6].toLowerCase()!==billId.toLowerCase()||
+     !/^[0-9a-f-]{36}\\.(jpg|png|webp|pdf)$/i.test(segments[7]))return false;
+  const expires=Number(url.searchParams.get("X-Amz-Expires"));
+  return url.searchParams.get("X-Amz-Algorithm")==="AWS4-HMAC-SHA256"&&
+   !!url.searchParams.get("X-Amz-Signature")&&
+   !!url.searchParams.get("X-Amz-Credential")&&
+   Number.isInteger(expires)&&expires>0&&expires<=180;
  }catch{return false}
 }
 export function mountCloudBills({root,controller,jobs=[],listBills,updateBill,viewReceipt}={}){
@@ -121,7 +131,7 @@ export function mountCloudBills({root,controller,jobs=[],listBills,updateBill,vi
      preview.disabled=true;queueStatus.textContent="Checking private receipt access…";
      try{
       const response=await viewReceipt({jobId:b.jobId,billId:b.id});
-      if(response?.id!==b.id||!isSafeReceiptView(response.viewUrl)||!Number.isInteger(response.expiresInSeconds)||
+      if(response?.id!==b.id||!isSafeReceiptView(response.viewUrl,b.jobId,b.id)||!Number.isInteger(response.expiresInSeconds)||
          response.expiresInSeconds<1||response.expiresInSeconds>900)
        throw Error("Unsafe or expired receipt preview");
       if(tab&&!tab.closed){
