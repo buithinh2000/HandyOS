@@ -45,6 +45,13 @@ try{
       const created={id:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",name:body.name,code:body.code,stage:"survey"};
       window.jobs.unshift(created);data={job:created,categories:0,tasks_created:0};
      }
+     else if(url===api+"/v1/jobs/"+job+"/financials/reconciliation"){
+      data={reconciliation:{jobId:job,profitReady:false,reconciled:false,
+       adjustedContractInc:"11000.00",newContractReceiptsInc:"250.00",
+       checks:[{key:"forecast_inputs",status:"recorded",label:"Owner forecast saved"},
+        {key:"contract_receipts",status:"unverified",label:"Bank confirmation still needed"},
+        {key:"variation_evidence",status:"unverified",label:"Approve variation evidence"}]}};
+     }
      else if(url===api+"/v1/jobs/"+job+"/financials/contract-receipts"){
       window.contractCashReceipts??=[];
       if(opts.method==="POST"){
@@ -197,6 +204,9 @@ try{
    "Task editor cannot be shown on Job Overview");
   assert.match(await page.locator("[data-workspace-root] [data-page-body] [data-job-summary]").innerText(),/survey/);
   await page.locator("[data-workspace-root] [data-page-body] [data-detail-financials]").click();
+  await page.locator("[data-workspace-root] [data-page-body] [data-reconciliation-review]").evaluate(el=>el.open=true);
+  await page.getByText(/Bank confirmation still needed/).waitFor();
+  assert.match(await page.locator("[data-workspace-root] [data-page-body] [data-reconciliation-checks]").innerText(),/UNVERIFIED/);
   await page.locator("[data-workspace-root] [data-page-body] [data-financial-summary] strong").first().waitFor();
   assert.match(await page.locator("[data-workspace-root] [data-page-body] [data-financial-summary]").innerText(),/10,000\.00/);
   assert.match(await page.locator("[data-workspace-root] [data-page-body] [data-financial-summary]").innerText(),/NOT READY/,

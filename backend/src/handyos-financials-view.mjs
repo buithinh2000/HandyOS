@@ -35,6 +35,11 @@ export async function mountJobFinancials({root,api,jobId}={}){
   <label>Combined tax & contingency reserve (%)<input name="reserve" type="number" min="0" max="100" step="0.01" required></label>
   <button type="submit">Save financial settings</button>
  </form>
+ <details data-reconciliation-review>
+  <summary>Financial reconciliation checks</summary>
+  <p>Review missing evidence before relying on any final profit number.</p>
+  <div data-reconciliation-checks></div>
+ </details>
  <h3>Approved forecast inputs</h3>
  <p>Complete these values separately from legacy EX-GST settings. Save does not activate final profit: customer payment reconciliation and audit evidence are still required.</p>
  <p data-forecast-readiness role="status">Checking saved assumptions…</p>
@@ -96,11 +101,28 @@ export async function mountJobFinancials({root,api,jobId}={}){
   legacyList=panel.querySelector("[data-legacy-payment-list]"),
   receiptForm=panel.querySelector("[data-contract-receipt-form]"),
   receiptToggle=panel.querySelector("[data-contract-receipt-toggle]");
+ const reconciliationChecks=panel.querySelector("[data-reconciliation-checks]");
  for(const [value,label] of KINDS){const option=document.createElement("option");option.value=value;option.textContent=label;expense.elements.kind.append(option)}
  expense.elements.date.value=localDate();
  receiptForm.elements.receivedOn.value=localDate();
  let disposed=false,busy=false,forecastVersion=null,pendingReceiptId=null;
  const say=v=>{if(!disposed)status.textContent=v};
+ async function refreshReconciliation(){
+  try{
+   const report=(await api.request({path:"/v1/jobs/"+jobId+"/financials/reconciliation"}))?.reconciliation;
+   if(!report||report.jobId!==jobId||report.profitReady!==false||!Array.isArray(report.checks))
+    throw Error("Invalid reconciliation report");
+   if(disposed)return;
+   reconciliationChecks.replaceChildren();
+   for(const entry of report.checks){
+    if(!["recorded","missing","blocked","clear","unverified"].includes(entry.status)||
+       typeof entry.label!=="string")throw Error("Invalid reconciliation entry");
+    const item=document.createElement("p");
+    item.textContent=entry.status.toUpperCase()+": "+entry.label;
+    reconciliationChecks.append(item);
+   }
+  }catch{if(!disposed)reconciliationChecks.textContent="Reconciliation evidence unavailable. Final profit NOT READY."}
+ }
  async function refreshContractReceipts(){
   try{
    const response=await api.request({path:"/v1/jobs/"+jobId+"/financials/contract-receipts"});
@@ -176,6 +198,7 @@ export async function mountJobFinancials({root,api,jobId}={}){
   say("Financials loaded from server.");
   await refreshForecast();
   await refreshContractReceipts();
+  await refreshReconciliation();
  }
  async function submitContractReceipt(event){
   event.preventDefault();if(disposed||busy||!receiptForm.reportValidity())return;
