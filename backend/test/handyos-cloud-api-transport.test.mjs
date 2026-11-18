@@ -99,14 +99,16 @@ test("Financials only expose exact tenant-scoped job routes, not arbitrary cost 
  await transport.request({method:"POST",path:base+"/expenses",json:{kind:"other",description:"Waste",amountExGst:50,gstAmount:5,incurredOn:"2026-11-18"}});
  await transport.request({path:base+"/forecast-inputs"});
  await transport.request({method:"POST",path:base+"/forecast-inputs",json:{contractInc:11000,approvedVariationInc:0,remainingCostsEx:500,unbookedOverheadEx:0,taxReservePercent:15,expectedUpdatedAt:null}});
- assert.equal(calls.length,5);
- for(const p of [base+"?company=other",base+"/other",base+"/expenses/1",base+"/forecast-inputs?tenant=other","/v1/jobs/bad/financials",
+ await transport.request({path:base+"/contract-receipts"});
+ await transport.request({method:"POST",path:base+"/contract-receipts",json:{requestId:"cccccccc-cccc-4ccc-8ccc-cccccccccccc",basis:"no_gst",amount:250,receivedOn:"2026-11-18",reference:"Bank paid"}});
+ assert.equal(calls.length,7);
+ for(const p of [base+"?company=other",base+"/other",base+"/expenses/1",base+"/forecast-inputs?tenant=other",base+"/contract-receipts?tenant=other","/v1/jobs/bad/financials",
   base.replace(id,"../../secrets")])
   await assert.rejects(transport.request({path:p}),/unavailable/);
  for(const args of [{method:"DELETE",path:base+"/expenses"},{method:"GET",path:base+"/expenses"},
-  {method:"POST",path:base},{method:"DELETE",path:base+"/forecast-inputs"}])
+  {method:"POST",path:base},{method:"DELETE",path:base+"/forecast-inputs"},{method:"PATCH",path:base+"/contract-receipts"}])
   await assert.rejects(transport.request(args),/unavailable/);
- assert.equal(calls.length,5);
+ assert.equal(calls.length,7);
 });
 test("forbid external routes, mutations and token storage",async()=>{
  const {transport,calls}=setup();
