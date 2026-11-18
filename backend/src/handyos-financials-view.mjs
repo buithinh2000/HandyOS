@@ -26,14 +26,27 @@ export async function mountJobFinancials({root,api,jobId}={}){
  @media(max-width:580px){.handyos-financials .financials-grid{grid-template-columns:1fr}}
  </style>
  <h3>Financials</h3>
- <p>All contract and company cost amounts are EX GST. Customer purchase reimbursements are shown separately.</p>
+ <p>Forecast uses the approved INC-GST contract and an Owner-set reserve. Historical EX-GST figures below are preliminary until reconciled. Customer purchases remain separate.</p>
  <div class="financials-grid" data-financial-summary></div>
  <p data-financial-warning></p>
- <button type="button" data-edit-contract>Edit contract & reserve</button>
+ <button type="button" data-edit-contract>Legacy EX-GST settings (preliminary)</button>
  <form data-contract-form hidden>
   <label>Contract value — EX GST (AUD)<input name="contract" type="number" min="0" step="0.01" required></label>
   <label>Combined tax & contingency reserve (%)<input name="reserve" type="number" min="0" max="100" step="0.01" required></label>
   <button type="submit">Save financial settings</button>
+ </form>
+ <h3>Approved forecast inputs</h3>
+ <p>Complete these values separately from legacy EX-GST settings. Save does not activate final profit: customer payment reconciliation and audit evidence are still required.</p>
+ <p data-forecast-readiness role="status">Checking saved assumptions…</p>
+ <button type="button" data-forecast-toggle>Edit forecast assumptions</button>
+ <form data-forecast-form hidden>
+  <label>Signed contract — INCLUDING GST (AUD)<input name="contractInc" type="number" min="0.01" step="0.01" required></label>
+  <label>Net approved variations — INCLUDING GST (AUD; negative allowed)<input name="variationInc" type="number" step="0.01" required></label>
+  <label>Remaining estimated costs — EX GST (AUD)<input name="remainingEx" type="number" min="0" step="0.01" required></label>
+  <label>Unbooked overhead — EX GST (AUD)<input name="overheadEx" type="number" min="0" step="0.01" required></label>
+  <label>Combined tax & reserve (%)<input name="reservePercent" type="number" min="0" max="100" step="0.01" required></label>
+  <p>Use 0 only when you have actually confirmed there is no variation, remaining cost or overhead. This form never records customer cash payments.</p>
+  <button type="submit">Save confirmed forecast inputs</button>
  </form>
  <h3>Company expenses</h3>
  <div class="financials-grid" data-expense-summary></div>
@@ -53,11 +66,29 @@ export async function mountJobFinancials({root,api,jobId}={}){
  const summary=panel.querySelector("[data-financial-summary]"),costs=panel.querySelector("[data-expense-summary]"),
   reimbursements=panel.querySelector("[data-reimbursements]"),warning=panel.querySelector("[data-financial-warning]"),
   status=panel.querySelector("[data-financial-status]"),contract=panel.querySelector("[data-contract-form]"),
-  expense=panel.querySelector("[data-expense-form]");
+  expense=panel.querySelector("[data-expense-form]"),forecast=panel.querySelector("[data-forecast-form]"),
+  forecastReadiness=panel.querySelector("[data-forecast-readiness]");
  for(const [value,label] of KINDS){const option=document.createElement("option");option.value=value;option.textContent=label;expense.elements.kind.append(option)}
  expense.elements.date.value=localDate();
- let disposed=false,busy=false;
+ let disposed=false,busy=false,forecastVersion=null;
  const say=v=>{if(!disposed)status.textContent=v};
+ async function refreshForecast(){
+  try{
+   const r=(await api.request({path:"/v1/jobs/"+jobId+"/financials/forecast-inputs"}))?.forecastInputs;
+   if(!r||r.jobId!==jobId||typeof r.recorded!=="boolean")throw Error("Missing forecast");
+   if(disposed)return;
+   forecastVersion=r.recorded?r.assumptions.updatedAt:null;
+   if(r.recorded){
+    const a=r.assumptions;
+    forecast.elements.contractInc.value=a.contractInc;
+    forecast.elements.variationInc.value=a.approvedVariationInc;
+    forecast.elements.remainingEx.value=a.remainingCostsEx;
+    forecast.elements.overheadEx.value=a.unbookedOverheadEx;
+    forecast.elements.reservePercent.value=a.taxReservePercent;
+   }else forecast.reset();
+   forecastReadiness.textContent=r.confirmed?"Owner forecast assumptions saved; final profit still NOT READY pending payment reconciliation.":"No confirmed forecast assumptions yet. Final profit NOT READY.";
+  }catch{if(!disposed)forecastReadiness.textContent="Forecast inputs unavailable. No changes made; final profit NOT READY."}
+ }
  async function refresh(){
   const result=await api.request({path:"/v1/jobs/"+jobId+"/financials"});
   const r=result?.financials;
@@ -79,6 +110,27 @@ export async function mountJobFinancials({root,api,jobId}={}){
   contract.elements.contract.value=r.settings.contractExGst;
   contract.elements.reserve.value=r.settings.reservePercent;
   say("Financials loaded from server.");
+  await refreshForecast();
+ }
+ async function submitForecast(event){
+  event.preventDefault();if(disposed||busy||!forecast.reportValidity())return;
+  const button=forecast.querySelector('[type="submit"]');busy=true;button.disabled=true;
+  say("Saving confirmed forecast assumptions…");
+  try{
+   const data=forecast.elements;
+   const response=await api.request({method:"POST",
+    path:"/v1/jobs/"+jobId+"/financials/forecast-inputs",
+    json:{contractInc:Number(data.contractInc.value),
+     approvedVariationInc:Number(data.variationInc.value),
+     remainingCostsEx:Number(data.remainingEx.value),
+     unbookedOverheadEx:Number(data.overheadEx.value),
+     taxReservePercent:Number(data.reservePercent.value),
+     expectedUpdatedAt:forecastVersion}});
+   if(!response?.forecastInputs?.confirmed||response.forecastInputs.jobId!==jobId)throw Error("Save not confirmed");
+   forecast.hidden=true;
+   await refreshForecast();say("Forecast assumptions saved. Final profit still awaits payment reconciliation.");
+  }catch{say("Could not save forecast assumptions. Review values and reload if another device updated this job.")}
+  finally{busy=false;button.disabled=false}
  }
  async function submit(event,kind){
   event.preventDefault();if(disposed||busy)return;
@@ -101,9 +153,12 @@ export async function mountJobFinancials({root,api,jobId}={}){
   finally{busy=false;button.disabled=false}
  }
  const edit=()=>{contract.hidden=!contract.hidden},add=()=>{expense.hidden=!expense.hidden};
+ const toggleForecast=()=>{forecast.hidden=!forecast.hidden};
  const onContract=e=>submit(e,"contract"),onExpense=e=>submit(e,"expense");
  panel.querySelector("[data-edit-contract]").addEventListener("click",edit);
  panel.querySelector("[data-add-cost]").addEventListener("click",add);
+ panel.querySelector("[data-forecast-toggle]").addEventListener("click",toggleForecast);
+ forecast.addEventListener("submit",submitForecast);
  contract.addEventListener("submit",onContract);expense.addEventListener("submit",onExpense);
  try{await refresh()}catch{say("Financials are unavailable. Please retry when your company is connected.")}
  return Object.freeze({destroy(){disposed=true;root.replaceChildren()}});
