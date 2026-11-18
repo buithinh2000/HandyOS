@@ -17,8 +17,8 @@ function melbourneWallParts(value){
  return [get("year"),get("month"),get("day")].join("-")+"T"+[get("hour"),get("minute")].join(":");
 }
 export function melbourneDateTimeISO(workDate,time){
- if(typeof workDate!=="string"||!/^\\d{4}-\\d{2}-\\d{2}$/.test(workDate)||
-    typeof time!=="string"||!/^\\d{2}:\\d{2}$/.test(time))throw Error("Invalid shift clock");
+ if(typeof workDate!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(workDate)||
+    typeof time!=="string"||!/^\d{2}:\d{2}$/.test(time))throw Error("Invalid shift clock");
  const [year,month,day]=workDate.split("-").map(Number),[hour,minute]=time.split(":").map(Number);
  if(month<1||month>12||hour>23||minute>59)throw Error("Invalid shift clock");
  const wall=Date.UTC(year,month-1,day,hour,minute);
