@@ -22,7 +22,19 @@ const templateByCode = new Map(renovationCatalog.categories.map(x=>[x.code,x]));
 const required = ["DATABASE_URL","COGNITO_USER_POOL_ID","COGNITO_APP_CLIENT_ID","AWS_REGION"];
 for (const key of required) if (!process.env[key]) throw new Error("Missing configuration: " + key);
 if (!/^postgres(ql)?:\/\//.test(process.env.DATABASE_URL)) throw Error("DATABASE_URL must be PostgreSQL");
-const pool = new Pool({ connectionString:process.env.DATABASE_URL, ssl: process.env.DB_CA_PEM ? {ca:process.env.DB_CA_PEM,rejectUnauthorized:true} : {rejectUnauthorized:true}, max:5, connectionTimeoutMillis:5000 });
+// Local-only profile is permitted exclusively for the internal single-host Docker
+// network. Postgres has NO host port; remote/production databases still require TLS.
+const dbUrl=new URL(process.env.DATABASE_URL);
+const localDb=process.env.HANDYOS_DB_MODE==="docker-private"&&
+ dbUrl.hostname==="db"&&dbUrl.port==="5432"&&
+ dbUrl.pathname==="/handyos"&&
+ dbUrl.username==="handyos_runtime"&&
+ process.env.DB_CA_PEM===undefined;
+if(process.env.HANDYOS_DB_MODE&& !localDb)
+ throw Error("HandyOS database mode must match isolated Docker service exactly");
+const pool = new Pool({connectionString:process.env.DATABASE_URL,
+ ssl: localDb?false:process.env.DB_CA_PEM?{ca:process.env.DB_CA_PEM,rejectUnauthorized:true}:{rejectUnauthorized:true},
+ max:5,connectionTimeoutMillis:5000});
 const verifier = CognitoJwtVerifier.create({userPoolId:process.env.COGNITO_USER_POOL_ID,clientId:process.env.COGNITO_APP_CLIENT_ID,tokenUse:"access"});
 const allowedOrigin = process.env.FRONTEND_ORIGIN || "https://handyos.buitai.com";
 
