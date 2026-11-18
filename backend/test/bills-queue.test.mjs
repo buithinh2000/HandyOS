@@ -8,7 +8,7 @@ test("owner can read only scoped material reimbursement metadata, never S3 keys"
  const calls=[],db={query:async(sql,args)=>{
   calls.push({sql,args});return{rows:[{id:bill,job_id:job,job_name:"Bathroom",
    bought_on:"2026-11-16",store_reference:"Bunnings",
-   amount_gross:"250.75",gst_basis:"inc",customer_status:"draft",
+   amount_gross:"250.75",amount_received:"50.25",gst_basis:"inc",customer_status:"sent",
    sent_on:null,reimbursed_on:null,created_at:"2026-11-16"}]};
  }};
  const result=await listBillsQueue({db,ctx:{role:"owner",tenant_id:tenant}});
@@ -18,7 +18,7 @@ test("owner can read only scoped material reimbursement metadata, never S3 keys"
  assert.equal(result.bills.length,1);
  assert.deepEqual(result.bills[0],{
   id:bill,jobId:job,jobName:"Bathroom",boughtOn:"2026-11-16",
-  storeReference:"Bunnings",amountGross:"250.75",gstBasis:"inc",status:"draft",
+  storeReference:"Bunnings",amountGross:"250.75",amountReceived:"50.25",remaining:"200.50",gstBasis:"inc",status:"sent",
   sentOn:null,reimbursedOn:null
  });
  assert.equal(JSON.stringify(result).includes("receipt_object_key"),false);
