@@ -33,6 +33,7 @@ function routeAllowed(method,path){
  if(method==="POST"&&(path==="/v1/staff"||path==="/v1/attendance/check-in"||path==="/v1/attendance/backfill"))return true;
  if(method==="POST"&&new RegExp("^/v1/attendance/"+UUID.source.slice(1,-1)+"/(?:check-out|correct)$","i").test(path))return true;
  if(method==="GET"&&(path==="/v1/me"||path==="/v1/jobs"||path==="/v1/bills"))return true;
+ if(method==="POST"&&new RegExp("^/v1/bills/"+UUID.source.slice(1,-1)+"/(?:mark-sent|payment)$","i").test(path))return true;
  const m=JOB_ROUTE.exec(path);
  if(!m)return false;
  return method==="POST"&&(m[2]==="uploads"||m[4]==="confirm")||
