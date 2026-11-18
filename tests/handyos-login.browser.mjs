@@ -45,6 +45,21 @@ try{
       const created={id:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",name:body.name,code:body.code,stage:"survey"};
       window.jobs.unshift(created);data={job:created,categories:0,tasks_created:0};
      }
+     else if(url===api+"/v1/jobs/"+job+"/financials/forecast-inputs"){
+      if(opts.method==="POST"){
+       const incoming=JSON.parse(opts.body);
+       if(window.forecastData&&incoming.expectedUpdatedAt!==window.forecastData.updatedAt)
+        throw Error("stale forecast");
+       const version=window.forecastData?"2026-11-18T04:00:00.000Z":"2026-11-18T03:00:00.000Z";
+       window.forecastData={contractInc:incoming.contractInc.toFixed(2),
+        approvedVariationInc:incoming.approvedVariationInc.toFixed(2),
+        remainingCostsEx:incoming.remainingCostsEx.toFixed(2),
+        unbookedOverheadEx:incoming.unbookedOverheadEx.toFixed(2),
+        taxReservePercent:incoming.taxReservePercent.toFixed(2),updatedAt:version};
+      }
+      data={forecastInputs:{jobId:job,recorded:!!window.forecastData,
+       confirmed:!!window.forecastData,assumptions:window.forecastData||null}};
+     }
      else if(url.startsWith(api+"/v1/jobs/"+job+"/financials")){
       if(opts.method==="POST"){
        const input=JSON.parse(opts.body);
@@ -173,6 +188,17 @@ try{
   assert.match(await page.locator("[data-workspace-root] [data-page-body] [data-financial-summary]").innerText(),/NOT READY/,
    "A partial profit projection cannot appear as a final forecast");
   assert.equal(await page.locator("[data-workspace-root] [data-page-body] [data-create-task]").isVisible(),false);
+  await page.locator("[data-workspace-root] [data-page-body] [data-forecast-toggle]").click();
+  for(const [name,value] of [["contractInc","11000"],["variationInc","880"],
+   ["remainingEx","500"],["overheadEx","200"],["reservePercent","15"]]){
+   await page.locator('[data-workspace-root] [data-page-body] [data-forecast-form] [name="'+name+'"]').fill(value);
+  }
+  await page.locator("[data-workspace-root] [data-page-body] [data-forecast-form] button").click();
+  await page.getByText("Forecast assumptions saved. Final profit still awaits payment reconciliation.").waitFor();
+  assert.equal(await page.evaluate(()=>window.forecastData.contractInc),"11000.00");
+  assert.equal(await page.evaluate(()=>window.forecastData.approvedVariationInc),"880.00");
+  assert.match(await page.locator("[data-workspace-root] [data-page-body] [data-financial-summary]").innerText(),/NOT READY/,
+   "Confirming assumptions must not claim a ready final forecast");
   await page.locator("[data-workspace-root] [data-page-body] [data-edit-contract]").click();
   await page.locator("[data-workspace-root] [data-page-body] [data-contract-form] input[name=contract]").fill("12000");
   await page.locator("[data-workspace-root] [data-page-body] [data-contract-form] input[name=reserve]").fill("17.5");
