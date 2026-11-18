@@ -97,12 +97,14 @@ test("Financials only expose exact tenant-scoped job routes, not arbitrary cost 
  await transport.request({path:base});
  await transport.request({method:"POST",path:base+"/settings",json:{contractExGst:1000,reservePercent:15}});
  await transport.request({method:"POST",path:base+"/expenses",json:{kind:"other",description:"Waste",amountExGst:50,gstAmount:5,incurredOn:"2026-11-18"}});
- assert.equal(calls.length,3);
- for(const p of [base+"?company=other",base+"/other",base+"/expenses/1","/v1/jobs/bad/financials",
+ await transport.request({path:base+"/forecast-inputs"});
+ await transport.request({method:"POST",path:base+"/forecast-inputs",json:{contractInc:11000,approvedVariationInc:0,remainingCostsEx:500,unbookedOverheadEx:0,taxReservePercent:15,expectedUpdatedAt:null}});
+ assert.equal(calls.length,5);
+ for(const p of [base+"?company=other",base+"/other",base+"/expenses/1",base+"/forecast-inputs?tenant=other","/v1/jobs/bad/financials",
   base.replace(id,"../../secrets")])
   await assert.rejects(transport.request({path:p}),/unavailable/);
  for(const args of [{method:"DELETE",path:base+"/expenses"},{method:"GET",path:base+"/expenses"},
-  {method:"POST",path:base}])
+  {method:"POST",path:base},{method:"DELETE",path:base+"/forecast-inputs"}])
   await assert.rejects(transport.request(args),/unavailable/);
  assert.equal(calls.length,3);
 });
