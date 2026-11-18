@@ -56,6 +56,8 @@ jobs:
         run: psql -X -v ON_ERROR_STOP=1 -f backend/test/weekly-payroll-rls-smoke.sql
       - name: Verify financial settings, cost RLS and customer pass-through
         run: psql -X -v ON_ERROR_STOP=1 -f backend/test/job-financials-rls-smoke.sql
+      - name: Verify explicit Owner financial forecast input RLS isolation
+        run: psql -X -v ON_ERROR_STOP=1 -f backend/test/job-forecast-inputs-rls-smoke.sql
       - name: Verify immutable attendance correction history and RLS isolation
         run: psql -X -v ON_ERROR_STOP=1 -f backend/test/attendance-corrections-rls-smoke.sql
       - name: Verify client-bill send/repayment immutable event RLS
