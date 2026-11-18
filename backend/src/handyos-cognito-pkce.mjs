@@ -16,7 +16,7 @@ export function validateHandyOsCognitoConfig({issuerOrigin,uiOrigin,clientId,red
  const issuer=origin(issuerOrigin),ui=origin(uiOrigin);
  // Dedicated app-specific Cognito domain; never a BuiTai Core / shared login.
  if(!/^handyos-[a-z0-9-]+\.auth\.ap-[a-z]+-\d\.amazoncognito\.com$/.test(issuer.hostname)||
-  ui.hostname!=="staging.handyos.buitai.com"||
+  !["staging.handyos.buitai.com","handyos.buitai.com"].includes(ui.hostname)||
   typeof clientId!=="string"||!/^[a-zA-Z0-9]{12,128}$/.test(clientId)||
   redirectPath!=="/auth/callback")fail();
  return Object.freeze({issuerOrigin:issuer.origin,uiOrigin:ui.origin,clientId,

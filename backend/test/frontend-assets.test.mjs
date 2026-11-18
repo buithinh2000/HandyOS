@@ -64,6 +64,40 @@ test("cloud UI refuses config if Cognito, API or frontend host not isolated",()=
   assert.ok(!result.body.toString().includes("postgresql"));
  }
 });
+test("production HTTPS login and CSP use only validated production API / dedicated Cognito",()=>{
+ const production={...env,HANDYOS_UI_ORIGIN:"https://handyos.buitai.com",
+  HANDYOS_API_ORIGIN:"https://api-handyos.buitai.com",
+  HANDYOS_COGNITO_DOMAIN:"https://handyos-production.auth.ap-southeast-1.amazoncognito.com"};
+ const runtime=publicHandyOsConfig(production);
+ assert.equal(runtime.uiOrigin,"https://handyos.buitai.com");
+ for(const path of ["/","/auth/callback"]){
+  const response=frontendRoute(path,"GET",production);
+  assert.equal(response.status,200);
+  const policy=response.headers["content-security-policy"];
+  assert.match(policy,/connect-src 'self' https:\/\/api-handyos\.buitai\.com /);
+  assert.ok(policy.includes(production.HANDYOS_COGNITO_DOMAIN));
+  assert.ok(!policy.includes("api-staging.handyos.buitai.com"));
+  assert.ok(!policy.includes("handyos-staging.auth"));
+ }
+ const stage=frontendRoute("/","GET",env).headers["content-security-policy"];
+ assert.ok(stage.includes(env.HANDYOS_API_ORIGIN));
+ assert.ok(stage.includes(env.HANDYOS_COGNITO_DOMAIN));
+ assert.ok(!stage.includes(production.HANDYOS_API_ORIGIN));
+});
+test("untrusted or incomplete runtime config never serves an active login shell",()=>{
+ const invalid=[{...env,HANDYOS_COGNITO_CLIENT_ID:""},
+  {...env,HANDYOS_API_ORIGIN:"https://api-buitai.buitai.com"},
+  {...env,HANDYOS_UI_ORIGIN:"https://evil.com"},
+  {...env,HANDYOS_COGNITO_DOMAIN:"https://buitai-core.auth.ap-southeast-1.amazoncognito.com"}];
+ for(const props of invalid){
+  for(const path of ["/","/auth/callback","/config.json"]){
+   const route=frontendRoute(path,"GET",props);
+   assert.equal(route.status,503,path);
+   assert.ok(!route.body.toString().includes(env.DATABASE_URL));
+   assert.ok(!route.body.toString().includes(env.AWS_SECRET_ACCESS_KEY));
+  }
+ }
+});
 test("HEAD returns same fixed bytes and cannot open API or secret routes",()=>{
  assert.equal(frontendRoute("/config.json","HEAD",env).status,200);
  assert.equal(frontendRoute("/v1/companies","HEAD",env),null);

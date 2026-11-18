@@ -28,6 +28,17 @@ test("reject foreign Cognito pools, UI origins, HTTP or wrong callback",()=>{
   {redirectPath:"/other"},{clientId:"weak"}])
   assert.throws(()=>validateHandyOsCognitoConfig({...config,...change}),/unavailable/);
 });
+test("same PKCE gate permits exact production hostname but not copied core domain",()=>{
+ const production={uiOrigin:"https://handyos.buitai.com",
+  issuerOrigin:"https://handyos-production.auth.ap-southeast-1.amazoncognito.com",
+  clientId:"handyosprodclient12345"};
+ const verified=validateHandyOsCognitoConfig(production);
+ assert.equal(verified.redirectUri,"https://handyos.buitai.com/auth/callback");
+ for(const badUi of ["https://admin.handyos.buitai.com",
+  "https://handyos.buitai.com.evil.net","https://handyos.buitai.com:8443"]){
+  assert.throws(()=>validateHandyOsCognitoConfig({...production,uiOrigin:badUi}),/unavailable/);
+ }
+});
 test("PKCE S256 authenticates state-bound code exactly once and access token stays in memory",async()=>{
  values.clear();const calls=[];const s=make(async(url,req)=>{
   calls.push({url,req});return {ok:true,status:200,json:async()=>({

@@ -46,13 +46,18 @@ export function frontendRoute(path,method,env={}){
  if(!asset)return null;
  let csp;
  if(path==="/"||path==="/auth/callback"){
-  // Staging blocks inline JavaScript, embeddings and form submission to other hosts.
-  // Inline CSS is necessary for current mobile components.
+  // Validate both origins as a matched HandyOS staging OR production pair,
+  // then construct CSP from that verified pair. Never allow other ventures.
+  let config;
+  try{config=publicHandyOsConfig(env)}catch{
+   return {status:503,headers:publicHeaders("text/plain; charset=utf-8"),
+    body:Buffer.from("HandyOS cloud not configured")};
+  }
+  // Inline CSS is necessary for the current mobile components.
   csp="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; "+
-   "img-src 'self' blob: data:; connect-src 'self' https://api-staging.handyos.buitai.com "+
-   "https://handyos-staging.auth.ap-southeast-1.amazoncognito.com "+
-   "https://*.s3.ap-southeast-1.amazonaws.com; form-action 'none'; base-uri 'none'; "+
-   "frame-ancestors 'none'; object-src 'none'";
+   "img-src 'self' blob: data:; connect-src 'self' "+config.apiOrigin+" "+
+   config.issuerOrigin+" https://*.s3.ap-southeast-1.amazonaws.com; "+
+   "form-action 'none'; base-uri 'none'; frame-ancestors 'none'; object-src 'none'";
  }
  return {status:200,headers:publicHeaders(asset.type,csp),
   body:readFileSync(new URL(asset.file,import.meta.url))};
