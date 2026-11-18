@@ -238,6 +238,8 @@ test("attendance correction changes one existing shift and writes immutable befo
  assert.equal(update.values[4],20);
  assert.equal(update.values[7],old.updated_at);
  assert.doesNotMatch(update.sql,/rate_snapshot|job_id\s*=/);
+ assert.match(update.sql,/date_trunc\(\x27milliseconds\x27,updated_at\)=\$8::timestamptz/);
+ assert.match(update.sql,/greatest\(date_trunc\(\x27milliseconds\x27,clock_timestamp\(\)\)/);
  const audit=calls.find(x=>x.sql.includes("insert into attendance_corrections"));
  assert.ok(audit);
  assert.equal(audit.values[0],tenant);
