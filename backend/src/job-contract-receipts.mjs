@@ -62,12 +62,25 @@ async function listReceipts(db,tenant,jobId){
  }));
  let total=0;for(const row of receipts)total+=storedCents(row.receivedIncGst);
  // Existing legacy progress-claim payments are NOT silently included or discarded.
- const legacy=await db.query(`select count(p.id)::integer as legacy_count from payments p
+ const legacy=await db.query(`select p.id,p.claim_id,p.paid_on,p.amount,
+    c.reference as claim_reference,c.amount_ex_gst as claim_ex_gst,
+    c.gst_amount as claim_gst,c.status as claim_status
+  from payments p
   join progress_claims c on c.id=p.claim_id and c.tenant_id=p.tenant_id
-  where p.tenant_id=$1 and c.job_id=$2`,[tenant,jobId]);
- const count=Number(legacy.rows[0]?.legacy_count);
- if(!Number.isSafeInteger(count)||count<0)throw new HttpError(503,"Invalid legacy payment count");
- return {jobId,receipts,receivedIncGst:money(total),legacyPaymentsPresent:count>0,
+  where p.tenant_id=$1 and c.job_id=$2
+  order by p.paid_on desc,p.id desc limit 501`,[tenant,jobId]);
+ if(legacy.rows.length>500)throw new HttpError(409,"Legacy payment register too large; manual reconciliation required");
+ const legacyPayments=legacy.rows.map(row=>({
+  id:row.id,claimId:row.claim_id,paidOn:String(row.paid_on instanceof Date?
+   row.paid_on.toISOString().slice(0,10):row.paid_on),
+  enteredAmount:money(storedCents(row.amount)),
+  claimReference:row.claim_reference,claimStatus:row.claim_status,
+  claimExGst:money(storedCents(row.claim_ex_gst)),
+  claimGst:money(storedCents(row.claim_gst)),
+  gstBasisVerified:false
+ }));
+ const count=legacyPayments.length;
+ return {jobId,receipts,receivedIncGst:money(total),legacyPayments,legacyPaymentsPresent:count>0,
   profitReady:false,reconciled:false,
   note:count>0?"Existing progress-claim payments need explicit reconciliation; do not double count.":
    "Cash ledger saved; contract and approved variations still require reconciliation before final profit."};
