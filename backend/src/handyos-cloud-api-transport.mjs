@@ -17,6 +17,7 @@ export function validateHandyOsApiOrigin({apiOrigin,uiOrigin}={}){
  return Object.freeze({apiOrigin:api.origin,uiOrigin:ui.origin});
 }
 function routeAllowed(method,path){
+ if(method==="GET"&&new RegExp("^/v1/jobs/"+UUID.source.slice(1,-1)+"/financials/reconciliation$","i").test(path))return true;
  if(new RegExp("^/v1/jobs/"+UUID.source.slice(1,-1)+"/financials/contract-receipts$","i").test(path))
   return method==="GET"||method==="POST";
  if(new RegExp("^/v1/jobs/"+UUID.source.slice(1,-1)+"/financials/forecast-inputs$","i").test(path))
