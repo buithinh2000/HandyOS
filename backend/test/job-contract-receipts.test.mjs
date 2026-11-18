@@ -53,6 +53,11 @@ test("reading saved payments shows actual gross received and warns if legacy cla
  const sql=s.calls.find(x=>x.sql.includes("count(p.id)"));
  assert.deepEqual(sql.args,[tenant,job]);
 });
+test("existing legacy progress-claim payment blocks new cash capture, protecting against double count",async()=>{
+ const s=mock({legacy:2});
+ await assert.rejects(s.run("POST",payload),e=>e.status===409&&/Legacy claim payments/.test(e.message));
+ assert.ok(!s.calls.some(x=>x.sql.includes("insert into job_contract_receipts")));
+});
 test("replay with same UUID and exact recorded content is idempotent",async()=>{
  const previous={job_id:job,received_on:"2026-11-18",input_basis:"inc_gst",
   entered_amount:"1100.00",received_inc_gst:"1100.00",gst_component:"100.00",
