@@ -5,6 +5,36 @@ function localDay(){
  const d=new Date();
  return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");
 }
+// Explicit Melbourne wall-clock conversion; browser/phone timezone must never change payroll hours.
+// Reject DST spring gaps and duplicated fall-back times rather than silently guessing an instant.
+const WORK_TZ="Australia/Melbourne";
+const clockParts=new Intl.DateTimeFormat("en-GB",{
+ timeZone:WORK_TZ,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"
+});
+function melbourneWallParts(value){
+ const parts=clockParts.formatToParts(value);
+ const get=kind=>parts.find(part=>part.type===kind)?.value;
+ return [get("year"),get("month"),get("day")].join("-")+"T"+[get("hour"),get("minute")].join(":");
+}
+export function melbourneDateTimeISO(workDate,time){
+ if(typeof workDate!=="string"||!/^\\d{4}-\\d{2}-\\d{2}$/.test(workDate)||
+    typeof time!=="string"||!/^\\d{2}:\\d{2}$/.test(time))throw Error("Invalid shift clock");
+ const [year,month,day]=workDate.split("-").map(Number),[hour,minute]=time.split(":").map(Number);
+ if(month<1||month>12||hour>23||minute>59)throw Error("Invalid shift clock");
+ const wall=Date.UTC(year,month-1,day,hour,minute);
+ if(!Number.isFinite(wall)||new Date(wall).toISOString().slice(0,10)!==workDate)
+  throw Error("Invalid work date");
+ const desired=workDate+"T"+time;
+ const matches=[600,660].map(offset=>new Date(wall-offset*60000))
+  .filter(candidate=>melbourneWallParts(candidate)===desired);
+ if(matches.length!==1)throw Error("This local time is ambiguous or does not exist in Melbourne due to daylight saving. Choose a different time.");
+ return matches[0].toISOString();
+}
+function melbourneClock(value){
+ const parts=clockParts.formatToParts(new Date(value));
+ const get=kind=>parts.find(part=>part.type===kind)?.value;
+ return get("hour")+":"+get("minute");
+}
 function option(parent,label,value){
  const el=document.createElement("option");el.value=value;el.textContent=label;parent.append(el);
 }
@@ -239,7 +269,7 @@ export async function mountHandyOsToday({root,api}={}){
       <label>Notes<input name="notes" maxlength="500"></label>
       <label>Reason for change<input name="reason" maxlength="500" minlength="3" required placeholder="e.g. Actual hours corrected"></label>
       <button type="submit">Save corrected shift</button>`;
-     const time=v=>new Date(v).toTimeString().slice(0,5);
+     const time=v=>melbourneClock(v);
      form.elements.start.value=time(item.started_at);
      if(item.finished_at)form.elements.finish.value=time(item.finished_at);
      form.elements.break.value=String(item.break_minutes??0);
@@ -266,7 +296,7 @@ export async function mountHandyOsToday({root,api}={}){
          expectedUpdatedAt:item.updated_at}});
        await refresh();await loadMonth({force:true});
        say("Shift corrected and saved with audit history.");
-      }catch{say("Correction not saved. It may be an unchanged shift, stale version or closed payroll week. Refresh and review.")}
+      }catch(err){say(err?.message?.includes("daylight saving")?err.message:"Correction not saved. It may be an unchanged shift, stale version or closed payroll week. Refresh and review.")}
       finally{busy=false;submit.disabled=false}
      });
      card.append(edit,form);
@@ -302,9 +332,7 @@ export async function mountHandyOsToday({root,api}={}){
  }
  function dateTimeISO(workDate,time){
   if(!/^\d{2}:\d{2}$/.test(time))throw Error("Invalid shift time");
-  const dt=new Date(workDate+"T"+time+":00");
-  if(Number.isNaN(dt.getTime()))throw Error("Invalid shift time");
-  return dt.toISOString();
+  return melbourneDateTimeISO(workDate,time);
  }
  async function saveBackfill(event){
   event.preventDefault();
@@ -323,7 +351,7 @@ export async function mountHandyOsToday({root,api}={}){
     notes:container.querySelector("[data-backfill-notes]").value
    }});
    await refresh();await loadMonth({force:true});say("Past attendance saved on server. Check employee payroll for this week.");
-  }catch{say("Could not save missed workday. Check for an existing day or a closed payroll week.")}
+  }catch(err){say(err?.message?.includes("daylight saving")?err.message:"Could not save missed workday. Check for an existing day or a closed payroll week.")}
   finally{busy=false;button.disabled=false}
  }
  inForm.addEventListener("submit",saveCheckIn);
