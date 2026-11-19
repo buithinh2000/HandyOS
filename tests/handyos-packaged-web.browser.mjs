@@ -32,7 +32,7 @@ try{
     assert.match(await page.locator("h1").innerText(),/HandyOS/);
     assert.equal(await page.locator("[data-bills]").isVisible(),false);
    }else{
-    await page.getByText(/cloud is not activated/i).waitFor();
+    await page.getByText(/HandyOS cloud not configured/i).waitFor();
     assert.equal(await page.locator("[data-login]").count(),0);
     assert.equal(await page.locator("[data-bills]").count(),0);
    }

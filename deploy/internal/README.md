@@ -11,6 +11,24 @@
 - Postgres admin password is an on-host Docker secret, application password is a **different** limited runtime role. Store runtime env outside Git; `deploy/internal/private/` and backups are .gitignored.
 - **Not high availability.** Single host crash causes downtime; encrypted off-host backups and a successful restore rehearsal are a mandatory GO-LIVE gate. No assumption that a VM snapshot by itself protects app data.
 
+## Read-only Lightsail plan selection (no AWS provisioning)
+
+From a checked-out HandyOS repository inside AWS CloudShell, the following script
+runs only `sts:GetCallerIdentity`, `lightsail:GetBundles`, `lightsail:GetBlueprints`,
+`lightsail:GetInstances` and `lightsail:GetStaticIps`:
+
+```bash
+git pull --ff-only
+node cloud/lightsail-readonly-preflight.mjs
+```
+
+The response selects active Linux 2GB Lightsail offers, including the **actual AWS
+bundle ID and AWS-returned monthly price**. Do not guess the bundle ID or
+provision from a hard-coded example. It also checks the proposed dedicated name
+`handyos-internal-01` and redacts other venture identifiers. `INVENTORY_ONLY`
+does **not** verify whether a Lightsail bundle is permitted by quotas, nor
+authorise spend or a create-instances call. On `BLOCKED`, stop.
+
 ## One-time preparation — only after approved server exists
 
 Install Docker Engine + Compose on a dedicated Ubuntu Lightsail VM. Harden SSH to a nominated operator source IP, configure automatic OS security updates, restrict firewall to required HTTPS/DNS validation and SSH, and verify exact HandyOS-only DNS and host OS isolation. Do **not** install on another venture's EC2/Lightsail. On that host clone the verified release SHA (not an unreviewed floating branch), then:
