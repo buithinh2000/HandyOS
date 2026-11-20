@@ -109,3 +109,30 @@ test("deny nonmanager, malformed week and unknown paths before SQL",async()=>{
  await assert.rejects(dispatchWeeklyPayroll({method:"GET",path:"/v1/payroll/random",ctx,db:s.db}),e=>e.status===404);
  assert.equal(s.sql.length,0);
 });
+
+test("multiple named entries can coexist in same payroll week with distinct periods",async()=>{
+ const s=sample();
+ await s.call("POST","/bonus",{jobId:job,kind:"bonus",amount:20,label:"Attendance",period:"day",effectiveOn:"2026-11-17"});
+ await s.call("POST","/bonus",{jobId:job,kind:"allowance",amount:100,label:"Travel",period:"week"});
+ await s.call("POST","/bonus",{jobId:job,kind:"bonus",amount:300,label:"Monthly performance",period:"month",effectiveOn:"2026-11-01"});
+ const inserts=s.sql.filter(x=>x.query.includes("insert into weekly_wage_adjustments"));
+ assert.equal(inserts.length,3);
+ assert.deepEqual(inserts.map(x=>x.values.slice(8,11)),[
+  ["Attendance","day","2026-11-17"],
+  ["Travel","week",null],
+  ["Monthly performance","month","2026-11-01"]
+ ]);
+});
+test("bonus day cannot escape payroll week and malformed month is blocked without writes",async()=>{
+ for(const body of [
+  {jobId:job,kind:"bonus",amount:10,label:"Wrong day",period:"day",effectiveOn:"2026-11-23"},
+  {jobId:job,kind:"bonus",amount:10,label:"Wrong month",period:"month",effectiveOn:"2026-10-01"},
+  {jobId:job,kind:"bonus",amount:10,label:"Not first",period:"month",effectiveOn:"2026-11-14"},
+  {jobId:job,kind:"bonus",amount:10,label:"",period:"repeat"},
+  {jobId:job,kind:"bonus",amount:10,label:"Travel",period:"week",effectiveOn:"2026-11-17"}
+ ]){
+  const mock=sample();
+  await assert.rejects(mock.call("POST","/bonus",body),e=>e.status===400);
+  assert.equal(mock.sql.some(x=>x.query.includes("insert into weekly_wage_adjustments")),false);
+ }
+});
