@@ -10,6 +10,13 @@ function week(v){
   throw new HttpError(400,"Payroll week must start Monday");
  return v;
 }
+function isoDate(v){
+ if(typeof v!=="string"||!DATE.test(v))throw new HttpError(400,"Invalid bonus date");
+ const d=new Date(v+"T00:00:00Z");
+ if(Number.isNaN(d.getTime())||d.toISOString().slice(0,10)!==v)throw new HttpError(400,"Invalid bonus date");
+ return v;
+}
+function addUtcDays(iso,n){const d=new Date(iso+"T00:00:00Z");d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
 function amount(v){
  if(typeof v!=="number"||!Number.isFinite(v)||v<=0||v>1000000||
   Math.abs(Math.round(v*100)-v*100)>0.000001)
@@ -48,7 +55,7 @@ export async function readPayrollWeek(db,tenant,staffId,weekBegin){
   from attendance_entries a join jobs j on j.tenant_id=a.tenant_id and j.id=a.job_id
   where a.tenant_id=$1 and a.staff_id=$2 and a.work_date >= $3::date
     and a.work_date < $3::date+7 order by a.work_date,a.id`,[tenant,staffId,weekBegin]);
- const adjustments=await db.query("select id,job_id,kind,amount,notes from weekly_wage_adjustments where tenant_id=$1 and staff_id=$2 and week_begin=$3 order by created_at,id",[tenant,staffId,weekBegin]);
+ const adjustments=await db.query("select id,job_id,kind,label,period,effective_on,amount,notes from weekly_wage_adjustments where tenant_id=$1 and staff_id=$2 and week_begin=$3 order by created_at,id",[tenant,staffId,weekBegin]);
  const payments=await db.query("select id,job_id,paid_on,amount,reference from staff_wage_payments where tenant_id=$1 and staff_id=$2 and week_begin=$3 order by paid_on,id",[tenant,staffId,weekBegin]);
  const entries=attendance.rows.map(a=>({...a,wage:a.wage===null?null:money(cents(a.wage))}));
  const earned=entries.reduce((sum,a)=>sum+(a.wage===null?0:cents(a.wage)),0);
@@ -83,7 +90,7 @@ export async function dispatchWeeklyPayroll({method,path,query,ctx,db,readBody})
  const staffId=ensureUuid(m[1]),weekBegin=week(m[2]),action=m[3];
  if(method==="GET"&&!action)return {payroll:await readPayrollWeek(db,tenant,staffId,weekBegin)};
  if(method!=="POST"||!action)throw new HttpError(404,"Payroll endpoint not found");
- const data=exactBody(await readBody(),action==="bonus"?["jobId","kind","amount","notes"]:
+ const data=exactBody(await readBody(),action==="bonus"?["jobId","kind","label","period","effectiveOn","amount","notes"]:
   action==="payment"?["jobId","amount","paidOn","reference"]:[]);
  // Serialize payroll writes for this employee and week. All mutations commit
  // under existing API transaction, preventing race with closure in payroll paths.
@@ -105,9 +112,29 @@ export async function dispatchWeeklyPayroll({method,path,query,ctx,db,readBody})
  const value=amount(data.amount);
  const id=randomUUID();
  if(action==="bonus"){
-  if(!["bonus","allowance","expense"].includes(data.kind)|| (data.notes!==undefined&&(typeof data.notes!=="string"||data.notes.length>500)))
+  if(!["bonus","allowance","expense"].includes(data.kind)||
+    (data.notes!==undefined&&(typeof data.notes!=="string"||data.notes.length>500)))
    throw new HttpError(400,"Invalid bonus details");
-  await db.query("insert into weekly_wage_adjustments(id,tenant_id,job_id,staff_id,week_begin,kind,amount,notes) values($1,$2,$3,$4,$5,$6,$7,$8)",[id,tenant,jobId,staffId,weekBegin,data.kind,value,data.notes||""]);
+  const label=data.label===undefined?"":data.label;
+  if(typeof label!=="string"||label.trim().length>120)
+   throw new HttpError(400,"Invalid bonus label");
+  const period=data.period===undefined?"week":data.period;
+  if(!["day","week","month"].includes(period))
+   throw new HttpError(400,"Invalid bonus period");
+  let effectiveOn=null;
+  if(period==="week"){
+   if(data.effectiveOn!==undefined&&data.effectiveOn!==null)
+    throw new HttpError(400,"Weekly adjustment has no separate date");
+  }else if(period==="day"){
+   effectiveOn=isoDate(data.effectiveOn);
+   if(effectiveOn<weekBegin||effectiveOn>addUtcDays(weekBegin,6))
+    throw new HttpError(400,"Bonus date must belong to selected payroll week");
+  }else{
+   effectiveOn=isoDate(data.effectiveOn);
+   if(!effectiveOn.endsWith("-01")||effectiveOn.slice(0,7)!==weekBegin.slice(0,7))
+    throw new HttpError(400,"Monthly bonus must use the first day of the payroll week month");
+  }
+  await db.query("insert into weekly_wage_adjustments(id,tenant_id,job_id,staff_id,week_begin,kind,amount,notes,label,period,effective_on) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",[id,tenant,jobId,staffId,weekBegin,data.kind,value,data.notes||"",label.trim(),period,effectiveOn]);
  }else{
   if(typeof data.paidOn!=="string"||!DATE.test(data.paidOn)||Number.isNaN(Date.parse(data.paidOn+"T00:00:00Z"))||
    new Date(data.paidOn+"T00:00:00Z").toISOString().slice(0,10)!==data.paidOn||
