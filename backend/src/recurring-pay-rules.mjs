@@ -99,12 +99,12 @@ export async function dispatchRecurringPayRules({method,path,ctx,db,readBody,now
   exact(await readBody(),[]);
   const id=ensureUuid(match[2]);
   const changed=await db.query(`update staff_recurring_pay_rules
-    set ends_on=$4::date where tenant_id=$1 and staff_id=$2 and id=$3
-    and starts_on<$4::date and (ends_on is null or ends_on>$4::date)
-    returning id`,[tenant,staff,id,cutoff]);
+    set ends_on=greatest(starts_on,$4::date) where tenant_id=$1 and staff_id=$2 and id=$3
+    and (ends_on is null or ends_on>greatest(starts_on,$4::date))
+    returning id,to_char(ends_on,'YYYY-MM-DD') as stops_on`,[tenant,staff,id,cutoff]);
   if(changed.rowCount!==1)throw new HttpError(409,"Rule cannot be stopped at next payroll week");
   await db.query("insert into audit_events(tenant_id,actor_sub,action,entity_type,entity_id) values($1,$2,'stopped','recurring_pay_rule',$3)",[tenant,ctx.actorSub,id]);
-  return {id,stopsOn:cutoff};
+  return {id,stopsOn:changed.rows[0].stops_on};
  }
  const data=exact(await readBody(),["jobId","kind","label","cadence","amount","startsOn"]);
  const job=ensureUuid(data.jobId),start=monday(data.startsOn);
