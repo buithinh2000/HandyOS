@@ -62,10 +62,15 @@ export async function mountHandyOsPayroll({root,api}={}){
   <button type="button" data-refresh>View weekly payroll</button>
   <div class="payroll-total" data-totals></div>
   <div data-work-summary></div>
+  <section aria-label="Recorded bonuses and allowances"><h3>Recorded extras for this week</h3><div class="payroll-list" data-adjustment-list></div></section>
   <form data-bonus>
-   <h3>Bonus / Allowance / Other expense</h3>
+   <h3>Add another bonus / allowance / expense</h3>
    <label>Job<select name="jobId" required></select></label>
    <label>Type<select name="kind"><option value="bonus">Bonus</option><option value="allowance">Allowance</option><option value="expense">Other expense / reimbursement</option></select></label>
+   <label>Bonus / allowance name<input name="label" maxlength="120" placeholder="Site bonus, travel, weekend work…" required></label>
+   <label>Apply to<select name="period"><option value="week">This week (once)</option><option value="day">Specific day (once)</option><option value="month">This month (once)</option></select></label>
+   <label data-day-field hidden>Work date<input type="date" name="effectiveDay"></label>
+   <p data-period-help>This entry is added once to the selected payroll week. It does not automatically repeat.</p>
    <label>Amount (AUD)<input type="number" name="amount" min="0.01" step="0.01" required></label>
    <label>Details (optional)<input type="text" name="notes" maxlength="500" placeholder="Travel, tools, meal allowance…"></label>
    <button type="submit">Add bonus / allowance / expense</button>
@@ -88,7 +93,8 @@ export async function mountHandyOsPayroll({root,api}={}){
   weeklyDate=panel.querySelector("[data-week]"),totals=panel.querySelector("[data-totals]"),
   work=panel.querySelector("[data-work-summary]"),title=panel.querySelector("[data-worker]"),
   status=panel.querySelector("[data-payroll-status]"),close=panel.querySelector("[data-close]"),
-  bonus=panel.querySelector("[data-bonus]"),payment=panel.querySelector("[data-payment]");
+  bonus=panel.querySelector("[data-bonus]"),payment=panel.querySelector("[data-payment]"),
+  adjustmentList=panel.querySelector("[data-adjustment-list]");
  let selected=null,disposed=false,busy=false,report=null;
  const say=value=>{if(!disposed)status.textContent=value};
  weeklyDate.value=currentMonday();
@@ -104,7 +110,15 @@ export async function mountHandyOsPayroll({root,api}={}){
    const data=await api.request({path:"/v1/payroll/"+selected.id+"/weeks/"+weeklyDate.value});
    if(!data?.payroll?.totals)throw Error("Invalid payroll result");
    report=data.payroll;
-   totals.replaceChildren();work.replaceChildren();
+   totals.replaceChildren();work.replaceChildren();adjustmentList.replaceChildren();
+   const items=Array.isArray(report.adjustments)?report.adjustments:[];
+   if(!items.length)element("p","No bonuses, allowances or expenses recorded for this week.",adjustmentList);
+   for(const item of items){
+    const name=typeof item.label==="string"&&item.label.trim()?item.label:item.kind;
+    const when=item.period==="day"?"Day · "+String(item.effective_on||"").slice(0,10):
+      item.period==="month"?"Monthly one-time":"This week";
+    element("p",name+" · "+when+" · "+money(item.amount),adjustmentList);
+   }
    const profile=report.staff;
    panel.querySelector("[data-base-pay]").textContent=
     "Base pay: "+money(profile.defaultRate)+" / "+(profile.wageUnit==="hour"?"hour":"day")+
@@ -146,14 +160,31 @@ export async function mountHandyOsPayroll({root,api}={}){
   say(action==="bonus"?"Saving bonus…":"Saving payment…");
   try{
    const body=action==="bonus"?
-    {jobId,amount,kind:form.elements.kind.value,notes:form.elements.notes.value}:
+    {jobId,amount,kind:form.elements.kind.value,
+     label:form.elements.label.value.trim(),period:form.elements.period.value,
+     ...(form.elements.period.value==="day"?{effectiveOn:form.elements.effectiveDay.value}:
+        form.elements.period.value==="month"?{effectiveOn:weeklyDate.value.slice(0,7)+"-01"}:{}),
+     notes:form.elements.notes.value}:
     {jobId,amount,paidOn:form.elements.paidOn.value,reference:form.elements.reference.value};
    const result=await api.request({method:"POST",path:"/v1/payroll/"+selected.id+"/weeks/"+weeklyDate.value+"/"+action,json:body});
    if(!result?.payroll)throw Error("Server did not confirm");
-   form.reset();busy=false;await load();say(action==="bonus"?"Bonus saved on server.":"Payment saved on server.");
+   form.reset();if(action==="bonus")updateBonusPeriod();
+   busy=false;await load();say(action==="bonus"?"Entry saved. You can add another bonus or allowance.":"Payment saved on server.");
   }catch{say("Unable to save. Please check payroll is still open.")}
   finally{busy=false;button.disabled=false}
  };
+ const updateBonusPeriod=()=>{
+  const period=bonus.elements.period.value;
+  const dayField=bonus.querySelector("[data-day-field]");
+  dayField.hidden=period!=="day";
+  bonus.elements.effectiveDay.required=period==="day";
+  const help=bonus.querySelector("[data-period-help]");
+  help.textContent=period==="day"?"This is one adjustment for the selected date; no daily auto-repeat.":
+   period==="month"?"This is one monthly bonus credited to the selected payroll week; no auto-repeat.":
+   "This entry is added once to the selected payroll week. It does not automatically repeat.";
+ };
+ bonus.elements.period.addEventListener("change",updateBonusPeriod);
+ updateBonusPeriod();
  const onBonus=evt=>onSave(evt,"bonus"),onPayment=evt=>onSave(evt,"payment");
  const onClose=async()=>{
   if(!selected||busy||!report?.canClose)return;
