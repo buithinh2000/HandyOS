@@ -62,6 +62,21 @@ export async function mountHandyOsPayroll({root,api}={}){
   <button type="button" data-refresh>View weekly payroll</button>
   <div class="payroll-total" data-totals></div>
   <div data-work-summary></div>
+  <details data-rule-section>
+   <summary>Recurring bonus & allowances · Manage rules</summary>
+   <p>Starts from a future Monday. Daily amounts apply per completed workday for the chosen job; weekly and monthly amounts are fixed. Existing closed payroll is unchanged.</p>
+   <div class="payroll-list" data-rules-list></div>
+   <form data-rule-form>
+    <h3>Add recurring amount</h3>
+    <label>Job<select name="jobId" required></select></label>
+    <label>Type<select name="kind"><option value="bonus">Bonus</option><option value="allowance">Allowance</option></select></label>
+    <label>Name<input name="label" maxlength="120" required placeholder="Travel allowance, attendance bonus…"></label>
+    <label>Repeat<select name="cadence"><option value="day">Per completed workday</option><option value="week">Every week</option><option value="month">Every month</option></select></label>
+    <label>Amount (AUD)<input name="amount" type="number" min="0.01" step="0.01" required></label>
+    <label>Start from Monday<input name="startsOn" type="date" required></label>
+    <button type="submit">Save recurring rule</button>
+   </form>
+  </details>
   <section aria-label="Recorded bonuses and allowances"><h3>Recorded extras for this week</h3><div class="payroll-list" data-adjustment-list></div></section>
   <form data-bonus>
    <h3>Add another bonus / allowance / expense</h3>
@@ -94,8 +109,9 @@ export async function mountHandyOsPayroll({root,api}={}){
   work=panel.querySelector("[data-work-summary]"),title=panel.querySelector("[data-worker]"),
   status=panel.querySelector("[data-payroll-status]"),close=panel.querySelector("[data-close]"),
   bonus=panel.querySelector("[data-bonus]"),payment=panel.querySelector("[data-payment]"),
-  adjustmentList=panel.querySelector("[data-adjustment-list]");
- let selected=null,disposed=false,busy=false,report=null;
+  adjustmentList=panel.querySelector("[data-adjustment-list]"),
+  ruleList=panel.querySelector("[data-rules-list]"),ruleForm=panel.querySelector("[data-rule-form]");
+ let selected=null,disposed=false,busy=false,report=null,ruleBusy=false;
  const say=value=>{if(!disposed)status.textContent=value};
  weeklyDate.value=currentMonday();
  {const today=new Date();payment.elements.paidOn.value=[today.getFullYear(),String(today.getMonth()+1).padStart(2,"0"),String(today.getDate()).padStart(2,"0")].join("-");}
@@ -119,6 +135,8 @@ export async function mountHandyOsPayroll({root,api}={}){
       item.period==="month"?"Monthly one-time":"This week";
     element("p",name+" · "+when+" · "+money(item.amount),adjustmentList);
    }
+   const recurring=Array.isArray(report.recurring)?report.recurring:[];
+   for(const rule of recurring)element("p","Recurring · "+rule.label+" · "+rule.cadence+" · "+money(rule.amount),adjustmentList);
    const profile=report.staff;
    panel.querySelector("[data-base-pay]").textContent=
     "Base pay: "+money(profile.defaultRate)+" / "+(profile.wageUnit==="hour"?"hour":"day")+
@@ -143,9 +161,56 @@ export async function mountHandyOsPayroll({root,api}={}){
   }catch{report=null;totals.replaceChildren();work.replaceChildren();say("Cannot load payroll. Please retry.")}
   finally{busy=false}
  }
+ async function loadRules(){
+  if(!selected||ruleBusy)return;
+  ruleBusy=true;ruleList.replaceChildren();
+  try{
+   const result=await api.request({path:"/v1/payroll/"+selected.id+"/rules"});
+   if(!Array.isArray(result.rules)||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(result.nextEligibleMonday))
+    throw Error("Invalid rules");
+   ruleForm.elements.startsOn.min=result.nextEligibleMonday;
+   if(!ruleForm.elements.startsOn.value||ruleForm.elements.startsOn.value<result.nextEligibleMonday)
+    ruleForm.elements.startsOn.value=result.nextEligibleMonday;
+   if(!result.rules.length)element("p","No recurring rules. Add one below.",ruleList);
+   for(const rule of result.rules){
+    if(!UUID.test(rule.id))throw Error("Invalid rule");
+    const line=element("div",undefined,ruleList);
+    const ended=Boolean(rule.ends_on);
+    element("span",rule.label+" · "+money(rule.amount)+" / "+rule.cadence+" · starts "+rule.starts_on+
+      (ended?" · stops "+rule.ends_on:""),line);
+    if(!ended){
+     const stop=element("button","Stop from next week",line);stop.type="button";
+     stop.addEventListener("click",async()=>{
+      if(ruleBusy)return;
+      ruleBusy=true;stop.disabled=true;
+      try{
+       await api.request({method:"POST",path:"/v1/payroll/"+selected.id+"/rules/"+rule.id+"/stop",json:{}});
+       say("Rule stop scheduled. Existing and closed weeks are unchanged.");
+      }catch{say("Could not stop this rule. It may not have started yet.");}
+      finally{ruleBusy=false;await loadRules()}
+     });
+    }
+   }
+  }catch{element("p","Cannot load recurring rules. Please retry.",ruleList)}
+  finally{ruleBusy=false}
+ }
+ async function onSaveRule(evt){
+  evt.preventDefault();if(!selected||ruleBusy)return;
+  ruleBusy=true;const submit=ruleForm.querySelector('button[type="submit"]');submit.disabled=true;
+  try{
+   const data={
+    jobId:ruleForm.elements.jobId.value,kind:ruleForm.elements.kind.value,
+    label:ruleForm.elements.label.value.trim(),cadence:ruleForm.elements.cadence.value,
+    amount:Number(ruleForm.elements.amount.value),startsOn:ruleForm.elements.startsOn.value
+   };
+   await api.request({method:"POST",path:"/v1/payroll/"+selected.id+"/rules",json:data});
+   ruleForm.reset();say("Recurring rule saved for future payroll.");
+  }catch{say("Could not save. Check future Monday and rule details.");}
+  finally{ruleBusy=false;submit.disabled=false;await loadRules()}
+ }
  const open=async staff=>{
   selected=staff;title.textContent=staff.display_name;
-  overview.hidden=true;detail.hidden=false;await load();
+  overview.hidden=true;detail.hidden=false;await Promise.all([load(),loadRules()]);
  };
  const onBack=()=>{selected=null;report=null;detail.hidden=true;overview.hidden=false;say("Select an employee to view payroll.")};
  const onRefresh=()=>load();
@@ -231,6 +296,7 @@ export async function mountHandyOsPayroll({root,api}={}){
  panel.querySelector("[data-back]").addEventListener("click",onBack);
  panel.querySelector("[data-refresh]").addEventListener("click",onRefresh);
  bonus.addEventListener("submit",onBonus);payment.addEventListener("submit",onPayment);
+ ruleForm.addEventListener("submit",onSaveRule);
  close.addEventListener("click",onClose);
  try{
   const [staffResp,jobResp]=await Promise.all([
@@ -238,6 +304,7 @@ export async function mountHandyOsPayroll({root,api}={}){
   ]);
   if(!Array.isArray(staffResp.staff)||!Array.isArray(jobResp.jobs))throw Error("Invalid lists");
   selectOptions(bonus.elements.jobId,jobResp.jobs,"Job");
+  selectOptions(ruleForm.elements.jobId,jobResp.jobs,"Job");
   selectOptions(payment.elements.jobId,jobResp.jobs,"Job");
   if(!staffResp.staff.length)element("p","No employees yet. Add your first employee here.",list);
   for(const staff of staffResp.staff){
@@ -248,5 +315,6 @@ export async function mountHandyOsPayroll({root,api}={}){
   say("Select an employee to see their weekly wages.");
  }catch{say("Employee payroll is unavailable. Please refresh after signing in.")}
  return Object.freeze({destroy(){disposed=true;addEmployee.removeEventListener("click",toggleEmployee);
-  employeeForm.removeEventListener("submit",onCreateEmployee);root.replaceChildren()}});
+  employeeForm.removeEventListener("submit",onCreateEmployee);
+  ruleForm.removeEventListener("submit",onSaveRule);root.replaceChildren()}});
 }
