@@ -21,6 +21,7 @@ function sample({open=false,paid="1350.00",hasClosure=false,hourly=false}={}){
   if(query.includes("from weekly_payroll_closures"))return {rowCount:hasClosure?1:0,rows:hasClosure?[{id:"closure",closed_at:"2026-11-18"}]:[]};
   if(query.includes("from attendance_entries"))return {rowCount:records.attendance.length,rows:records.attendance};
   if(query.includes("from weekly_wage_adjustments"))return {rowCount:records.adjustment.length,rows:records.adjustment};
+  if(query.includes("from staff_recurring_pay_rules"))return {rowCount:0,rows:[]};
   if(query.includes("from staff_wage_payments"))return {rowCount:records.payment.length,rows:records.payment};
   if(query.includes("select id from jobs"))return {rowCount:1,rows:[{id:job}]};
   if(query.includes("insert into weekly_payroll_closures"))return {rowCount:1,rows:[{id:"closure"}]};

@@ -2,6 +2,7 @@
 // Uses snapshot wage rates and completed attendance only. No assumed payment week.
 import {randomUUID} from "node:crypto";
 import {HttpError,ensureUuid} from "./domain.mjs";
+import {readRecurringPayLines,dispatchRecurringPayRules} from "./recurring-pay-rules.mjs";
 const DATE=/^\d{4}-\d{2}-\d{2}$/;
 function week(v){
  if(typeof v!=="string"||!DATE.test(v))throw new HttpError(400,"Invalid payroll week");
@@ -57,6 +58,7 @@ export async function readPayrollWeek(db,tenant,staffId,weekBegin){
     and a.work_date < $3::date+7 order by a.work_date,a.id`,[tenant,staffId,weekBegin]);
  const adjustments=await db.query("select id,job_id,kind,label,period,effective_on,amount,notes from weekly_wage_adjustments where tenant_id=$1 and staff_id=$2 and week_begin=$3 order by created_at,id",[tenant,staffId,weekBegin]);
  const payments=await db.query("select id,job_id,paid_on,amount,reference from staff_wage_payments where tenant_id=$1 and staff_id=$2 and week_begin=$3 order by paid_on,id",[tenant,staffId,weekBegin]);
+ const recurring=await readRecurringPayLines(db,tenant,staffId,weekBegin,attendance.rows);
  const entries=attendance.rows.map(a=>({...a,wage:a.wage===null?null:money(cents(a.wage))}));
  const earned=entries.reduce((sum,a)=>sum+(a.wage===null?0:cents(a.wage)),0);
  const kinds={bonus:0,allowance:0,expense:0};
@@ -64,18 +66,22 @@ export async function readPayrollWeek(db,tenant,staffId,weekBegin){
   if(!Object.hasOwn(kinds,x.kind))throw new HttpError(503,"Unexpected payroll adjustment");
   kinds[x.kind]+=cents(x.amount);
  }
+ for(const item of recurring){
+  if(!Object.hasOwn(kinds,item.kind))throw new HttpError(503,"Invalid recurring category");
+  kinds[item.kind]+=cents(item.amount);
+ }
  const extras=Object.values(kinds).reduce((sum,x)=>sum+x,0);
  const paid=payments.rows.reduce((sum,x)=>sum+cents(x.amount),0);
  const openCount=entries.filter(a=>!a.finished_at).length;
  return {staff:{id:staffId,name:profile.display_name,roleLabel:profile.role_label,
    wageUnit:profile.wage_unit,defaultRate:String(profile.default_rate),active:profile.active},weekBegin,
-  attendance:entries,adjustments:adjustments.rows,payments:payments.rows,
+  attendance:entries,adjustments:adjustments.rows,recurring,payments:payments.rows,
   totals:{earned:money(earned),extras:money(extras),bonus:money(kinds.bonus),
    allowance:money(kinds.allowance),otherExpenses:money(kinds.expense),due:money(earned+extras),
    paid:money(paid),remaining:money(earned+extras-paid),openEntries:openCount},
   closed:closure?{id:closure.id,closedAt:closure.closed_at}:null,
   // Negative balance is overpayment, never silently treated as zero.
-  canClose:!closure&&openCount===0&&entries.length+adjustments.rows.length>0&&earned+extras===paid};
+  canClose:!closure&&openCount===0&&entries.length+adjustments.rows.length+recurring.length>0&&earned+extras===paid};
 }
 async function isClosed(db,tenant,staffId,weekBegin){
  const r=await db.query("select id from weekly_payroll_closures where tenant_id=$1 and staff_id=$2 and week_begin=$3",[tenant,staffId,weekBegin]);
@@ -83,6 +89,8 @@ async function isClosed(db,tenant,staffId,weekBegin){
 }
 export async function dispatchWeeklyPayroll({method,path,query,ctx,db,readBody}){
  if(!/^\/v1\/payroll(?:\/|$)/.test(path))return null;
+ if(/^\/v1\/payroll\/[0-9a-f-]{36}\/rules(?:\/|$)/i.test(path))
+  return dispatchRecurringPayRules({method,path,ctx,db,readBody});
  if(!["owner","manager"].includes(ctx?.role))throw new HttpError(403,"Payroll restricted to management");
  const tenant=ensureUuid(ctx.tenant_id);
  const m=/^\/v1\/payroll\/([0-9a-f-]{36})\/weeks\/([0-9]{4}-[0-9]{2}-[0-9]{2})(?:\/(bonus|payment|close))?$/.exec(path);
