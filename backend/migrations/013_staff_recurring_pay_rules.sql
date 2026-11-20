@@ -14,7 +14,7 @@ create table staff_recurring_pay_rules (
  cadence text not null check(cadence in ('day','week','month')),
  amount numeric(12,2) not null check(amount>0 and amount<=1000000),
  starts_on date not null check(extract(isodow from starts_on)=1),
- ends_on date check(ends_on is null or (ends_on>starts_on and extract(isodow from ends_on)=1)),
+ ends_on date check(ends_on is null or (ends_on>=starts_on and extract(isodow from ends_on)=1)),
  created_by text not null,
  created_at timestamptz not null default now(),
  unique(tenant_id,id),
