@@ -1,0 +1,12 @@
+[Unit]
+Description=Check GitHub for an approved HandyOS app release
+
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=10min
+AccuracySec=1min
+Persistent=true
+Unit=handyos-auto-release.service
+
+[Install]
+WantedBy=timers.target

@@ -1,18 +1,43 @@
-# HandyOS one-action release
+# HandyOS auto-release — outbound-only, one small VM
 
-This release automation affects only the existing `/home/ubuntu/HandyOS` Lightsail application container. It must **not** create AWS resources, run migrations, restart Postgres/Caddy or touch other ventures.
+HandyOS remains on its existing Lightsail host with isolated private PostgreSQL and Caddy. This version **does not use GitHub SSH deployment secrets**, GitHub hosted-runner access to the VM, AWS permissions, IAM or extra paid services.
 
-**How it works:** On a successful push build for `main`, the workflow checks the main SHA and any other push CI results, then securely SSHes into the dedicated HandyOS VM. The host script fetches precisely that SHA, requires clean main and fast-forward history, builds only `app`, replaces only `app`, and checks Docker app health + production API + HTTPS. If those checks fail, it attempts to restore the previous Docker app image and emits a failure for follow-up. Rollback is best-effort, not a substitute for backups or full end-to-end testing.
+## Release process
 
-**One-time configuration required before automatic releases work:**
-- Create a **dedicated HandyOS-only** restricted deployment SSH account/key (do not reuse BuiTai/Core credentials). It must have tightly scoped access to the HandyOS repo and Docker; on this single host Docker privileges are effectively root, so minimize access and secure the key.
-- Verify the dedicated server SSH firewall allows the chosen runner source, or arrange a fixed approved runner network. Do not open unrestricted SSH just for automation.
-- Configure GitHub Actions repository secrets `HANDYOS_DEPLOY_HOST`, `HANDYOS_DEPLOY_USER`, `HANDYOS_DEPLOY_SSH_KEY` and `HANDYOS_DEPLOY_KNOWN_HOSTS`. The latter must be the pre-verified host public key (not collected with unverified ssh-keyscan during each deploy).
-- Require protected `main` and the relevant CI checks. No production deployment occurs without all four secrets, and no secret values should be posted to chat or stored in Git.
-- Ensure existing off-host encrypted PostgreSQL backups and restore tests. This tool never modifies the database and is not a backup tool.
+An Ubuntu systemd timer checks every 10 minutes. The `poll-release.py` gate fetches only public GitHub main metadata and GitHub Actions results over HTTPS. Automatic deployment occurs **only** when the exact main SHA has a successful push-triggered single-package build, all other relevant push CI seen for that SHA are successful, the Git history is fast-forward, and the commit contains **no** backend migrations or infrastructure changes. Network errors, missing CI and failed CI block deployment.
 
-**Current activation:** Source-only until those secrets, firewall and backups are verified. The workflow will fail with an explicit BLOCKED message when the setup is incomplete, without touching the server. This avoids a misleading green deployment status.
+The existing `release-app.sh` then checks its input SHA, rebuilds/replaces only the HandyOS app Docker container, verifies container/API/website health, and attempts to restore the old image on failure. A successful release SHA marker is recorded in `/home/ubuntu/.local/state/handyos/deployed-sha`. A failed/interrupted release leaves the marker unchanged so the next timer activation can retry. This is best-effort rollback, not zero-downtime or a verified data restore.
 
-**Fallback on VM:** `bash deploy/internal/release-app.sh` performs one guarded update instead of five manual commands. Supply a full approved commit SHA to pin a release: `bash deploy/internal/release-app.sh <40-character-main-sha>`. If the source already equals the remote SHA, the script still rebuilds and checks the app. This supports safe retries if source was updated but the previous rollout was interrupted.
+## One-time host activation — NOT YET DONE
 
-Monitor GitHub Actions / HandyOS app-only production release. Only count `HANDYOS_APP_RELEASE_PASS` as a completed application rollout; the workflow itself completing with missing secrets does not mean the app was updated.
+Before enabling the timer, the Owner must verify encrypted off-host database backups **and** an isolated restore test, and inspect the app-only rollback constraints. Deployment scripts do **not** apply database schema migrations. Stop if a pending release includes `backend/migrations/`, `cloud/` or `deploy/internal/compose.yaml`. Manual schema changes require separate bounded authorization.
+
+The host operator can inspect eligibility without deploying:
+
+```bash
+cd /home/ubuntu/HandyOS
+python3 deploy/internal/poll-release.py --check
+```
+
+After verifying backups and approving the one-time scheduling change, install the timer on the dedicated HandyOS Lightsail host:
+
+```bash
+bash deploy/internal/auto-release-outbound-setup.sh
+```
+
+To inspect the timer and most recent run:
+
+```bash
+sudo systemctl list-timers handyos-auto-release.timer --no-pager
+sudo journalctl -u handyos-auto-release.service -n 30 --no-pager
+```
+
+To stop future auto releases without stopping the website:
+
+```bash
+sudo systemctl disable --now handyos-auto-release.timer
+```
+
+**Scope:** only /home/ubuntu/HandyOS, one app container, existing fixed domain and existing postgres. No AWS account-wide changes, no Core, no automatic database migration, no direct GitHub SSH. The public GitHub Actions API must remain accessible and the HandyOS repository public; otherwise this gate fails closed. Current repo is public, but live VM network and backups remain unverified.
+
+Production activation is **not** implied by merging a PR; the one-time host timer setup must be explicitly performed and then validated by observing an actual release log.

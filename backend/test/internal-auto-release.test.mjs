@@ -15,15 +15,18 @@ test("release script updates app only and has health rollback",()=>{
  assert.match(s,/api-handyos\.buitai\.com\/healthz/);
  assert.doesNotMatch(s,/\b(?:down|volume rm|prune|migrate|do-release-upgrade|aws lightsail)\b/);
 });
-test("GitHub deploy workflow requires pinned SSH host identity and release CI",()=>{
- const w=read(".github/workflows/handyos-app-release.yml");
- assert.match(w,/workflow_run:/);
- assert.match(w,/concurrency:/);
- assert.match(w,/StrictHostKeyChecking=yes/);
- assert.match(w,/HANDYOS_DEPLOY_KNOWN_HOSTS/);
- assert.match(w,/HANDYOS_DEPLOY_SSH_KEY/);
- assert.match(w,/BLOCKED: HandyOS deploy secrets are not configured/);
- assert.match(w,/throw new Error\("Main changed since triggering CI/);
- assert.match(w,/head_sha/);
- assert.doesNotMatch(w,/StrictHostKeyChecking=no|ssh-keyscan|aws configure/);
+test("Outbound timer gates on successful main CI and needs no inbound SSH",()=>{
+ const gate=read("deploy/internal/poll-release.py");
+ const service=read("deploy/internal/handyos-auto-release.service");
+ const timer=read("deploy/internal/handyos-auto-release.timer");
+ assert.match(gate,/api\.github\.com\/repos\/buithinh2000\/HandyOS\/actions\/runs/);
+ assert.match(gate,/head_sha/);
+ assert.match(gate,/conclusion/);
+ assert.match(gate,/--check/);
+ assert.match(gate,/--deploy/);
+ assert.match(gate,/release-app\.sh/);
+ assert.match(service,/User=ubuntu/);
+ assert.match(service,/poll-release\.py --deploy/);
+ assert.match(timer,/OnUnitInactiveSec=10min/);
+ assert.doesNotMatch(gate,/SSH_PRIVATE_KEY|aws_access_key|secrets\./i);
 });
