@@ -38,6 +38,7 @@ test("profit uses EX GST contract, recorded costs and earned wages, excluding bi
  assert.equal(r.provisional,true);
  assert.equal(r.profitReady,false);
  assert.match(r.warnings[0],/NOT READY.*INC-GST/);
+ assert.ok(r.warnings.some(x=>/Recurring employee bonus\/allowance.*NOT YET allocated/.test(x)));
  assert.ok(s.queries.every(x=>x.args[0]===tenant&&x.args[1]===job));
  const a=s.queries.find(x=>x.sql.includes("from attendance_entries")).sql;
  assert.match(a,/finished_at is null then null/);
@@ -49,7 +50,7 @@ test("unentered contract and incomplete shift show provisional, not a falsely fi
  assert.equal(r.provisional,true);
  assert.equal(r.totals.contractExGst,"0.00");
  assert.equal(r.costs.openAttendance,1);
- assert.equal(r.warnings.length,3);
+ assert.equal(r.warnings.length,4);
  assert.equal(r.profitReady,false);
 });
 test("settings and costs are explicit validated management-only writes with audit",async()=>{
