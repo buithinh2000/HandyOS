@@ -13,6 +13,6 @@ This release automation affects only the existing `/home/ubuntu/HandyOS` Lightsa
 
 **Current activation:** Source-only until those secrets, firewall and backups are verified. The workflow may run and report release skipped when the setup is incomplete.
 
-**Fallback on VM:** `bash deploy/internal/release-app.sh` performs one guarded update instead of five manual commands. Supply a full approved commit SHA to pin a release: `bash deploy/internal/release-app.sh <40-character-main-sha>`. If the source already equals the remote SHA, the script returns `NO_CHANGE`, not a claim of a fresh deployment.
+**Fallback on VM:** `bash deploy/internal/release-app.sh` performs one guarded update instead of five manual commands. Supply a full approved commit SHA to pin a release: `bash deploy/internal/release-app.sh <40-character-main-sha>`. If the source already equals the remote SHA, the script still rebuilds and checks the app. This supports safe retries if source was updated but the previous rollout was interrupted.
 
 Monitor GitHub Actions / HandyOS app-only production release. Only count `HANDYOS_APP_RELEASE_PASS` as a completed application rollout; the workflow itself completing with missing secrets does not mean the app was updated.
