@@ -11,7 +11,7 @@ This release automation affects only the existing `/home/ubuntu/HandyOS` Lightsa
 - Require protected `main` and the relevant CI checks. No production deployment occurs without all four secrets, and no secret values should be posted to chat or stored in Git.
 - Ensure existing off-host encrypted PostgreSQL backups and restore tests. This tool never modifies the database and is not a backup tool.
 
-**Current activation:** Source-only until those secrets, firewall and backups are verified. The workflow may run and report release skipped when the setup is incomplete.
+**Current activation:** Source-only until those secrets, firewall and backups are verified. The workflow will fail with an explicit BLOCKED message when the setup is incomplete, without touching the server. This avoids a misleading green deployment status.
 
 **Fallback on VM:** `bash deploy/internal/release-app.sh` performs one guarded update instead of five manual commands. Supply a full approved commit SHA to pin a release: `bash deploy/internal/release-app.sh <40-character-main-sha>`. If the source already equals the remote SHA, the script still rebuilds and checks the app. This supports safe retries if source was updated but the previous rollout was interrupted.
 
