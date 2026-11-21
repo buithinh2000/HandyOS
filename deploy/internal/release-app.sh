@@ -46,7 +46,11 @@ restore_previous_app() {
   echo "ROLLBACK_NEEDS_OPERATOR_INSPECTION"
   return 1
 }
-"${dc[@]}" up -d --no-deps --no-build --force-recreate app
+if ! "${dc[@]}" up -d --no-deps --no-build --force-recreate app; then
+  echo "APP_RECREATE_FAILED"
+  restore_previous_app || true
+  exit 1
+fi
 healthy=0
 for i in $(seq 1 24); do
   cid="$("${dc[@]}" ps -q app)"
