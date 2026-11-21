@@ -9,6 +9,10 @@ RUN cd backend && npm install --omit=dev --ignore-scripts --no-audit --no-fund -
 COPY backend/src ./backend/src
 COPY shared ./shared
 COPY web ./web
+# Some Lightsail working-tree files can be owner-only (0600). Docker COPY
+# preserves their mode; non-root node must be able to traverse/read app files.
+# This does not touch private runtime env files (provided by Compose, not copied).
+RUN chmod -R a+rX /opt/handyos/backend/src /opt/handyos/shared /opt/handyos/web
 USER node
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=4s --start-period=20s --retries=3 \
