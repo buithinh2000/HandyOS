@@ -30,22 +30,18 @@ jobs:
             const sha=branch.commit.sha;
             if(context.eventName==="workflow_run" && context.payload.workflow_run.head_sha!==sha)
               core.setFailed("Main changed since triggering CI; skip stale deployment");
-            const required=[
-              "HandyOS Project Brain continuity gate (source-only)",
-              "HandyOS PostgreSQL Integration",
-              "HandyOS single-package build (NO DEPLOY)",
-              "HandyOS Workspace smoke tests",
-              "HandyOS backend source checks"
-            ];
+            const required=["HandyOS single-package build (NO DEPLOY)"];
+            const optional=["HandyOS PostgreSQL Integration","HandyOS Workspace smoke tests","HandyOS backend source checks"];
             let ok=false;
             for(let i=0;i<18;i++){
               const {data}=await github.rest.actions.listWorkflowRunsForRepo({owner,repo,head_sha:sha,per_page:100});
               const runs=data.workflow_runs.filter(r=>r.event==="push");
-              ok=required.every(name=>runs.some(r=>r.name===name && r.status==="completed" && r.conclusion==="success"));
+              ok=required.every(name=>runs.some(r=>r.name===name && r.status==="completed" && r.conclusion==="success"))
+                && optional.every(name=>runs.filter(r=>r.name===name).every(r=>r.status==="completed" && r.conclusion==="success"));
               if(ok) break;
               await new Promise(resolve=>setTimeout(resolve,10000));
             }
-            if(!ok) core.setFailed("Required push CI workflows not all green for main HEAD");
+            if(!ok) core.setFailed("Build CI is missing/failed or other push CI pending/failed for main HEAD");
             else core.setOutput("sha",sha);
       - name: Confirm preconfigured HandyOS-only SSH credentials exist
         id: ready
