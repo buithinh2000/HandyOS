@@ -26,19 +26,20 @@ test("server-sourced GET jobs and POST upload include only scoped bearer token a
  const {transport,calls}=setup();
  await transport.request({path:"/v1/jobs"});
  await transport.request({path:"/v1/bills"});
+ await transport.request({path:"/v1/bills/capabilities"});
  await transport.request({method:"POST",path:"/v1/bills/"+receipt+"/mark-sent",json:{reference:"Sent by text"}});
  await transport.request({method:"POST",path:"/v1/bills/"+receipt+"/payment",json:{amount:10}});
  await transport.request({method:"POST",path:`/v1/jobs/${job}/receipts/uploads`,json:{boughtOn:"2026-11-16"}});
  await transport.request({method:"POST",path:`/v1/jobs/${job}/receipts/${receipt}/confirm`});
- assert.equal(calls.length,6);
+ assert.equal(calls.length,7);
  assert.equal(calls[0].url,apiOrigin+"/v1/jobs");
  assert.equal(calls[1].url,apiOrigin+"/v1/bills");
- assert.equal(calls[4].options.headers["x-handyos-tenant"],tenant);
- assert.equal(calls[4].options.headers.authorization,"Bearer "+token);
- assert.equal(calls[4].options.credentials,"omit");
- assert.equal(calls[4].options.redirect,"error");
- assert.equal(calls[4].options.cache,"no-store");
- assert.equal(calls[4].options.body,'{"boughtOn":"2026-11-16"}');
+ assert.equal(calls[5].options.headers["x-handyos-tenant"],tenant);
+ assert.equal(calls[5].options.headers.authorization,"Bearer "+token);
+ assert.equal(calls[5].options.credentials,"omit");
+ assert.equal(calls[5].options.redirect,"error");
+ assert.equal(calls[5].options.cache,"no-store");
+ assert.equal(calls[5].options.body,'{"boughtOn":"2026-11-16"}');
 });
 test("allow only validated day-scoped attendance and staff API methods",async()=>{
  const {transport,calls}=setup();
