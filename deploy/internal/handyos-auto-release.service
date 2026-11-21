@@ -9,4 +9,3 @@ User=ubuntu
 WorkingDirectory=/home/ubuntu/HandyOS
 ExecStart=/usr/bin/python3 /home/ubuntu/HandyOS/deploy/internal/poll-release.py --deploy
 TimeoutStartSec=16min
-NoNewPrivileges=true
