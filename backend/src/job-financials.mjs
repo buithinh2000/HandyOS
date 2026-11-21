@@ -90,7 +90,8 @@ export async function readJobFinancials({db,tenant,jobId}){
    customerReceiptsReimbursedGross:money(reimbursed),
    includedInProfit:false},
   expenseEntries:expense.rows,
-  warnings:["Final forecast profit NOT READY: approved variations, future remaining costs, overhead and Owner-approved INC-GST tax/reserve base require parity reconciliation.",...(unpaidAttendance?["An open attendance entry is not yet costed."]:[]),...(!setting.rowCount?["Contract amount has not been entered yet."]:[])],
+  warnings:["Final forecast profit NOT READY: approved variations, future remaining costs, overhead and Owner-approved INC-GST tax/reserve base require parity reconciliation.",
+   "Recurring employee bonus/allowance rules are included in weekly payroll but NOT YET allocated to job cost or the provisional profit calculation.",...(unpaidAttendance?["An open attendance entry is not yet costed."]:[]),...(!setting.rowCount?["Contract amount has not been entered yet."]:[])],
   provisional:true,
   profitReady:false
  };
