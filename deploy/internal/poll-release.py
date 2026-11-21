@@ -30,6 +30,18 @@ def main():
     target = git("ls-remote", "origin", "refs/heads/main").split()[0]
     if not re.fullmatch(r"[0-9a-f]{40}", target):
         raise ValueError("BLOCKED: invalid main SHA")
+    # Fetch metadata only; never merge or rebuild until CI and scope checks pass.
+    git("fetch", "--no-tags", "origin", "main")
+    if git("rev-parse", "FETCH_HEAD") != target:
+        raise ValueError("BLOCKED: main changed during preflight")
+    base = git("rev-parse", "HEAD")
+    subprocess.run(["git", "-C", str(REPO), "merge-base", "--is-ancestor", base, target],
+                   check=True, timeout=15)
+    changed = git("diff", "--name-only", base, target).splitlines()
+    if any(p.startswith(("backend/migrations/", "cloud/", "deploy/internal/private/"))
+           or p == "deploy/internal/compose.yaml" for p in changed):
+        print("BLOCKED: migration or infrastructure change requires manual release review")
+        return 0
     request = urllib.request.Request(
         API + "?head_sha=" + target + "&per_page=100",
         headers={"Accept": "application/vnd.github+json", "User-Agent": "HandyOS-release-gate"},
