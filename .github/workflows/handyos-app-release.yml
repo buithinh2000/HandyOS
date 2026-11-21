@@ -1,0 +1,76 @@
+name: HandyOS app-only production release
+on:
+  workflow_run:
+    workflows: ["HandyOS single-package build (NO DEPLOY)"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: handyos-production-release
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Verify all five HandyOS source CI workflows for current main
+        id: guard
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            const {data: branch}=await github.rest.repos.getBranch({owner,repo,branch:"main"});
+            const sha=branch.commit.sha;
+            if(context.eventName==="workflow_run" && context.payload.workflow_run.head_sha!==sha)
+              core.setFailed("Main changed since triggering CI; skip stale deployment");
+            const required=["HandyOS single-package build (NO DEPLOY)"];
+            const optional=["HandyOS PostgreSQL Integration","HandyOS Workspace smoke tests","HandyOS backend source checks"];
+            let ok=false;
+            for(let i=0;i<18;i++){
+              const {data}=await github.rest.actions.listWorkflowRunsForRepo({owner,repo,head_sha:sha,per_page:100});
+              const runs=data.workflow_runs.filter(r=>r.event==="push");
+              ok=required.every(name=>runs.some(r=>r.name===name && r.status==="completed" && r.conclusion==="success"))
+                && optional.every(name=>runs.filter(r=>r.name===name).every(r=>r.status==="completed" && r.conclusion==="success"));
+              if(ok) break;
+              await new Promise(resolve=>setTimeout(resolve,10000));
+            }
+            if(!ok) core.setFailed("Build CI is missing/failed or other push CI pending/failed for main HEAD");
+            else core.setOutput("sha",sha);
+      - name: Confirm preconfigured HandyOS-only SSH credentials exist
+        id: ready
+        env:
+          HOST: ${{ secrets.HANDYOS_DEPLOY_HOST }}
+          USER: ${{ secrets.HANDYOS_DEPLOY_USER }}
+          KEY: ${{ secrets.HANDYOS_DEPLOY_SSH_KEY }}
+          HOSTKEY: ${{ secrets.HANDYOS_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          if [[ -z "$HOST" || -z "$USER" || -z "$KEY" || -z "$HOSTKEY" ]]; then
+            echo "HandyOS deploy secrets are not configured: release NOT attempted."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Deploy HandyOS app only, verify and roll back if unhealthy
+        if: steps.ready.outputs.ready == 'true'
+        env:
+          HOST: ${{ secrets.HANDYOS_DEPLOY_HOST }}
+          USER: ${{ secrets.HANDYOS_DEPLOY_USER }}
+          KEY: ${{ secrets.HANDYOS_DEPLOY_SSH_KEY }}
+          HOSTKEY: ${{ secrets.HANDYOS_DEPLOY_KNOWN_HOSTS }}
+          SHA: ${{ steps.guard.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/handyos_key
+          printf '%s\n' "$HOSTKEY" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/handyos_key ~/.ssh/known_hosts
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=12 -i ~/.ssh/handyos_key -- "$USER@$HOST" "bash -s -- '$SHA'" < deploy/internal/release-app.sh
