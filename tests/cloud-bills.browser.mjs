@@ -56,6 +56,19 @@ try{
   assert.equal(records[0].fileSize,1024);
   assert.equal(await page.evaluate(()=>localStorage.length),0);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,"mobile horizontal overflow");
+  // Disabled S3 mode must not invite upload attempts or claim an image is saved.
+  await page.evaluate(async()=>{
+   window.view.destroy();
+   const {mountCloudBills}=await import("/receipt-cloud-view.mjs");
+   window.view=mountCloudBills({root:document.querySelector("#cloudBills"),
+    receiptUploadsEnabled:false,jobs:[{id:"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",name:"Bathroom"}],
+    controller:{save:async()=>{throw Error("Disabled upload must never be called")}},
+    listBills:async()=>({bills:[],limit:200,hasMore:false})
+   });
+  });
+  assert.equal(await page.locator('.handyos-cloud-bills form button[type="submit"]').first().isDisabled(),true);
+  assert.equal(await page.locator('.handyos-cloud-bills input[type="file"]').isDisabled(),true);
+  assert.match(await page.locator('.handyos-cloud-bills form [role="status"]').first().innerText(),/not enabled yet/);
   assert.deepEqual(errors,[]);
   await page.close();
  }
