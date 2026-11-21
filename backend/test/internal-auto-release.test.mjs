@@ -30,3 +30,12 @@ test("Outbound timer gates on successful main CI and needs no inbound SSH",()=>{
  assert.match(timer,/OnUnitInactiveSec=10min/);
  assert.doesNotMatch(gate,/SSH_PRIVATE_KEY|aws_access_key|secrets\./i);
 });
+
+test("Auto-release readiness uses metadata only and does not imply verified backup",()=>{
+ const script=read("deploy/internal/auto-release-readiness.sh");
+ assert.match(script,/PREFLIGHT_COMPLETE_NO_MUTATIONS/);
+ assert.match(script,/BACKUP_RESTORE_EVIDENCE=/);
+ assert.match(script,/UNVERIFIED_MANUAL_CHECK_REQUIRED/);
+ assert.match(script,/list-timers --all/);
+ assert.doesNotMatch(script,/\bpg_dump\s+-|\bpg_restore\s+|GetSecretValue|aws s3|docker compose down|systemctl enable|systemctl restart/);
+});
