@@ -21,6 +21,8 @@ export async function mountAuthenticatedCloudBills({
  const me=await authApi.request({method:"GET",path:"/v1/me"});
  if(!me||!["owner","manager"].includes(me.role)||typeof me.tenant_id!=="string"||
   !UUID.test(me.tenant_id)||me.tenant_id!==await session.tenantId())deny();
+ const capabilities=await authApi.request({method:"GET",path:"/v1/bills/capabilities"});
+ if(typeof capabilities?.receiptUploadsEnabled!=="boolean")deny();
  const response=await authApi.request({method:"GET",path:"/v1/jobs"});
  if(!Array.isArray(response.jobs)||response.jobs.length>100)deny();
  // Prevent invalid or duplicate job IDs from materializing in the picker.
@@ -33,7 +35,7 @@ export async function mountAuthenticatedCloudBills({
  }
  let view;
  const controller=createCloudBillController({authApi,put,notify:event=>view?.setStatus(event.status)});
- view=mountCloudBills({root,controller,jobs,listBills:()=>authApi.request({path:"/v1/bills"}),
+ view=mountCloudBills({root,controller,jobs,receiptUploadsEnabled:capabilities.receiptUploadsEnabled,listBills:()=>authApi.request({path:"/v1/bills"}),
   updateBill:({billId,kind,json})=>authApi.request({method:"POST",path:"/v1/bills/"+billId+"/"+kind,json}),
   viewReceipt:({jobId,billId})=>authApi.request({path:"/v1/jobs/"+jobId+"/receipts/"+billId+"/media"})});
  return Object.freeze({destroy:()=>view.destroy(),get status(){return controller.status}});

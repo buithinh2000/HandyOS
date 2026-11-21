@@ -122,6 +122,12 @@ async function dispatch(req,{receiptWorkflow=null}={}){
    return dispatchJobFinancials({method:req.method,path:url.pathname,
     ctx:{...ctx,actorSub:sub},db:client,readBody:()=>body(req)});
   }
+  if(req.method==="GET"&&url.pathname==="/v1/bills/capabilities"){
+   if(!["owner","manager"].includes(ctx.role))throw new HttpError(403,"Bills restricted to management");
+   // Capability is tied to the actual initialized runtime, never a browser flag
+   // or an unchecked deployment environment variable.
+   return {receiptUploadsEnabled:receiptWorkflow!==null};
+  }
   if(req.method==="GET"&&url.pathname==="/v1/bills")return listBillsQueue({db:client,ctx});
   if(/^\/v1\/bills\//.test(url.pathname))return dispatchBillsOperation({method:req.method,path:url.pathname,ctx:{...ctx,actorSub:sub},db:client,readBody:()=>body(req)});
   if(req.method==="GET"&&url.pathname==="/v1/me")return{tenant_id:ctx.tenant_id,role:ctx.role,actor_id:sub};

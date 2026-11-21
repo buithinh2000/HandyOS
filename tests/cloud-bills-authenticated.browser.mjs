@@ -49,6 +49,7 @@ try{
     window.calls.push({kind:"api",url,method:options.method,auth:options.headers.authorization,tenant:options.headers["x-handyos-tenant"]});
     let answer;
     if(url===api+"/v1/me")answer={tenant_id:tenant,role:"owner"};
+    else if(url===api+"/v1/bills/capabilities")answer={receiptUploadsEnabled:true};
     else if(url===api+"/v1/jobs")answer={jobs:[{id:job,name:"Bathroom & kitchen"}]};
     else if(url===api+"/v1/bills")answer={bills:window.billRecords,limit:200,hasMore:false};
     else if(url===api+"/v1/jobs/"+job+"/receipts/"+receipt+"/media")answer={id:receipt,viewUrl:signedPrivate,expiresInSeconds:180};
@@ -113,15 +114,16 @@ try{
   await page.locator('[data-bill-filter-status]').selectOption("draft");
   assert.equal(await page.locator('[data-bill-id="'+receipt+'"]').count(),1);
   const calls=await page.evaluate(()=>window.calls);
-  assert.deepEqual(calls.map(x=>x.kind),["api","api","api","api","s3","api","api","api"]);
+  assert.deepEqual(calls.map(x=>x.kind),["api","api","api","api","api","s3","api","api","api"]);
   assert.equal(calls[0].url,api+"/v1/me");
-  assert.equal(calls[1].url,api+"/v1/jobs");
-  assert.equal(calls[2].url,api+"/v1/bills");
-  assert.equal(calls[3].url,api+`/v1/jobs/${job}/receipts/uploads`);
-  assert.equal(calls[5].url,api+`/v1/jobs/${job}/receipts/${receipt}/confirm`);
-  assert.equal(calls[6].url,api+"/v1/bills");
-  assert.equal(calls[7].url,api+`/v1/jobs/${job}/receipts/${receipt}/media`);
-  assert.equal(calls[4].headers["content-length"],undefined);
+  assert.equal(calls[1].url,api+"/v1/bills/capabilities");
+  assert.equal(calls[2].url,api+"/v1/jobs");
+  assert.equal(calls[3].url,api+"/v1/bills");
+  assert.equal(calls[4].url,api+`/v1/jobs/${job}/receipts/uploads`);
+  assert.equal(calls[6].url,api+`/v1/jobs/${job}/receipts/${receipt}/confirm`);
+  assert.equal(calls[7].url,api+"/v1/bills");
+  assert.equal(calls[8].url,api+`/v1/jobs/${job}/receipts/${receipt}/media`);
+  assert.equal(calls[5].headers["content-length"],undefined);
   assert.equal(await page.evaluate(()=>localStorage.length),0);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);
   // Returning to All is intentional: a bill vanishes from Not sent once marked Sent.
