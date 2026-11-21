@@ -152,7 +152,7 @@ test("recurring daily, weekly and monthly allowances reconcile once into payable
  assert.equal(p.totals.allowance,"0.00"); // sample attendance omits job_id, so none matches
  assert.equal(p.totals.extras,"200.00");
  assert.equal(p.totals.due,"1450.00");
- assert.equal(p.totals.remaining,"20.00"); // overpaid by 20
+ assert.equal(p.totals.remaining,"-20.00"); // overpaid by 20
  assert.equal(p.canClose,false);
  assert.equal(p.recurring.length,1);
  assert.equal(p.recurring[0].cadence,"week");
