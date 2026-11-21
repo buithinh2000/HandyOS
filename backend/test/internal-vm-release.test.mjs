@@ -37,3 +37,14 @@ test("Credentials, customer backups and local configuration excluded from git",(
  for(const item of ["deploy/internal/private/","deploy/internal/backups/","deploy/internal/.env"])
   assert.ok(ignore.includes(item));
 });
+
+test("Non-root Node runtime can read copied source even when the host checkout has private file modes",()=>{
+ const dockerfile=read("Dockerfile");
+ const copies=["COPY backend/src ./backend/src","COPY shared ./shared","COPY web ./web"];
+ for(const marker of copies)assert.ok(dockerfile.includes(marker));
+ const normalize=dockerfile.indexOf("RUN chmod -R a+rX /opt/handyos/backend/src /opt/handyos/shared /opt/handyos/web");
+ const user=dockerfile.indexOf("USER node");
+ assert.ok(normalize>dockerfile.indexOf("COPY web ./web"),"normalize permissions after COPY");
+ assert.ok(user>normalize,"run permission normalization before non-root switch");
+ assert.doesNotMatch(dockerfile,/COPY .*private|COPY .*\.env/);
+});
