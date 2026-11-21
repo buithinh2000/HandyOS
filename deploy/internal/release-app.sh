@@ -2,7 +2,7 @@
 # HandyOS-only release: fast-forward a verified main SHA, rebuild APP only,
 # check live health and roll back the APP image if health checks fail.
 set -Eeuo pipefail
-cd "$(dirname "$0")/../.."
+cd "${HANDYOS_REPO_DIR:-/home/ubuntu/HandyOS}"
 exec 9>/tmp/handyos-app-release.lock
 flock -n 9 || { echo "BLOCKED: HandyOS release already running"; exit 1; }
 dc=(sudo docker compose --env-file deploy/internal/.env -f deploy/internal/compose.yaml)
@@ -36,8 +36,8 @@ restore_previous_app() {
   sudo docker tag "$old_image" internal-app:latest
   "${dc[@]}" up -d --no-deps --no-build --force-recreate app
   for i in $(seq 1 18); do
-    status="$("${dc[@]}" ps --format json app 2>/dev/null || true)"
-    if echo "$status" | grep -q '"healthy"'; then
+    cid="$("${dc[@]}" ps -q app)"
+    if [[ -n "$cid" && "$(sudo docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$cid")" == "healthy" ]]; then
       echo "ROLLBACK_CONTAINER_HEALTHY"; return 0
     fi
     sleep 5
