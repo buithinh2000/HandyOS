@@ -4,7 +4,7 @@ import {dispatchWeeklyPayroll,readPayrollWeek} from "../src/weekly-payroll.mjs";
 const tenant="11111111-1111-4111-8111-111111111111",staff="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",job="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const ctx={tenant_id:tenant,role:"owner",actorSub:"cognito-owner-synthetic"};
 const week="2026-11-16",base="/v1/payroll/"+staff+"/weeks/"+week;
-function sample({open=false,paid="1350.00",hasClosure=false,hourly=false}={}){
+function sample({open=false,paid="1350.00",hasClosure=false,hourly=false,recurring=[]}={}){
  const sql=[],records={
   attendance:hourly?[{id:"1",finished_at:"2026-11-17",wage:"175.00"}]:
    [{id:"1",finished_at:"2026-11-16",wage:"250.00"},
@@ -21,7 +21,7 @@ function sample({open=false,paid="1350.00",hasClosure=false,hourly=false}={}){
   if(query.includes("from weekly_payroll_closures"))return {rowCount:hasClosure?1:0,rows:hasClosure?[{id:"closure",closed_at:"2026-11-18"}]:[]};
   if(query.includes("from attendance_entries"))return {rowCount:records.attendance.length,rows:records.attendance};
   if(query.includes("from weekly_wage_adjustments"))return {rowCount:records.adjustment.length,rows:records.adjustment};
-  if(query.includes("from staff_recurring_pay_rules"))return {rowCount:0,rows:[]};
+  if(query.includes("from staff_recurring_pay_rules"))return {rowCount:recurring.length,rows:recurring};
   if(query.includes("from staff_wage_payments"))return {rowCount:records.payment.length,rows:records.payment};
   if(query.includes("select id from jobs"))return {rowCount:1,rows:[{id:job}]};
   if(query.includes("insert into weekly_payroll_closures"))return {rowCount:1,rows:[{id:"closure"}]};
@@ -136,4 +136,34 @@ test("bonus day cannot escape payroll week and malformed month is blocked withou
   await assert.rejects(mock.call("POST","/bonus",body),e=>e.status===400);
   assert.equal(mock.sql.some(x=>x.query.includes("insert into weekly_wage_adjustments")),false);
  }
+});
+
+test("recurring daily, weekly and monthly allowances reconcile once into payable and closure",async()=>{
+ const recurring=[
+  {id:"rule-1",job_id:job,kind:"allowance",label:"Travel",cadence:"day",amount:"20.00"},
+  {id:"rule-2",job_id:job,kind:"bonus",label:"Weekly performance",cadence:"week",amount:"100.00"},
+  {id:"rule-3",job_id:job,kind:"bonus",label:"Monthly",cadence:"month",amount:"300.00"}
+ ];
+ // The week of November 16 does not contain the first of a calendar month.
+ const s=sample({paid:"1470.00",recurring});
+ const p=(await s.call()).payroll;
+ assert.equal(p.totals.earned,"1250.00");
+ assert.equal(p.totals.bonus,"200.00"); // existing 100 + recurring weekly 100
+ assert.equal(p.totals.allowance,"0.00"); // sample attendance omits job_id, so none matches
+ assert.equal(p.totals.extras,"200.00");
+ assert.equal(p.totals.due,"1450.00");
+ assert.equal(p.totals.remaining,"20.00"); // overpaid by 20
+ assert.equal(p.canClose,false);
+ assert.equal(p.recurring.length,1);
+ assert.equal(p.recurring[0].cadence,"week");
+ const writes=s.sql.filter(x=>x.query.includes("insert into weekly_wage_adjustments"));
+ assert.equal(writes.length,0,"recurring calculation never inserts duplicate adjustments");
+});
+test("weekly payroll report preserves closed snapshot totals independently of rule updates",async()=>{
+ const recurring=[{id:"r",job_id:job,kind:"bonus",label:"Weekly",cadence:"week",amount:"100.00"}];
+ const s=sample({recurring,hasClosure:true});
+ const p=(await s.call()).payroll;
+ assert.equal(p.closed.id,"closure");
+ assert.equal(p.canClose,false);
+ await assert.rejects(s.call("POST","/bonus",{jobId:job,kind:"bonus",amount:100}),e=>e.status===409);
 });
