@@ -11,6 +11,7 @@ test("release script updates app only and has health rollback",()=>{
  assert.match(s,/build app/);
  assert.match(s,/--no-deps --no-build --force-recreate app/);
  assert.match(s,/restore_previous_app/);
+ assert.doesNotMatch(s,/NO_CHANGE: current main already deployed/);
  assert.match(s,/api-handyos\.buitai\.com\/healthz/);
  assert.doesNotMatch(s,/\b(?:down|volume rm|prune|migrate|do-release-upgrade|aws lightsail)\b/);
 });
