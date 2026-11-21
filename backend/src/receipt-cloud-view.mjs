@@ -48,7 +48,7 @@ export function customerBillMessage(b){
   "Outstanding reimbursement: AUD $"+remaining+".\n"+
   "Please reimburse the outstanding amount. I will attach the original receipt separately. Thank you.";
 }
-export function mountCloudBills({root,controller,jobs=[],listBills,updateBill,viewReceipt}={}){
+export function mountCloudBills({root,controller,jobs=[],listBills,updateBill,viewReceipt,receiptUploadsEnabled=true}={}){
  if(!root||typeof root.replaceChildren!=="function"||
   typeof controller?.save!=="function"||!Array.isArray(jobs))
   throw Error("Authenticated HandyOS Bills application required");
@@ -105,6 +105,14 @@ export function mountCloudBills({root,controller,jobs=[],listBills,updateBill,vi
   select.append(option);
  }
  const form=element(section,"form"),status=element(form,"[role=status]"),submit=element(form,'[type="submit"]');
+ // Fail closed for live cloud mounts: upload controls remain disabled until
+ // the authenticated server confirms a running private receipt workflow.
+ if(receiptUploadsEnabled!==true){
+  submit.disabled=true;
+  status.textContent="Receipt photo uploads are not enabled yet. Existing bills can still be viewed and updated.";
+  const filePicker=element(form,'[name="file"]');
+  filePicker.disabled=true;
+ }
  const storeSelect=element(form,'[name="storeSelect"]'),customStore=element(form,"[data-custom-store]");
  const dateField=element(form,'[name="boughtOn"]');
  // Local workday is the default; UTC dates can be wrong around midnight in Australia.
@@ -268,7 +276,7 @@ export function mountCloudBills({root,controller,jobs=[],listBills,updateBill,vi
  const setStatus=state=>message(steps[state]||"Ready to save receipt");
  const onSubmit=async event=>{
   event.preventDefault();
-  if(submit.disabled)return;
+  if(submit.disabled||receiptUploadsEnabled!==true)return;
   const file=element(form,'[name="file"]').files?.[0],jobId=select.value;
   const amount=Number(element(form,'[name="amountGross"]').value);
   if(!form.reportValidity()||!file||!jobId||!Number.isFinite(amount)||amount<=0){
