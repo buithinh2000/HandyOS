@@ -29,7 +29,7 @@ jobs:
             const {data: branch}=await github.rest.repos.getBranch({owner,repo,branch:"main"});
             const sha=branch.commit.sha;
             if(context.eventName==="workflow_run" && context.payload.workflow_run.head_sha!==sha)
-              core.setFailed("Main changed since triggering CI; skip stale deployment");
+              throw new Error("Main changed since triggering CI; skip stale deployment");
             const required=["HandyOS single-package build (NO DEPLOY)"];
             const optional=["HandyOS PostgreSQL Integration","HandyOS Workspace smoke tests","HandyOS backend source checks"];
             let ok=false;
@@ -41,7 +41,7 @@ jobs:
               if(ok) break;
               await new Promise(resolve=>setTimeout(resolve,10000));
             }
-            if(!ok) core.setFailed("Build CI is missing/failed or other push CI pending/failed for main HEAD");
+            if(!ok) throw new Error("Build CI is missing/failed or other push CI pending/failed for main HEAD");
             else core.setOutput("sha",sha);
       - name: Confirm preconfigured HandyOS-only SSH credentials exist
         id: ready
@@ -52,8 +52,8 @@ jobs:
           HOSTKEY: ${{ secrets.HANDYOS_DEPLOY_KNOWN_HOSTS }}
         run: |
           if [[ -z "$HOST" || -z "$USER" || -z "$KEY" || -z "$HOSTKEY" ]]; then
-            echo "HandyOS deploy secrets are not configured: release NOT attempted."
-            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::error::BLOCKED: HandyOS deploy secrets are not configured; production remains unchanged."
+            exit 1
           else
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
