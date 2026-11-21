@@ -22,6 +22,8 @@ test("GitHub deploy workflow requires pinned SSH host identity and release CI",(
  assert.match(w,/StrictHostKeyChecking=yes/);
  assert.match(w,/HANDYOS_DEPLOY_KNOWN_HOSTS/);
  assert.match(w,/HANDYOS_DEPLOY_SSH_KEY/);
+ assert.match(w,/BLOCKED: HandyOS deploy secrets are not configured/);
+ assert.match(w,/throw new Error\("Main changed since triggering CI/);
  assert.match(w,/head_sha/);
  assert.doesNotMatch(w,/StrictHostKeyChecking=no|ssh-keyscan|aws configure/);
 });
