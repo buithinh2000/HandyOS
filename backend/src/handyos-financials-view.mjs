@@ -1,8 +1,9 @@
+import {melbourneToday} from "./handyos-business-date.mjs";
 // Job Financials is a dedicated on-demand screen, not another form in Overview.
 // Monetary calculations always come from the authenticated server response.
 const KINDS=[["material","Materials"],["labour","Manual labour"],["subcontractor","Subcontractors"],["equipment","Equipment"],["other","Other expense"]];
 function money(v){const n=Number(v);return Number.isFinite(n)?"$"+n.toLocaleString("en-AU",{minimumFractionDigits:2,maximumFractionDigits:2}):"Unavailable"}
-function localDate(){const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-")}
+const localDate=melbourneToday;
 function field(parent,label,value){
  const el=document.createElement("div");const caption=document.createElement("small"),strong=document.createElement("strong");
  caption.textContent=label;strong.textContent=value;el.append(caption,strong);parent.append(el);
@@ -26,7 +27,7 @@ export async function mountJobFinancials({root,api,jobId}={}){
  @media(max-width:580px){.handyos-financials .financials-grid{grid-template-columns:1fr}}
  </style>
  <h3>Financials</h3>
- <p>Forecast uses the approved INC-GST contract and an Owner-set reserve. Historical EX-GST figures below are preliminary until reconciled. Customer purchases remain separate.</p>
+ <p>Final forecast profit and tax/reserve fund are NOT READY until the adjusted INC-GST contract, variations and all costs are reconciled. Legacy EX-GST entries below are inputs only, not approved fund calculations. Customer purchases remain separate.</p>
  <div class="financials-grid" data-financial-summary></div>
  <p data-financial-warning></p>
  <button type="button" data-edit-contract>Legacy EX-GST settings (preliminary)</button>
@@ -182,7 +183,7 @@ export async function mountJobFinancials({root,api,jobId}={}){
   if(disposed)return;
   summary.replaceChildren();costs.replaceChildren();reimbursements.replaceChildren();
   field(summary,"Contract EX GST",money(r.totals.contractExGst));
-  field(summary,"Tax & reserve — preliminary",money(r.totals.reserveAllocation));
+  field(summary,"Tax & reserve fund (approved INC-GST basis)","NOT READY — verify adjusted contract");
   field(summary,"Final forecast profit EX GST",r.profitReady===true&&r.provisional===false?
    money(r.totals.estimatedProfitExGst):"NOT READY — reconciliation required");
   for(const [label,key] of [["Materials","materials"],["Manual labour","labourManual"],["Subcontractors","subcontractors"],
