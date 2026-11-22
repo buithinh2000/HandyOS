@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# HandyOS-only PostgreSQL logical backup to dedicated, versioned, KMS-encrypted S3.
+# HandyOS-only PostgreSQL logical backup to dedicated, versioned, SSE-S3-encrypted S3.
 # NOT scheduled/activated by this source change. Never copy database content to Git.
 set -Eeuo pipefail
 umask 077
