@@ -64,6 +64,6 @@ test("Single-run V1 status reads only local catalog, health and service metadata
  assert.match(s,/OFF_HOST_BACKUP UNVERIFIED/);
  assert.match(s,/ISOLATED_RESTORE UNVERIFIED/);
  assert.match(s,/HANDYOS_READONLY_V1_GATE_DONE/);
- const commands=s.split("\\n").filter(line=>!/^\\s*#/.test(line)).join("\\n");
+ const commands=s.split("\n").filter(line=>!/^\s*#/.test(line)).join("\n");
  assert.doesNotMatch(commands,/git fetch|git merge|pg_dump|pg_restore|aws s3|aws iam|docker compose up|docker compose down|systemctl enable|systemctl restart|psql.*-(?:f|c).*insert into/i);
 });
