@@ -18,6 +18,8 @@ for bin in aws sudo docker; do command -v "$bin" >/dev/null || fail "required to
 [[ -f deploy/internal/.env && -f deploy/internal/private/app.env ]] || fail "HandyOS runtime config missing"
 identity="$(aws sts get-caller-identity --query Account --output text --region "$HANDYOS_BACKUP_REGION")"
 [[ "$identity" == "$HANDYOS_BACKUP_AWS_ACCOUNT" ]] || fail "wrong AWS account"
+bucket_region="$(aws s3api get-bucket-location --bucket "$HANDYOS_BACKUP_BUCKET" --query LocationConstraint --output text --region "$HANDYOS_BACKUP_REGION")"
+[[ "$bucket_region" == "$HANDYOS_BACKUP_REGION" ]] || fail "bucket region mismatch"
 versioning="$(aws s3api get-bucket-versioning --bucket "$HANDYOS_BACKUP_BUCKET" --query Status --output text --region "$HANDYOS_BACKUP_REGION")"
 [[ "$versioning" == "Enabled" ]] || fail "bucket versioning not enabled"
 block="$(aws s3api get-public-access-block --bucket "$HANDYOS_BACKUP_BUCKET" --query 'PublicAccessBlockConfiguration.[BlockPublicAcls,IgnorePublicAcls,BlockPublicPolicy,RestrictPublicBuckets]' --output text --region "$HANDYOS_BACKUP_REGION")"
