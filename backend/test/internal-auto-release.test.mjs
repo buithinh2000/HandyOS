@@ -39,3 +39,16 @@ test("Auto-release readiness uses metadata only and does not imply verified back
  assert.match(script,/list-timers --all/);
  assert.doesNotMatch(script,/\bpg_dump\s+-|\bpg_restore\s+|GetSecretValue|aws s3|docker compose down|systemctl enable|systemctl restart/);
 });
+
+test("HandyOS S3 backup is isolated, encrypted and not auto activated",()=>{
+ const s=read("deploy/internal/backup-to-s3.sh");
+ assert.match(s,/set -Eeuo pipefail/);
+ assert.match(s,/pg_dump -U handyos_admin -d handyos --format=custom/);
+ assert.match(s,/--sse aws:kms/);
+ assert.match(s,/HANDYOS_BACKUP_BUCKET/);
+ assert.match(s,/get-public-access-block/);
+ assert.match(s,/get-bucket-versioning/);
+ assert.match(s,/get-caller-identity/);
+ assert.match(s,/RESTORE_TEST_NOT_YET_VERIFIED/);
+ assert.doesNotMatch(s,/docker compose down|pg_restore|CREATE DATABASE|aws s3 mb|create-bucket/);
+});
