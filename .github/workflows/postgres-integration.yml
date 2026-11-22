@@ -49,11 +49,14 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f backend/migrations/009_material_reimbursement_events.sql
           psql -X -v ON_ERROR_STOP=1 -f backend/migrations/010_job_forecast_inputs.sql
           psql -X -v ON_ERROR_STOP=1 -f backend/migrations/011_job_contract_receipts.sql
+          psql -X -v ON_ERROR_STOP=1 -f backend/migrations/013_staff_recurring_pay_rules.sql
           psql -X -v ON_ERROR_STOP=1 -f backend/migrations/014_job_manager_updates.sql
       - name: Verify tenant isolation and job/task insert
         run: psql -X -v ON_ERROR_STOP=1 -f backend/test/postgres-smoke.sql
       - name: Verify owner-only job edits, worker deny and tenant isolation
         run: psql -X -v ON_ERROR_STOP=1 -f backend/test/jobs-update-rls-smoke.sql
+      - name: Verify recurring bonuses/allowances RLS isolation
+        run: psql -X -v ON_ERROR_STOP=1 -f backend/test/recurring-pay-rules-rls-smoke.sql
       - name: Verify owner-only payroll, receipts and tenant RLS
         run: psql -X -v ON_ERROR_STOP=1 -f backend/test/operations-rls-smoke.sql
       - name: Verify weekly payroll settlement RLS and payment allocation
