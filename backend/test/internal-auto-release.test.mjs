@@ -55,3 +55,14 @@ test("HandyOS S3 backup is isolated, encrypted and not auto activated",()=>{
  assert.match(s,/RESTORE_TEST_NOT_YET_VERIFIED/);
  assert.doesNotMatch(s,/docker compose down|pg_restore|CREATE DATABASE|aws s3 mb|create-bucket/);
 });
+
+test("Single-run V1 status reads only local catalog, health and service metadata",()=>{
+ const s=read("deploy/internal/v1-release-gate.sh");
+ assert.match(s,/MIGRATION_013_RECURRING/);
+ assert.match(s,/MIGRATION_014_JOB_UPDATE_POLICY/);
+ assert.match(s,/RUNNING_IMAGE_SOURCE_SHA UNVERIFIED/);
+ assert.match(s,/OFF_HOST_BACKUP UNVERIFIED/);
+ assert.match(s,/ISOLATED_RESTORE UNVERIFIED/);
+ assert.match(s,/HANDYOS_READONLY_V1_GATE_DONE/);
+ assert.doesNotMatch(s,/git fetch|git merge|pg_dump|pg_restore|aws s3|aws iam|docker compose up|docker compose down|systemctl enable|systemctl restart|psql.*-(?:f|c).*insert into/i);
+});
