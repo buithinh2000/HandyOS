@@ -1,11 +1,8 @@
+import {melbourneToday,melbourneCurrentMonday} from "./handyos-business-date.mjs";
 // HandyOS payroll: employee overview -> weekly details -> audited bonus/payment/close.
 // All data comes from authenticated server. Never stores wages in localStorage.
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-function currentMonday(){
- const d=new Date(),offset=(d.getDay()+6)%7;
- d.setDate(d.getDate()-offset);
- return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");
-}
+const currentMonday=melbourneCurrentMonday;
 function element(tag,text,parent){
  const x=document.createElement(tag);if(text!==undefined)x.textContent=text;
  if(parent)parent.append(x);return x;
@@ -114,7 +111,7 @@ export async function mountHandyOsPayroll({root,api}={}){
  let selected=null,disposed=false,busy=false,report=null,ruleBusy=false;
  const say=value=>{if(!disposed)status.textContent=value};
  weeklyDate.value=currentMonday();
- {const today=new Date();payment.elements.paidOn.value=[today.getFullYear(),String(today.getMonth()+1).padStart(2,"0"),String(today.getDate()).padStart(2,"0")].join("-");}
+ payment.elements.paidOn.value=melbourneToday();
  async function load(){
   if(!selected||busy)return;
   const d=new Date(weeklyDate.value+"T00:00:00Z");
