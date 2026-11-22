@@ -134,7 +134,7 @@ async function dispatch(req,{receiptWorkflow=null}={}){
   if(req.method==="GET"&&url.pathname==="/v1/renovation-catalog")return renovationCatalog;
   if(req.method==="GET"&&url.pathname==="/v1/jobs"){
    if(["owner","manager"].includes(ctx.role)){
-    const q=await client.query("select id,name,code,stage,notes,created_at from jobs where tenant_id=$1 order by created_at desc limit 100",[ctx.tenant_id]);return{jobs:q.rows}
+    const q=await client.query("select id,name,code,stage,notes,updated_at,created_at from jobs where tenant_id=$1 order by created_at desc limit 100",[ctx.tenant_id]);return{jobs:q.rows}
    }
    const q=await client.query("select j.id,j.name,j.code,j.stage,j.created_at from jobs j join job_members jm on jm.job_id=j.id and jm.tenant_id=j.tenant_id where j.tenant_id=$1 and jm.cognito_sub=$2 and jm.access_level=$3 order by j.created_at desc limit 100",[ctx.tenant_id,sub,ctx.role]);
    return{jobs:q.rows}
@@ -159,6 +159,33 @@ async function dispatch(req,{receiptWorkflow=null}={}){
    }
    await client.query("insert into audit_events(tenant_id,actor_sub,action,entity_type,entity_id) values($1,$2,'created','job',$3)",[ctx.tenant_id,sub,id]);
    return {job:{id,name,code,stage:"survey"},categories:chosen.length,tasks_created:taskCount}
+  }
+  const jobEdit=/^\/v1\/jobs\/([^/]+)\/update$/.exec(url.pathname);
+  if(jobEdit){
+   if(req.method!=="POST")throw new HttpError(404,"Job update route unavailable");
+   if(!["owner","manager"].includes(ctx.role))throw new HttpError(403,"Job edits restricted to management");
+   const jobId=ensureUuid(jobEdit[1]),data=await body(req);
+   if(!data||typeof data!=="object"||Array.isArray(data)||
+      Object.keys(data).some(k=>!["name","code","stage","notes","expectedUpdatedAt","confirmClose"].includes(k)))
+    throw new HttpError(400,"Invalid job update");
+   const name=sanitizeText(data.name),code=data.code,notes=data.notes,stage=data.stage;
+   const allowedStages=["survey","scope","estimate","quoted","approved","scheduled","active","handover","closed"];
+   if(typeof code!=="string"||code.length>60||typeof notes!=="string"||notes.length>4000||
+      typeof stage!=="string"||!allowedStages.includes(stage)||
+      typeof data.expectedUpdatedAt!=="string"||!/^\d{4}-\d{2}-\d{2}T/.test(data.expectedUpdatedAt)||
+      !Number.isFinite(Date.parse(data.expectedUpdatedAt)))
+    throw new HttpError(400,"Invalid job fields");
+   if(stage==="closed"&&data.confirmClose!==true)
+    throw new HttpError(400,"Confirm job completion explicitly");
+   if(data.confirmClose!==undefined&&typeof data.confirmClose!=="boolean")
+    throw new HttpError(400,"Invalid close confirmation");
+   const result=await client.query(`update jobs set name=$3,code=$4,stage=$5,notes=$6,updated_at=now()
+    where tenant_id=$1 and id=$2 and updated_at=$7::timestamptz and stage<>'closed'
+    returning id,name,code,stage,notes,updated_at`,
+    [ctx.tenant_id,jobId,name,code.trim(),stage,notes, data.expectedUpdatedAt]);
+   if(result.rowCount!==1)throw new HttpError(409,"Job changed elsewhere, is closed, or no longer exists. Refresh before editing.");
+   await client.query("insert into audit_events(tenant_id,actor_sub,action,entity_type,entity_id) values($1,$2,'updated','job',$3)",[ctx.tenant_id,sub,jobId]);
+   return {job:result.rows[0]};
   }
   const match=/^\/v1\/jobs\/([^/]+)\/tasks$/.exec(url.pathname);
   if(match){
