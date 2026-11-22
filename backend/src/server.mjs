@@ -179,8 +179,8 @@ async function dispatch(req,{receiptWorkflow=null}={}){
     throw new HttpError(400,"Confirm job completion explicitly");
    if(data.confirmClose!==undefined&&typeof data.confirmClose!=="boolean")
     throw new HttpError(400,"Invalid close confirmation");
-   const result=await client.query(`update jobs set name=$3,code=$4,stage=$5,notes=$6,updated_at=now()
-    where tenant_id=$1 and id=$2 and updated_at=$7::timestamptz and stage<>'closed'
+   const result=await client.query(`update jobs set name=$3,code=$4,stage=$5,notes=$6,updated_at=greatest(now(),updated_at+interval '1 millisecond')
+    where tenant_id=$1 and id=$2 and date_trunc('milliseconds',updated_at)=$7::timestamptz and stage<>'closed'
     returning id,name,code,stage,notes,updated_at`,
     [ctx.tenant_id,jobId,name,code.trim(),stage,notes, data.expectedUpdatedAt]);
    if(result.rowCount!==1)throw new HttpError(409,"Job changed elsewhere, is closed, or no longer exists. Refresh before editing.");
