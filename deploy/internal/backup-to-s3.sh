@@ -40,4 +40,5 @@ sudo -n docker compose --env-file deploy/internal/.env -f deploy/internal/compos
 size="$(aws s3api head-object --bucket "$HANDYOS_BACKUP_BUCKET" --key "$key" --query ContentLength --output text --region "$HANDYOS_BACKUP_REGION")"
 [[ "$size" =~ ^[0-9]+$ && "$size" -gt 1024 ]] || fail "backup object invalid; requires investigation"
 echo "HANDYOS_BACKUP_UPLOADED size_bytes=$size"
+echo "HANDYOS_BACKUP_OBJECT_KEY=$key"
 echo "RESTORE_TEST_NOT_YET_VERIFIED"

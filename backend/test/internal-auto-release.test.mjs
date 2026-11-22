@@ -67,3 +67,16 @@ test("Single-run V1 status reads only local catalog, health and service metadata
  const commands=s.split("\n").filter(line=>!/^\s*#/.test(line)).join("\n");
  assert.doesNotMatch(commands,/git fetch|git merge|pg_dump|pg_restore|aws s3|aws iam|docker compose up|docker compose down|systemctl enable|systemctl restart|psql.*-(?:f|c).*insert into/i);
 });
+
+test("Isolated S3 restore uses offline disposable container and never production volumes",()=>{
+ const s=read("deploy/internal/restore-check-s3.sh");
+ assert.match(s,/--network none/);
+ assert.match(s,/postgres:16-alpine/);
+ assert.match(s,/pg_restore --exit-on-error --no-owner --no-acl/);
+ assert.match(s,/--expected-bucket-owner/);
+ assert.match(s,/HANDYOS_ISOLATED_RESTORE_PASS/);
+ assert.match(s,/trap cleanup EXIT/);
+ assert.match(s,/docker volume rm/);
+ assert.match(s,/handyos-backup-916004827349-sg/);
+ assert.doesNotMatch(s,/docker compose|--network host|--network container:|docker exec.*internal-db|CREATE DATABASE handyos;/);
+});

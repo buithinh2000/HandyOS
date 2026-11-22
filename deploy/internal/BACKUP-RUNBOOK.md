@@ -13,7 +13,9 @@ The backup streams `pg_dump --format=custom` through AWS CLI to S3 with SSE-S3 a
 
 ## Mandatory next gate — isolated restore rehearsal
 
-Before enabling a recurring backup timer or production auto-deploy, select one verified backup version and restore it into a separate, disposable PostgreSQL 16 test container with a *different* database volume and private network. Check schema, table counts and sampled non-sensitive row counts. Confirm isolation from `internal-db-1`, delete temporary test data securely, and preserve only redacted PASS/FAIL evidence. Do not restore into production or modify `handyos` in place.
+Before enabling a recurring backup timer or production auto-deploy, select one verified backup object. `deploy/internal/restore-check-s3.sh` downloads that exact object from the dedicated HandyOS bucket, checks AWS account and size, and restores into a fresh disposable PostgreSQL 16 Docker container with **no network, no published port, and a distinct temporary volume**. It verifies five required schema tables, removes the temporary test container, volume, and dump via an EXIT trap, and outputs only redacted PASS/FAIL markers. Do not restore into production or modify `handyos` in place. On a crash, verify that any temporary restore volume has been removed before considering the rehearsal complete.
+
+After the first authorized backup is uploaded, it prints `HANDYOS_BACKUP_OBJECT_KEY=...`. Set `HANDYOS_BACKUP_OBJECT_KEY` to that exact value, together with the existing `HANDYOS_BACKUP_BUCKET` and `HANDYOS_BACKUP_AWS_ACCOUNT`, then run `bash deploy/internal/restore-check-s3.sh`. The script requires installed AWS CLI and a restricted authenticated identity allowed to read ONLY the HandyOS backup bucket; **do not** create long-lived AWS keys or expose tokens in terminal screenshots or ChatGPT. This is source preparation, **not** proof that a backup or restore has happened.
 
 ## Status
 
