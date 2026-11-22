@@ -86,7 +86,7 @@ export async function mountHandyOsToday({root,api}={}){
   <div class="calendar-toolbar"><button type="button" data-calendar-prev aria-label="Previous month">‹</button><strong data-calendar-month></strong><button type="button" data-calendar-next aria-label="Next month">›</button></div>
   <div class="calendar-grid" data-calendar-grid role="group" aria-label="Choose workday"></div>
   <p data-calendar-summary role="status" aria-live="polite">Loading recorded attendance days…</p>
-  <label>Selected work date<input type="date" data-work-date required></label>
+  <div class="crew-grid"><label>Selected work date<input type="date" data-work-date required></label><button type="button" data-go-today>Go to today</button></div>
  </div>
  <p data-day-context></p>
  <div class="crew-grid" data-attendance-selectors>
@@ -118,7 +118,7 @@ export async function mountHandyOsToday({root,api}={}){
   context=container.querySelector("[data-day-context]"),heading=container.querySelector("[data-attendance-heading]"),
   status=container.querySelector("[data-status]"),calendarGrid=container.querySelector("[data-calendar-grid]"),
   monthLabel=container.querySelector("[data-calendar-month]"),monthSummary=container.querySelector("[data-calendar-summary]"),
-  previous=container.querySelector("[data-calendar-prev]"),next=container.querySelector("[data-calendar-next]");
+  previous=container.querySelector("[data-calendar-prev]"),next=container.querySelector("[data-calendar-next]"),goToday=container.querySelector("[data-go-today]");
  date.value=localDay();
  root.replaceChildren(container);
  let disposed=false,busy=false;
@@ -356,11 +356,13 @@ export async function mountHandyOsToday({root,api}={}){
  backfillForm.addEventListener("submit",saveBackfill);
  const change=async()=>{if(busy)return;try{await refresh();say("Attendance updated.")}catch{say("Unable to load this date.")}};
  date.addEventListener("change",change);
+ const returnToToday=()=>{if(busy||disposed)return;date.value=localDay();void change()};
+ goToday.addEventListener("click",returnToToday);
  const shiftMonth=offset=>{if(busy)return;calendarMonth=new Date(calendarMonth.getFullYear(),calendarMonth.getMonth()+offset,1);void loadMonth()};
  const prev=()=>shiftMonth(-1),forward=()=>shiftMonth(1);
  previous.addEventListener("click",prev);next.addEventListener("click",forward);
  renderCalendar();
  try{await prepare()}catch{say("Today is unavailable. Try refreshing after signing in.")}
  return Object.freeze({destroy(){disposed=true;inForm.removeEventListener("submit",saveCheckIn);
-  date.removeEventListener("change",change);backfillForm.removeEventListener("submit",saveBackfill);previous.removeEventListener("click",prev);next.removeEventListener("click",forward);if(root.contains(container))root.removeChild(container)}});
+  date.removeEventListener("change",change);goToday.removeEventListener("click",returnToToday);backfillForm.removeEventListener("submit",saveBackfill);previous.removeEventListener("click",prev);next.removeEventListener("click",forward);if(root.contains(container))root.removeChild(container)}});
 }

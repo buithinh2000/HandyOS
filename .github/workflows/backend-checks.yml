@@ -22,6 +22,7 @@ jobs:
         run: |
           node --check backend/src/domain.mjs
           node --check backend/src/server.mjs
+          node --check backend/src/handyos-business-date.mjs
           node --check backend/src/frontend-assets.mjs
           node --check web/boot.mjs
           node --check backend/test/frontend-assets.test.mjs
@@ -66,6 +67,10 @@ jobs:
           python3 -c "import ast,pathlib; ast.parse(pathlib.Path('deploy/internal/poll-release.py').read_text())"
           bash -n deploy/internal/release-app.sh deploy/internal/auto-release-outbound-setup.sh
           node --test backend/test/internal-auto-release.test.mjs
+      - name: Verify Melbourne business date and Today navigation
+        run: |
+          node --test backend/test/handyos-business-date.test.mjs
+          node --input-type=module -e "import fs from 'node:fs';const s=fs.readFileSync('backend/src/handyos-today-view.mjs','utf8');if(!s.includes('data-go-today')||!s.includes('date.value=localDay();void change()'))process.exit(1)"
       - name: Run security domain unit tests (no cloud credentials)
         run: node --test backend/test/job-financials.test.mjs backend/test/weekly-payroll.test.mjs backend/test/daily-crew.test.mjs backend/test/receipt-runtime.test.mjs backend/test/frontend-assets.test.mjs backend/test/handyos-company-bootstrap.test.mjs backend/test/handyos-cognito-pkce.test.mjs backend/test/handyos-cloud-api-transport.test.mjs backend/test/receipt-cloud-controller.test.mjs backend/test/security.test.mjs backend/test/receipt-http-routes.test.mjs backend/test/receipt-s3-adapter.test.mjs backend/test/receipt-sdk-factory.test.mjs backend/test/receipt-iphone-upload.test.mjs
       - name: Install pinned backend SDK packages (no AWS credentials)
