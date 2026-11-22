@@ -1,3 +1,4 @@
+import {melbourneToday} from "./handyos-business-date.mjs";
 // HandyOS authenticated Bills UI component; source-only, NOT mounted in the
 // legacy browser-local owner-v1.html. Caller must supply authenticated controller
 // and job IDs loaded from isolated HandyOS PostgreSQL, never the demo ledger.
@@ -116,7 +117,7 @@ export function mountCloudBills({root,controller,jobs=[],listBills,updateBill,vi
  const storeSelect=element(form,'[name="storeSelect"]'),customStore=element(form,"[data-custom-store]");
  const dateField=element(form,'[name="boughtOn"]');
  // Local workday is the default; UTC dates can be wrong around midnight in Australia.
- const todayLocal=()=>{const d=new Date(),pad=n=>String(n).padStart(2,"0");return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
+ const todayLocal=melbourneToday;
  dateField.value=todayLocal();
  const updateStore=()=>{customStore.hidden=storeSelect.value!=="other";element(form,'[name="storeReference"]').required=!customStore.hidden};
  storeSelect.addEventListener("change",updateStore);
@@ -205,8 +206,8 @@ export function mountCloudBills({root,controller,jobs=[],listBills,updateBill,vi
        <label>Amount received (AUD)<input name="amount" type="number" min="0.01" step="0.01" required></label>
        <label>Payment reference<input name="reference" required minlength="3" maxlength="250" placeholder="e.g. Bank transfer"></label>
        <button type="submit">Record payment received</button>`;
-    const d=new Date(),pad=n=>String(n).padStart(2,"0");
-    form.elements.date.value=[d.getFullYear(),pad(d.getMonth()+1),pad(d.getDate())].join("-");
+    form.elements.date.value=melbourneToday();
+    if(b.status==="sent")form.elements.amount.value=Number(b.remaining??b.amountGross).toFixed(2);
     let pendingRequestId=null;
     action.addEventListener("click",()=>{form.hidden=!form.hidden});
     form.addEventListener("submit",async event=>{
