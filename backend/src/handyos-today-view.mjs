@@ -1,10 +1,8 @@
+import {melbourneToday} from "./handyos-business-date.mjs";
 // Daily-first authenticated HandyOS home screen. Uses verified API only,
 // never localStorage, guessed pay rates or browser-supplied tenant privileges.
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-function localDay(){
- const d=new Date();
- return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");
-}
+const localDay=melbourneToday;
 // Explicit Melbourne wall-clock conversion; browser/phone timezone must never change payroll hours.
 // Reject DST spring gaps and duplicated fall-back times rather than silently guessing an instant.
 const WORK_TZ="Australia/Melbourne";
