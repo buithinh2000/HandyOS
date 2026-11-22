@@ -28,7 +28,7 @@ export async function mountHandyOsJobs({root,api,onJobsChanged}={}){
  .handyos-jobs button{font:inherit;padding:10px 12px;min-height:44px;border-radius:8px;border:1px solid #17699b;background:#17699b;color:#fff}
  .handyos-jobs button:disabled{opacity:.5}.handyos-jobs [hidden]{display:none!important}
  .handyos-jobs label{display:grid;gap:4px}
- .handyos-jobs input,.handyos-jobs select{box-sizing:border-box;width:100%;border:1px solid #b8cddb;padding:10px;min-height:44px;border-radius:8px;font:inherit}
+ .handyos-jobs input,.handyos-jobs select,.handyos-jobs textarea{box-sizing:border-box;width:100%;border:1px solid #b8cddb;padding:10px;min-height:44px;border-radius:8px;font:inherit}
  .handyos-jobs form{display:grid;gap:10px;padding:12px;border-radius:10px;background:#f5f9fb}
  .handyos-jobs [data-job-list]{display:grid;gap:7px}
  .handyos-jobs [data-job-list] button{background:#f5f9fb;color:#16476b;text-align:left;border-color:#c9d9e5}
@@ -68,6 +68,14 @@ export async function mountHandyOsJobs({root,api,onJobsChanged}={}){
   </nav>
   <section data-job-summary aria-label="Job overview">
    <div class="job-summary" data-summary-fields></div>
+   <button type="button" data-edit-job>Edit job details</button>
+   <form data-job-edit-form hidden>
+    <label>Job name<input name="name" maxlength="200" required></label>
+    <label>Reference<input name="code" maxlength="60"></label>
+    <label>Status<select name="stage" required><option value="survey">Planning · Survey</option><option value="scope">Planning · Scope</option><option value="estimate">Quoting · Estimate</option><option value="quoted">Quoting · Sent</option><option value="approved">Booked · Approved</option><option value="scheduled">Booked · Scheduled</option><option value="active">In progress</option><option value="handover">Handover</option><option value="closed">Finished</option></select></label>
+    <label>Notes<textarea name="notes" maxlength="4000" rows="3"></textarea></label>
+    <button type="submit">Save changes</button><button type="button" data-cancel-job-edit>Cancel</button>
+   </form>
    <p>Financials, customer contact and documents will appear here when their verified data is available.</p>
   </section>
   <section data-job-financials hidden aria-label="Job financials"><div data-financials-root></div></section>
@@ -91,7 +99,7 @@ export async function mountHandyOsJobs({root,api,onJobsChanged}={}){
  summary=panel.querySelector("[data-job-summary]"),taskSection=panel.querySelector("[data-job-tasks]"),
  summaryFields=panel.querySelector("[data-summary-fields]"),
  overviewTab=panel.querySelector("[data-detail-overview]"),tasksTab=panel.querySelector("[data-detail-tasks]"),
- newTask=panel.querySelector("[data-new-task]"),financialTab=panel.querySelector("[data-detail-financials]"),
+ newTask=panel.querySelector("[data-new-task]"),editToggle=panel.querySelector("[data-edit-job]"),editForm=panel.querySelector("[data-job-edit-form]"),cancelEdit=panel.querySelector("[data-cancel-job-edit]"),financialTab=panel.querySelector("[data-detail-financials]"),
  financialSection=panel.querySelector("[data-job-financials]"),financialRoot=panel.querySelector("[data-financials-root]");
  let jobs=[],selected=null,busy=false,disposed=false,financialView=null;
  const message=s=>{if(!disposed)status.textContent=s};
@@ -147,10 +155,37 @@ export async function mountHandyOsJobs({root,api,onJobsChanged}={}){
   if(busy||disposed)return;
   financialView?.destroy();financialView=null;
   selected=job;jobTitle.textContent=job.name;
+  editToggle.disabled=job.stage==="closed";editForm.hidden=true;
+  editForm.elements.name.value=job.name;editForm.elements.code.value=job.code||"";
+  editForm.elements.stage.value=job.stage;editForm.elements.notes.value=job.notes||"";
   displaySummary(job);showDetailTab("overview");
   overview.hidden=true;detail.hidden=false;message("Job details loaded.");
  }
- const onBack=()=>{financialView?.destroy();financialView=null;selected=null;overview.hidden=false;detail.hidden=true;taskForm.hidden=true;message("Select a job for details.")};
+ const onBack=()=>{if(!editForm.hidden&&selected&&(["name","code","stage","notes"].some(k=>editForm.elements[k].value!==String(selected[k]??"")))&&!window.confirm("Discard unsaved job changes?"))return;financialView?.destroy();financialView=null;selected=null;overview.hidden=false;detail.hidden=true;taskForm.hidden=true;message("Select a job for details.")};
+ const onEditToggle=()=>{if(!selected||selected.stage==="closed"||busy)return;editForm.hidden=!editForm.hidden};
+ const onCancelEdit=()=>{if(!selected)return;editForm.hidden=true;
+  editForm.elements.name.value=selected.name;editForm.elements.code.value=selected.code||"";
+  editForm.elements.stage.value=selected.stage;editForm.elements.notes.value=selected.notes||""};
+ const onSaveJob=async event=>{
+  event.preventDefault();if(!selected||busy||!editForm.reportValidity())return;
+  const d=editForm.elements,stage=d.stage.value;
+  if(stage==="closed"&&!window.confirm("Mark this job Finished? It will be locked against further edits."))return;
+  busy=true;const button=editForm.querySelector('[type="submit"]');button.disabled=true;
+  message("Saving job changes…");
+  try{
+   const response=await api.request({method:"POST",path:"/v1/jobs/"+selected.id+"/update",
+    json:{name:d.name.value.trim(),code:d.code.value.trim(),stage,notes:d.notes.value,
+      expectedUpdatedAt:selected.updated_at,confirmClose:stage==="closed"}});
+   if(!response?.job||response.job.id!==selected.id)throw Error("Job save not confirmed");
+   const updated=response.job;selected={...selected,...updated};
+   jobs=jobs.map(j=>j.id===selected.id?selected:j);
+   jobTitle.textContent=selected.name;editToggle.disabled=selected.stage==="closed";
+   displaySummary(selected);editForm.hidden=true;drawList();
+   if(typeof onJobsChanged==="function")onJobsChanged(jobs.map(j=>({id:j.id,name:j.name,stage:j.stage})));
+   message("Job changes saved on server.");
+  }catch{message("Job not saved. It may have changed on another device. Reload Jobs before editing again.")}
+  finally{busy=false;button.disabled=false}
+ };
  const onOverviewTab=()=>showDetailTab("overview");
  const onFinancialTab=async()=>{
   if(!selected)return;
@@ -200,6 +235,7 @@ export async function mountHandyOsJobs({root,api,onJobsChanged}={}){
  tasksTab.addEventListener("click",onTasksTab);
  financialTab.addEventListener("click",onFinancialTab);
  newTask.addEventListener("click",onNewTask);
+ editToggle.addEventListener("click",onEditToggle);cancelEdit.addEventListener("click",onCancelEdit);editForm.addEventListener("submit",onSaveJob);
  search.addEventListener("input",drawList);filter.addEventListener("change",drawList);
  jobForm.addEventListener("submit",onJob);taskForm.addEventListener("submit",onTask);
  try{await refresh();message("Select a job for details.")}
@@ -207,6 +243,6 @@ export async function mountHandyOsJobs({root,api,onJobsChanged}={}){
  return Object.freeze({refresh,destroy(){disposed=true;
   financialView?.destroy();overviewTab.removeEventListener("click",onOverviewTab);tasksTab.removeEventListener("click",onTasksTab);
   financialTab.removeEventListener("click",onFinancialTab);
-  newTask.removeEventListener("click",onNewTask);search.removeEventListener("input",drawList);
+  newTask.removeEventListener("click",onNewTask);editToggle.removeEventListener("click",onEditToggle);cancelEdit.removeEventListener("click",onCancelEdit);editForm.removeEventListener("submit",onSaveJob);search.removeEventListener("input",drawList);
   filter.removeEventListener("change",drawList);root.replaceChildren()}});
 }
