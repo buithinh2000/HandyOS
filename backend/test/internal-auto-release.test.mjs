@@ -44,7 +44,10 @@ test("HandyOS S3 backup is isolated, encrypted and not auto activated",()=>{
  const s=read("deploy/internal/backup-to-s3.sh");
  assert.match(s,/set -Eeuo pipefail/);
  assert.match(s,/pg_dump -U handyos_admin -d handyos --format=custom/);
- assert.match(s,/--sse aws:kms/);
+ assert.match(s,/--sse AES256/);
+ assert.match(s,/get-bucket-encryption/);
+ assert.match(s,/handyos-backup/);
+ assert.doesNotMatch(s,/HANDYOS_BACKUP_KMS_KEY_ARN/);
  assert.match(s,/HANDYOS_BACKUP_BUCKET/);
  assert.match(s,/get-public-access-block/);
  assert.match(s,/get-bucket-versioning/);
