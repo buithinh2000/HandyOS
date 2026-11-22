@@ -161,7 +161,7 @@ export async function mountHandyOsJobs({root,api,onJobsChanged}={}){
   displaySummary(job);showDetailTab("overview");
   overview.hidden=true;detail.hidden=false;message("Job details loaded.");
  }
- const onBack=()=>{if(!editForm.hidden&&editForm.elements.name.value!==selected?.name&&!window.confirm("Discard unsaved job changes?"))return;financialView?.destroy();financialView=null;selected=null;overview.hidden=false;detail.hidden=true;taskForm.hidden=true;message("Select a job for details.")};
+ const onBack=()=>{if(!editForm.hidden&&selected&&(["name","code","stage","notes"].some(k=>editForm.elements[k].value!==String(selected[k]??"")))&&!window.confirm("Discard unsaved job changes?"))return;financialView?.destroy();financialView=null;selected=null;overview.hidden=false;detail.hidden=true;taskForm.hidden=true;message("Select a job for details.")};
  const onEditToggle=()=>{if(!selected||selected.stage==="closed"||busy)return;editForm.hidden=!editForm.hidden};
  const onCancelEdit=()=>{if(!selected)return;editForm.hidden=true;
   editForm.elements.name.value=selected.name;editForm.elements.code.value=selected.code||"";
