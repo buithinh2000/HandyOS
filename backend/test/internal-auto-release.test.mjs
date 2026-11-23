@@ -80,3 +80,16 @@ test("Isolated S3 restore uses offline disposable container and never production
  assert.match(s,/handyos-backup-916004827349-sg/);
  assert.doesNotMatch(s,/docker compose|--network host|--network container:|docker exec.*internal-db|CREATE DATABASE handyos;/);
 });
+
+test("One-command local restore never writes to the live database",()=>{
+ const script=read("deploy/internal/local-restore-once.sh");
+ assert.match(script,/pg_dump -U handyos_admin -d handyos/);
+ assert.match(script,/--format=custom --no-owner --no-acl/);
+ assert.match(script,/--pull=never/);
+ assert.match(script,/--network none/);
+ assert.match(script,/pg_restore --exit-on-error --no-owner --no-acl/);
+ assert.match(script,/docker volume rm/);
+ assert.match(script,/trap cleanup EXIT/);
+ assert.match(script,/HANDYOS_LOCAL_BACKUP_RESTORE_PASS/);
+ assert.doesNotMatch(script,/docker compose down|docker compose up|CREATE DATABASE handyos|aws s3|docker volume prune|docker exec .*internal-db/);
+});
