@@ -69,7 +69,7 @@ jobs:
       - name: Check outbound release Python and shell syntax
         run: |
           python3 -c "import ast,pathlib; ast.parse(pathlib.Path('deploy/internal/poll-release.py').read_text())"
-          bash -n deploy/internal/release-app.sh deploy/internal/auto-release-outbound-setup.sh deploy/internal/v1-release-gate.sh deploy/internal/backup-to-s3.sh deploy/internal/restore-check-s3.sh
+          bash -n deploy/internal/release-app.sh deploy/internal/auto-release-outbound-setup.sh deploy/internal/v1-release-gate.sh deploy/internal/backup-to-s3.sh deploy/internal/restore-check-s3.sh deploy/internal/local-restore-once.sh
           node --test backend/test/internal-auto-release.test.mjs
       - name: Verify Melbourne business date and Today navigation
         run: |
