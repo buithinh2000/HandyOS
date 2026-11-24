@@ -16,7 +16,7 @@ test("Already-recorded employees cannot be checked in twice from default selecti
  assert.match(ui,/new Set\(attendanceForDay\.map\(item=>item\.staff_id\)\)/);
  assert.match(ui,/check\.disabled=recorded\.has\(employee\.id\)/);
  assert.match(ui,/check\.checked=!check\.disabled/);
- assert.match(ui,/\d+" employees checked in/);
+ assert.match(ui,/ids\.length\+" employees checked in/);
 });
 test("Historical workday still uses one staff member to backfill precisely",()=>{
  assert.match(ui,/pastStaff\.hidden=!past/);
