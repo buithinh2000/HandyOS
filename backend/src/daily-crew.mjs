@@ -180,6 +180,29 @@ export async function dispatchDailyCrew({method,path,query,ctx,db,readBody,now=(
   await db.query("insert into audit_events(tenant_id,actor_sub,action,entity_type,entity_id) values($1,$2,'corrected','attendance',$3)",[tenant,ctx.actorSub,id]);
   return {entry:saved.rows[0]};
  }
+ if(method==="POST"&&path==="/v1/attendance/check-in-batch"){
+  const d=payload(await readBody(),["jobId","staffIds","workDate"]);
+  const job=ensureUuid(d.jobId),date=isoDay(d.workDate);
+  if(date!==melbourneDay(now()))throw new HttpError(400,"Use backfill for historical work dates");
+  if(!Array.isArray(d.staffIds)||d.staffIds.length<1||d.staffIds.length>50)
+   throw new HttpError(400,"Select 1 to 50 active employees");
+  const ids=d.staffIds.map(ensureUuid);
+  if(new Set(ids).size!==ids.length)throw new HttpError(400,"Duplicate employee selection");
+  // Deterministic order prevents cross-request staff/week advisory-lock deadlocks.
+  ids.sort();
+  // This handler runs within the single transaction opened by server.mjs.
+  // Any failure propagates to the caller's ROLLBACK, including prior audit rows.
+  const timestamp=now();
+  if(!(timestamp instanceof Date)||Number.isNaN(timestamp.getTime())||
+     melbourneDay(timestamp)!==date)throw new HttpError(503,"Workday clock changed; retry");
+  const entries=[];
+  for(const staffId of ids){
+   const checked=await dispatchDailyCrew({method:"POST",path:"/v1/attendance/check-in",
+    query,ctx,db,readBody:async()=>({jobId:job,staffId,workDate:date}),now:()=>timestamp});
+   entries.push(checked.entry);
+  }
+  return {entries,checkedIn:entries.length};
+ }
  if(method==="POST"&&path==="/v1/attendance/check-in"){
   const d=payload(await readBody(),["jobId","staffId","workDate"]);
   const job=ensureUuid(d.jobId),staff=ensureUuid(d.staffId),date=isoDay(d.workDate);

@@ -54,6 +54,11 @@ export async function mountHandyOsToday({root,api}={}){
  .handyos-today button:disabled{opacity:.55}
  .handyos-today [hidden]{display:none!important}
  .handyos-today .crew-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+ .handyos-today .crew-choice{display:flex;align-items:center;gap:10px;min-height:44px;border:1px solid #d9e4ee;border-radius:9px;padding:8px 12px;font-size:15px}
+ .handyos-today .crew-choice input{width:22px;min-height:22px;height:22px;flex:0 0 22px;margin:0;accent-color:#17699b}
+ .handyos-today .crew-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+ .handyos-today .crew-toolbar button{background:#edf4f8;color:#183047;flex:1}
+ .handyos-today [data-crew-list]{display:grid;gap:7px}
  .handyos-today .crew-record{border:1px solid #e3ebf0;border-radius:9px;padding:12px;display:grid;gap:6px}
  .handyos-today .job-session{border:1px solid #d9e4ee;border-radius:12px;overflow:hidden;background:#fff}
  .handyos-today .job-session summary{cursor:pointer;list-style:none;padding:14px;min-height:52px;display:flex;justify-content:space-between;gap:8px;align-items:center;font-weight:700}
@@ -91,10 +96,16 @@ export async function mountHandyOsToday({root,api}={}){
  <p data-day-context></p>
  <div class="crew-grid" data-attendance-selectors>
  <label>Job<select data-job required></select></label>
- <label>Employee<select data-staff required></select></label>
+ <label data-past-employee>Employee (past workday only)<select data-staff></select></label>
+ </div>
+ <div data-crew-picker>
+  <strong>Today's crew</strong>
+  <p>All active employees selected by default. Untick anyone not working on this job today.</p>
+  <div class="crew-toolbar"><button type="button" data-select-all>Select all</button><button type="button" data-select-none>Clear</button><small data-crew-count></small></div>
+  <div data-crew-list role="group" aria-label="Employees to check in"></div>
  </div>
  <form data-check-in>
- <button type="submit">Check in employee</button>
+ <button type="submit">Check in selected crew</button>
  </form>
  <form data-backfill hidden>
   <h3>Record missed attendance</h3>
@@ -114,6 +125,9 @@ export async function mountHandyOsToday({root,api}={}){
  <p role="status" data-status aria-live="polite">Loading today…</p>`;
  const date=container.querySelector("[data-work-date]"),jobs=container.querySelector("[data-job]"),
   staff=container.querySelector("[data-staff]"),records=container.querySelector("[data-attendance]"),
+  crewPicker=container.querySelector("[data-crew-picker]"),crewList=container.querySelector("[data-crew-list]"),
+  crewCount=container.querySelector("[data-crew-count]"),pastStaff=container.querySelector("[data-past-employee]"),
+  selectAll=container.querySelector("[data-select-all]"),selectNone=container.querySelector("[data-select-none]"),
   inForm=container.querySelector("[data-check-in]"),backfillForm=container.querySelector("[data-backfill]"),
   context=container.querySelector("[data-day-context]"),heading=container.querySelector("[data-attendance-heading]"),
   status=container.querySelector("[data-status]"),calendarGrid=container.querySelector("[data-calendar-grid]"),
@@ -121,7 +135,7 @@ export async function mountHandyOsToday({root,api}={}){
   previous=container.querySelector("[data-calendar-prev]"),next=container.querySelector("[data-calendar-next]"),goToday=container.querySelector("[data-go-today]");
  date.value=localDay();
  root.replaceChildren(container);
- let disposed=false,busy=false;
+ let disposed=false,busy=false,activeStaff=[],attendanceForDay=[];
  const expandedJobs=new Set();
  let calendarMonth=new Date(Number(date.value.slice(0,4)),Number(date.value.slice(5,7))-1,1);
  let loadedMonth="",recordedDays=new Map(),summarySequence=0;
@@ -185,9 +199,35 @@ export async function mountHandyOsToday({root,api}={}){
  const setMode=()=>{
   const past=date.value<localDay(),future=date.value>localDay();
   inForm.hidden=past||future;backfillForm.hidden=!past;
+  crewPicker.hidden=past||future;pastStaff.hidden=!past;
   heading.textContent=`Attendance · ${date.value}`;
   context.textContent=past?"Past date — enter actual worked hours to record a completed shift.":future?"Future date — view only; no advance attendance.":"Today — use live check-in/check-out.";
  };
+ const selectedIds=()=>[...crewList.querySelectorAll('input[type="checkbox"]:checked')].map(input=>input.value);
+ const updateCrewCount=()=>{
+  const selected=selectedIds().length;
+  const eligible=crewList.querySelectorAll('input[type="checkbox"]:not(:disabled)').length;
+  crewCount.textContent=`${selected} of ${eligible} available selected`;
+  inForm.querySelector('button[type="submit"]').disabled=busy||selected===0||!jobs.value;
+ };
+ const renderCrew=()=>{
+  const selected=new Set(selectedIds());
+  const firstDraw=crewList.children.length===0;
+  const recorded=new Set(attendanceForDay.map(item=>item.staff_id));
+  crewList.replaceChildren();
+  for(const employee of activeStaff){
+   const line=document.createElement("label");line.className="crew-choice";
+   const check=document.createElement("input");check.type="checkbox";check.value=employee.id;
+   check.disabled=recorded.has(employee.id);
+   check.checked=!check.disabled&&(firstDraw||selected.has(employee.id));
+   check.addEventListener("change",updateCrewCount);
+   const name=document.createElement("span");name.textContent=employee.display_name+(check.disabled?" · already recorded":"");
+   line.append(check,name);crewList.append(line);
+  }
+  updateCrewCount();
+ };
+ const chooseAll=()=>{for(const input of crewList.querySelectorAll('input[type="checkbox"]:not(:disabled)'))input.checked=true;updateCrewCount()};
+ const chooseNone=()=>{for(const input of crewList.querySelectorAll('input[type="checkbox"]'))input.checked=false;updateCrewCount()};
  function optionList(select,data,selectedLabel,labelField){
   const selected=select.value;select.replaceChildren();option(select,selectedLabel,"");
   for(const item of data){
@@ -205,6 +245,8 @@ export async function mountHandyOsToday({root,api}={}){
   const result=await api.request({path:"/v1/attendance?date="+day});
   if(!Array.isArray(result.attendance))throw Error("Invalid attendance response");
   if(disposed)return;
+  attendanceForDay=result.attendance;
+  renderCrew();
   // Keep sessions collapsed after every new check-in. Expand only by deliberate tap.
   records.replaceChildren();
   if(!result.attendance.length){
@@ -311,22 +353,27 @@ export async function mountHandyOsToday({root,api}={}){
   if(!Array.isArray(jobResult.jobs)||!Array.isArray(staffResult.staff))throw Error("HandyOS list unavailable");
   if(disposed)return;
   optionList(jobs,jobResult.jobs,"Select job","name");
-  optionList(staff,staffResult.staff.filter(x=>x.active===true),"Select employee","display_name");
+  activeStaff=staffResult.staff.filter(x=>x.active===true);
+  optionList(staff,activeStaff,"Select employee","display_name");
   await refresh();
   say("Ready for check-in.");
  }
  async function saveCheckIn(event){
   event.preventDefault();
-  if(busy||!jobs.value||!staff.value)return;
-  busy=true;const button=inForm.querySelector("button");button.disabled=true;say("Saving check-in…");
+  const ids=selectedIds();
+  if(busy||!jobs.value||date.value!==localDay()||!ids.length)return;
+  busy=true;const button=inForm.querySelector('button');button.disabled=true;
+  say("Checking in "+ids.length+" employees…");
   try{
-   await api.request({method:"POST",path:"/v1/attendance/check-in",
-    json:{jobId:jobs.value,staffId:staff.value,workDate:date.value}});
+   const saved=await api.request({method:"POST",path:"/v1/attendance/check-in-batch",
+    json:{jobId:jobs.value,staffIds:ids,workDate:date.value}});
+   if(saved?.checkedIn!==ids.length||!Array.isArray(saved.entries)||saved.entries.length!==ids.length)
+    throw Error("Batch check-in not confirmed");
    expandedJobs.clear();
    await refresh();await loadMonth({force:true});
-   staff.value="";say("Check-in saved. Open the job below when you need to check out.");
-  }catch{say("Could not save check-in. Check for a duplicate date or retry.")}
-  finally{busy=false;button.disabled=false}
+   say(ids.length+" employees checked in. Tap the job below to check out later.");
+  }catch{say("Crew check-in not saved. Someone may already have a shift today. Refresh attendance and try again.")}
+  finally{busy=false;updateCrewCount()}
  }
  function dateTimeISO(workDate,time){
   if(!/^\d{2}:\d{2}$/.test(time))throw Error("Invalid shift time");
@@ -353,6 +400,8 @@ export async function mountHandyOsToday({root,api}={}){
   finally{busy=false;button.disabled=false}
  }
  inForm.addEventListener("submit",saveCheckIn);
+ selectAll.addEventListener("click",chooseAll);selectNone.addEventListener("click",chooseNone);
+ jobs.addEventListener("change",updateCrewCount);
  backfillForm.addEventListener("submit",saveBackfill);
  const change=async()=>{if(busy)return;try{await refresh();say("Attendance updated.")}catch{say("Unable to load this date.")}};
  date.addEventListener("change",change);
@@ -364,5 +413,6 @@ export async function mountHandyOsToday({root,api}={}){
  renderCalendar();
  try{await prepare()}catch{say("Today is unavailable. Try refreshing after signing in.")}
  return Object.freeze({destroy(){disposed=true;inForm.removeEventListener("submit",saveCheckIn);
-  date.removeEventListener("change",change);goToday.removeEventListener("click",returnToToday);backfillForm.removeEventListener("submit",saveBackfill);previous.removeEventListener("click",prev);next.removeEventListener("click",forward);if(root.contains(container))root.removeChild(container)}});
+  selectAll.removeEventListener("click",chooseAll);selectNone.removeEventListener("click",chooseNone);
+  jobs.removeEventListener("change",updateCrewCount);date.removeEventListener("change",change);goToday.removeEventListener("click",returnToToday);backfillForm.removeEventListener("submit",saveBackfill);previous.removeEventListener("click",prev);next.removeEventListener("click",forward);if(root.contains(container))root.removeChild(container)}});
 }
