@@ -98,7 +98,7 @@ export async function mountHandyOsToday({root,api}={}){
  <label>Job<select data-job required></select></label>
  <label data-past-employee>Employee (past workday only)<select data-staff></select></label>
  </div>
- <div data-crew-picker>
+ <div data-crew-picker hidden>
   <strong>Today's crew</strong>
   <p>All active employees selected by default. Untick anyone not working on this job today.</p>
   <div class="crew-toolbar"><button type="button" data-select-all>Select all</button><button type="button" data-select-none>Clear</button><small data-crew-count></small></div>
@@ -199,7 +199,7 @@ export async function mountHandyOsToday({root,api}={}){
  const setMode=()=>{
   const past=date.value<localDay(),future=date.value>localDay();
   inForm.hidden=past||future;backfillForm.hidden=!past;
-  crewPicker.hidden=past||future;pastStaff.hidden=!past;
+  crewPicker.hidden=past||future||!jobs.value;pastStaff.hidden=!past;
   heading.textContent=`Attendance · ${date.value}`;
   context.textContent=past?"Past date — enter actual worked hours to record a completed shift.":future?"Future date — view only; no advance attendance.":"Today — use live check-in/check-out.";
  };
@@ -210,7 +210,7 @@ export async function mountHandyOsToday({root,api}={}){
   crewCount.textContent=`${selected} of ${eligible} available selected`;
   inForm.querySelector('button[type="submit"]').disabled=busy||selected===0||!jobs.value;
  };
- const renderCrew=()=>{
+ const renderCrew=({reset=false}={})=>{
   const selected=new Set(selectedIds());
   const firstDraw=crewList.children.length===0;
   const recorded=new Set(attendanceForDay.map(item=>item.staff_id));
@@ -219,12 +219,19 @@ export async function mountHandyOsToday({root,api}={}){
    const line=document.createElement("label");line.className="crew-choice";
    const check=document.createElement("input");check.type="checkbox";check.value=employee.id;
    check.disabled=recorded.has(employee.id);
-   check.checked=!check.disabled&&(firstDraw||selected.has(employee.id));
+   check.checked=!check.disabled&&(reset||firstDraw||selected.has(employee.id));
    check.addEventListener("change",updateCrewCount);
    const name=document.createElement("span");name.textContent=employee.display_name+(check.disabled?" · already recorded":"");
    line.append(check,name);crewList.append(line);
   }
   updateCrewCount();
+ };
+ const onJobSelection=()=>{
+  // Choosing a job prepares the whole available crew without creating attendance.
+  // Reset any previous manual deselections when moving between different jobs.
+  crewPicker.hidden=date.value!==localDay()||!jobs.value;
+  if(jobs.value){renderCrew({reset:true});say("Crew selected. Untick anyone off today, then check in once.");}
+  else {chooseNone();say("Choose a job to prepare today's crew.");}
  };
  const chooseAll=()=>{for(const input of crewList.querySelectorAll('input[type="checkbox"]:not(:disabled)'))input.checked=true;updateCrewCount()};
  const chooseNone=()=>{for(const input of crewList.querySelectorAll('input[type="checkbox"]'))input.checked=false;updateCrewCount()};
@@ -247,6 +254,7 @@ export async function mountHandyOsToday({root,api}={}){
   if(disposed)return;
   attendanceForDay=result.attendance;
   renderCrew();
+  crewPicker.hidden=date.value!==localDay()||!jobs.value;
   // Keep sessions collapsed after every new check-in. Expand only by deliberate tap.
   records.replaceChildren();
   if(!result.attendance.length){
@@ -401,7 +409,7 @@ export async function mountHandyOsToday({root,api}={}){
  }
  inForm.addEventListener("submit",saveCheckIn);
  selectAll.addEventListener("click",chooseAll);selectNone.addEventListener("click",chooseNone);
- jobs.addEventListener("change",updateCrewCount);
+ jobs.addEventListener("change",onJobSelection);
  backfillForm.addEventListener("submit",saveBackfill);
  const change=async()=>{if(busy)return;try{await refresh();say("Attendance updated.")}catch{say("Unable to load this date.")}};
  date.addEventListener("change",change);
@@ -414,5 +422,5 @@ export async function mountHandyOsToday({root,api}={}){
  try{await prepare()}catch{say("Today is unavailable. Try refreshing after signing in.")}
  return Object.freeze({destroy(){disposed=true;inForm.removeEventListener("submit",saveCheckIn);
   selectAll.removeEventListener("click",chooseAll);selectNone.removeEventListener("click",chooseNone);
-  jobs.removeEventListener("change",updateCrewCount);date.removeEventListener("change",change);goToday.removeEventListener("click",returnToToday);backfillForm.removeEventListener("submit",saveBackfill);previous.removeEventListener("click",prev);next.removeEventListener("click",forward);if(root.contains(container))root.removeChild(container)}});
+  jobs.removeEventListener("change",onJobSelection);date.removeEventListener("change",change);goToday.removeEventListener("click",returnToToday);backfillForm.removeEventListener("submit",saveBackfill);previous.removeEventListener("click",prev);next.removeEventListener("click",forward);if(root.contains(container))root.removeChild(container)}});
 }

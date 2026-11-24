@@ -23,3 +23,19 @@ test("Historical workday still uses one staff member to backfill precisely",()=>
  assert.match(ui,/crewPicker\.hidden=past\|\|future/);
  assert.match(ui,/path:"\/v1\/attendance\/backfill"/);
 });
+
+test("Selecting a job reveals and resets the available crew while allowing untick",()=>{
+ assert.match(ui, /data-crew-picker hidden/);
+ assert.match(ui, /const onJobSelection=\(\)=>/);
+ assert.match(ui, /jobs\.addEventListener\("change",onJobSelection\)/);
+ assert.match(ui, /renderCrew\(\{reset:true\}\)/);
+ assert.match(ui, /reset\|\|firstDraw\|\|selected\.has\(employee\.id\)/);
+ assert.match(ui, /crewPicker\.hidden=date\.value!==localDay\(\)\|\|!jobs\.value/);
+ assert.match(ui, /check\.addEventListener\("change",updateCrewCount\)/);
+ assert.doesNotMatch(ui, /jobs\.addEventListener\("change",updateCrewCount\)/);
+});
+test("Selecting a job only prepares the crew; saving still requires user submit",()=>{
+ const handler=ui.split("const onJobSelection=()=>")[1].split("const chooseAll=")[0];
+ assert.doesNotMatch(handler, /api\.request|saveCheckIn|\/v1\/attendance\/check-in/);
+ assert.match(ui,/inForm\.addEventListener\("submit",saveCheckIn\)/);
+});
