@@ -155,7 +155,8 @@ export async function mountHandyOsPayroll({root,api}={}){
    close.disabled=!report.canClose;
    close.hidden=Boolean(report.closed);
    say("Payroll loaded from server.");
-  }catch{report=null;totals.replaceChildren();work.replaceChildren();say("Cannot load payroll. Please retry.")}
+   return true;
+  }catch{report=null;totals.replaceChildren();work.replaceChildren();say("Cannot load payroll. Please retry.");return false}
   finally{busy=false}
  }
  async function loadRules(){
@@ -241,8 +242,9 @@ export async function mountHandyOsPayroll({root,api}={}){
   }finally{busy=false;button.disabled=false}
   if(!confirmed)return;
   try{
-   await load();
-   say(action==="bonus"?"Entry saved on server. You can add another bonus or allowance.":"Payment saved on server.");
+   const refreshed=await load();
+   if(refreshed)say(action==="bonus"?"Entry saved on server. You can add another bonus or allowance.":"Payment saved on server.");
+   else say("Entry saved on server, but payroll could not refresh. Do not enter it again; reopen employee to view.");
   }catch{
    say("Entry saved on server, but payroll could not refresh. Do not enter it again; reopen employee to view.");
   }
@@ -272,7 +274,8 @@ export async function mountHandyOsPayroll({root,api}={}){
   }catch{say("Closure not confirmed. Check the week status before trying again.")}
   finally{busy=false}
   if(!confirmed){close.disabled=false;return}
-  try{await load();say("Payroll week closed and saved.");}
+  try{if(await load())say("Payroll week closed and saved.");
+   else say("Payroll week closed on server, but the display could not refresh. Reopen to review.");}
   catch{say("Payroll week closed on server, but the display could not refresh. Reopen to review.")}
  };
  async function onCreateEmployee(event){
