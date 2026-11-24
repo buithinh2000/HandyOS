@@ -269,3 +269,49 @@ test("attendance correction refuses stale version, closed payroll and unprivileg
  };
  await attempt({closed:true});await attempt({stale:true});await attempt({role:"worker"});
 });
+
+test("bulk crew check-in validates unique staff and records each wage snapshot once",async()=>{
+ const staff2="dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+ const queries=[];
+ const db={query:async(sql,values=[])=>{
+  queries.push({sql,values});
+  if(sql.includes("pg_advisory_xact_lock"))return {rowCount:1,rows:[{}]};
+  if(sql.includes("weekly_payroll_closures"))return {rowCount:0,rows:[]};
+  if(sql.includes("from staff_profiles"))return {rowCount:1,rows:[{id:values[1],wage_unit:"day",default_rate:"250.00"}]};
+  if(sql.includes("from jobs"))return {rowCount:1,rows:[{id:job}]};
+  if(sql.includes("from attendance_entries"))return {rowCount:0,rows:[]};
+  if(sql.includes("insert into attendance_entries"))return {rowCount:1,rows:[{id:entry,staff_id:values[3],rate_snapshot:"250.00"}]};
+  if(sql.includes("insert into audit_events"))return {rowCount:1,rows:[]};
+  throw Error("Unexpected SQL");
+ }};
+ const run=d=>dispatchDailyCrew({method:"POST",path:"/v1/attendance/check-in-batch",
+  ctx,db,now:()=>stamp,readBody:async()=>d});
+ const value=await run({jobId:job,staffIds:[staff2,staff],workDate:"2026-11-17"});
+ assert.equal(value.checkedIn,2);
+ assert.deepEqual(queries.filter(x=>x.sql.includes("insert into attendance_entries")).map(x=>x.values[3]),[staff,staff2]);
+ assert.equal(queries.filter(x=>x.sql.includes("'checked_in'")).length,2);
+ const before=queries.length;
+ for(const staffIds of [[staff,staff],[],[staff,"evil"],Array(51).fill(staff)]){
+  await assert.rejects(run({jobId:job,staffIds,workDate:"2026-11-17"}),e=>e.status===400);
+ }
+ assert.equal(queries.length,before,"Invalid bulk selection never touches database");
+ await assert.rejects(run({jobId:job,staffIds:[staff],workDate:"2026-11-16"}),e=>e.status===400);
+});
+test("bulk check-in propagates any staff failure so outer API transaction rolls back the whole group",async()=>{
+ const staff2="dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+ let inserts=0;
+ const db={query:async(sql,values=[])=>{
+  if(sql.includes("pg_advisory_xact_lock"))return {rowCount:1,rows:[]};
+  if(sql.includes("weekly_payroll_closures"))return {rowCount:0,rows:[]};
+  if(sql.includes("from staff_profiles"))return {rowCount:1,rows:[{id:values[1],wage_unit:"day",default_rate:250}]};
+  if(sql.includes("from jobs"))return {rowCount:1,rows:[{id:job}]};
+  if(sql.includes("from attendance_entries"))return {rowCount:values[1]===staff2?1:0,rows:[{id:entry}]};
+  if(sql.includes("insert into attendance_entries")){inserts++;return {rowCount:1,rows:[{id:entry}]}}
+  if(sql.includes("insert into audit_events"))return {rowCount:1,rows:[]};
+  throw Error("Unexpected SQL");
+ }};
+ await assert.rejects(dispatchDailyCrew({method:"POST",path:"/v1/attendance/check-in-batch",db,ctx,
+  now:()=>stamp,readBody:async()=>({jobId:job,staffIds:[staff,staff2],workDate:"2026-11-17"})}),
+  e=>e.status===409);
+ assert.equal(inserts,1,"An error after the first employee must propagate to enclosing transaction");
+});
