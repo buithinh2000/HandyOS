@@ -102,3 +102,28 @@ test("HEAD returns same fixed bytes and cannot open API or secret routes",()=>{
  assert.equal(frontendRoute("/config.json","HEAD",env).status,200);
  assert.equal(frontendRoute("/v1/companies","HEAD",env),null);
 });
+
+test("every reachable browser module import is served, not a silent loading-screen 404",()=>{
+ const stack=["/assets/boot.mjs"];
+ const visited=new Set();
+ while(stack.length){
+  const path=stack.pop();
+  if(visited.has(path))continue;
+  visited.add(path);
+  const route=frontendRoute(path,"GET",env);
+  assert.ok(route,`missing frontend asset route ${path}`);
+  assert.equal(route.status,200,`broken browser dependency ${path}`);
+  assert.match(route.headers["content-type"],/javascript/);
+  const code=route.body.toString("utf8");
+  // All browser entrypoints use relative static ESM imports; any new module
+  // dependency must be registered explicitly in the frontend allowlist.
+  const imports=code.matchAll(/\b(?:import|export)\s+(?:[\s\S]*?\s+from\s+)?["'](\.[^"']+)["']/g);
+  for(const match of imports){
+   const next=new URL(match[1],"https://handyos.buitai.com"+path).pathname;
+   assert.ok(next.startsWith("/assets/"),`unexpected browser import ${next}`);
+   stack.push(next);
+  }
+ }
+ assert.ok(visited.has("/assets/handyos-business-date.mjs"),
+  "Today, Payroll and Bills must load business-date from the production allowlist");
+});
