@@ -13,8 +13,8 @@ test("Today defaults available crew to selected and uses one button for all",()=
  assert.doesNotMatch(ui,/Check in employee/);
 });
 test("Already-recorded employees cannot be checked in twice from default selection",()=>{
- assert.match(ui,/new Set\(attendanceForDay\.map\(item=>item\.staff_id\)\)/);
- assert.match(ui,/check\.disabled=recorded\.has\(employee\.id\)/);
+ assert.match(ui,/new Map\(attendanceForDay\.map\(item=>\[item\.staff_id,item\]\)\)/);
+ assert.match(ui,/check\.disabled=Boolean\(existing\)/);
  assert.match(ui,/check\.checked=!check\.disabled/);
  assert.match(ui,/ids\.length\+" employees checked in/);
 });
@@ -38,4 +38,15 @@ test("Selecting a job only prepares the crew; saving still requires user submit"
  const handler=ui.split("const onJobSelection=()=>")[1].split("const chooseAll=")[0];
  assert.doesNotMatch(handler, /api\.request|saveCheckIn|\/v1\/attendance\/check-in/);
  assert.match(ui,/inForm\.addEventListener\("submit",saveCheckIn\)/);
+});
+
+test("Already-recorded employee provides specific job and actionable attendance review",()=>{
+ assert.match(ui,/existing\.finished_at\?"Checked out":"Checked in"/);
+ assert.match(ui,/String\(existing\.job_name\|\|"another job"\)/);
+ assert.match(ui,/view\.textContent="View recorded shift"/);
+ assert.match(ui,/expandedJobs\.add\(existing\.job_id\)/);
+ assert.match(ui,/details\.scrollIntoView/);
+ assert.match(ui,/Everyone has an attendance record for this date/);
+ assert.match(ui,/Check-in is disabled to prevent duplicate wages/);
+ assert.match(ui,/data-crew-notice role="status"/);
 });
