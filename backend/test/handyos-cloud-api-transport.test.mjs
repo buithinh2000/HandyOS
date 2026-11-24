@@ -136,3 +136,13 @@ test("unverified session and rejected upstream never leak token, URL or data",as
  await assert.rejects(b.transport.request({path:"/v1/jobs"}),/unavailable/);
  assert.equal(b.calls.length,0);
 });
+
+test("allow only authenticated bulk crew route with exact URL",async()=>{
+ const {transport,calls}=setup();
+ await transport.request({method:"POST",path:"/v1/attendance/check-in-batch",
+  json:{jobId:job,staffIds:[receipt],workDate:"2026-11-24"}});
+ assert.equal(calls[0].url,apiOrigin+"/v1/attendance/check-in-batch");
+ assert.equal(calls[0].options.headers["x-handyos-tenant"],tenant);
+ await assert.rejects(transport.request({method:"GET",path:"/v1/attendance/check-in-batch"}),/unavailable/);
+ await assert.rejects(transport.request({method:"POST",path:"/v1/attendance/check-in-batch?tenant=other",json:{}}),/unavailable/);
+});
