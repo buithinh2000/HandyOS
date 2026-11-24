@@ -220,6 +220,7 @@ export async function mountHandyOsPayroll({root,api}={}){
   if(!UUID.test(jobId)||!Number.isFinite(amount)||amount<=0){say("Choose a job and valid amount.");return}
   busy=true;const button=form.querySelector('button[type="submit"]');button.disabled=true;
   say(action==="bonus"?"Saving bonus…":"Saving payment…");
+  let confirmed=false;
   try{
    const body=action==="bonus"?
     {jobId,amount,kind:form.elements.kind.value,
@@ -230,10 +231,21 @@ export async function mountHandyOsPayroll({root,api}={}){
     {jobId,amount,paidOn:form.elements.paidOn.value,reference:form.elements.reference.value};
    const result=await api.request({method:"POST",path:"/v1/payroll/"+selected.id+"/weeks/"+weeklyDate.value+"/"+action,json:body});
    if(!result?.payroll)throw Error("Server did not confirm");
+   // Once the server acknowledges a financial write, NEVER report it as a failed
+   // save merely because a subsequent read/paint fails. That invites double-pay.
+   confirmed=true;report=result.payroll;
    form.reset();if(action==="bonus")updateBonusPeriod();
-   busy=false;await load();say(action==="bonus"?"Entry saved. You can add another bonus or allowance.":"Payment saved on server.");
-  }catch{say("Unable to save. Please check payroll is still open.")}
-  finally{busy=false;button.disabled=false}
+   say(action==="bonus"?"Bonus saved on server. Refreshing payroll…":"Payment saved on server. Refreshing payroll…");
+  }catch{
+   say("Save not confirmed. Check the payroll record before retrying to prevent duplicate payment.");
+  }finally{busy=false;button.disabled=false}
+  if(!confirmed)return;
+  try{
+   await load();
+   say(action==="bonus"?"Entry saved on server. You can add another bonus or allowance.":"Payment saved on server.");
+  }catch{
+   say("Entry saved on server, but payroll could not refresh. Do not enter it again; reopen employee to view.");
+  }
  };
  const updateBonusPeriod=()=>{
   const period=bonus.elements.period.value;
@@ -251,12 +263,17 @@ export async function mountHandyOsPayroll({root,api}={}){
  const onClose=async()=>{
   if(!selected||busy||!report?.canClose)return;
   busy=true;close.disabled=true;say("Closing paid payroll week…");
+  let confirmed=false;
   try{
    const result=await api.request({method:"POST",path:"/v1/payroll/"+selected.id+"/weeks/"+weeklyDate.value+"/close",json:{}});
    if(!result?.payroll?.closed)throw Error("Closure not confirmed");
-   busy=false;await load();say("Payroll week closed and saved.");
-  }catch{say("Payroll could not be closed. Verify payments and open attendance.")}
+   confirmed=true;report=result.payroll;
+   say("Payroll week closed on server.");
+  }catch{say("Closure not confirmed. Check the week status before trying again.")}
   finally{busy=false}
+  if(!confirmed){close.disabled=false;return}
+  try{await load();say("Payroll week closed and saved.");}
+  catch{say("Payroll week closed on server, but the display could not refresh. Reopen to review.")}
  };
  async function onCreateEmployee(event){
   event.preventDefault();
