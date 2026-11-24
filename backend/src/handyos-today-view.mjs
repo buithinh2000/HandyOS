@@ -103,6 +103,7 @@ export async function mountHandyOsToday({root,api}={}){
   <p>All active employees selected by default. Untick anyone not working on this job today.</p>
   <div class="crew-toolbar"><button type="button" data-select-all>Select all</button><button type="button" data-select-none>Clear</button><small data-crew-count></small></div>
   <div data-crew-list role="group" aria-label="Employees to check in"></div>
+  <p data-crew-notice role="status" aria-live="polite"></p>
  </div>
  <form data-check-in>
  <button type="submit">Check in selected crew</button>
@@ -126,7 +127,8 @@ export async function mountHandyOsToday({root,api}={}){
  const date=container.querySelector("[data-work-date]"),jobs=container.querySelector("[data-job]"),
   staff=container.querySelector("[data-staff]"),records=container.querySelector("[data-attendance]"),
   crewPicker=container.querySelector("[data-crew-picker]"),crewList=container.querySelector("[data-crew-list]"),
-  crewCount=container.querySelector("[data-crew-count]"),pastStaff=container.querySelector("[data-past-employee]"),
+  crewCount=container.querySelector("[data-crew-count]"),crewNotice=container.querySelector("[data-crew-notice]"),
+  pastStaff=container.querySelector("[data-past-employee]"),
   selectAll=container.querySelector("[data-select-all]"),selectNone=container.querySelector("[data-select-none]"),
   inForm=container.querySelector("[data-check-in]"),backfillForm=container.querySelector("[data-backfill]"),
   context=container.querySelector("[data-day-context]"),heading=container.querySelector("[data-attendance-heading]"),
@@ -213,17 +215,39 @@ export async function mountHandyOsToday({root,api}={}){
  const renderCrew=({reset=false}={})=>{
   const selected=new Set(selectedIds());
   const firstDraw=crewList.children.length===0;
-  const recorded=new Set(attendanceForDay.map(item=>item.staff_id));
+  const recorded=new Map(attendanceForDay.map(item=>[item.staff_id,item]));
   crewList.replaceChildren();
+  let eligible=0;
   for(const employee of activeStaff){
+   const existing=recorded.get(employee.id);
    const line=document.createElement("label");line.className="crew-choice";
    const check=document.createElement("input");check.type="checkbox";check.value=employee.id;
-   check.disabled=recorded.has(employee.id);
+   check.disabled=Boolean(existing);
+   if(!existing)eligible++;
    check.checked=!check.disabled&&(reset||firstDraw||selected.has(employee.id));
    check.addEventListener("change",updateCrewCount);
-   const name=document.createElement("span");name.textContent=employee.display_name+(check.disabled?" · already recorded":"");
-   line.append(check,name);crewList.append(line);
+   const name=document.createElement("span");
+   name.textContent=employee.display_name+(existing?
+    " · "+(existing.finished_at?"Checked out":"Checked in")+" at "+String(existing.job_name||"another job"):"");
+   line.append(check,name);
+   if(existing){
+    const view=document.createElement("button");view.type="button";
+    view.textContent="View recorded shift";
+    view.addEventListener("click",()=>{
+     expandedJobs.add(existing.job_id);
+     const details=[...records.querySelectorAll("[data-job-session]")].find(el=>el.dataset.jobSession===existing.job_id);
+     if(details){details.open=true;details.scrollIntoView({block:"nearest",behavior:"smooth"});}
+     else say("Recorded attendance is listed below. Open the job to review it.");
+    });
+    line.append(view);
+   }
+   crewList.append(line);
   }
+  crewNotice.textContent=activeStaff.length===0?
+   "No active employees. Add staff in Employees first.":
+   eligible===0?
+   "Everyone has an attendance record for this date. Check-in is disabled to prevent duplicate wages. Use View recorded shift to inspect or correct existing entries.":
+   recorded.size?recorded.size+" employee(s) already recorded today. Check in only staff without attendance.":"";
   updateCrewCount();
  };
  const onJobSelection=()=>{
